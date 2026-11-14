@@ -1,4 +1,5 @@
 use foldhash::HashSet;
+use std::rc::Rc;
 
 use mago_allocator::Arena;
 use mago_bytes::BytesDisplay;
@@ -19,6 +20,7 @@ use crate::statement::function_like::analyze_function_like;
 use crate::statement::function_like::resolve_closure_like_type;
 use crate::statement::function_like::unused_parameter;
 use crate::utils::expression::variable::get_variables_referenced_in_expression;
+use crate::utils::expression::variable::is_readonly_property_chain;
 use crate::utils::missing_type_hints;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
@@ -90,6 +92,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
             }
 
             inner_block_context.variables_possibly_in_scope.insert(variable_atom);
+        }
+
+        for (variable_id, variable_type) in &block_context.locals {
+            if variable_id.as_bytes().windows(2).any(|window| window == b"->")
+                && is_readonly_property_chain(context.codebase, &block_context.locals, variable_id.as_bytes())
+            {
+                inner_block_context.locals.insert(*variable_id, Rc::clone(variable_type));
+            }
         }
 
         if !context.settings.allow_implicit_pipe_callable_types || !block_context.flags.inside_pipe_callable() {

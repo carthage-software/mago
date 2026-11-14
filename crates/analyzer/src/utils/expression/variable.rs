@@ -112,3 +112,44 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for VariableScanner<'arena> {
         walk_enum_mut(self, enum_, context);
     }
 }
+
+/// Returns `true` when `id` is a `$var->a->b` chain that only passes through readonly
+/// properties, so what is known about it cannot change after it was read.
+pub(crate) fn is_readonly_property_chain(
+    codebase: &mago_codex::metadata::CodebaseMetadata,
+    locals: &mago_word::WordMap<std::rc::Rc<mago_codex::ttype::union::TUnion>>,
+    id: &[u8],
+) -> bool {
+    use mago_codex::ttype::atomic::TAtomic;
+    use mago_codex::ttype::atomic::object::TObject;
+
+    let Some(arrow) = memchr::memmem::rfind(id, b"->") else {
+        return false;
+    };
+
+    let (base, property) = (&id[..arrow], &id[arrow + 2..]);
+    if property.is_empty() || property.iter().any(|byte| matches!(byte, b'[' | b'-' | b'(' | b'$' | b':')) {
+        return false;
+    }
+
+    let base_is_readonly =
+        !base.windows(2).any(|window| window == b"->") || is_readonly_property_chain(codebase, locals, base);
+    if !base_is_readonly {
+        return false;
+    }
+
+    let Some(base_type) = locals.get(&mago_word::word(base)) else {
+        return false;
+    };
+
+    let property_name = mago_word::concat_word!(b"$", property);
+
+    !base_type.types.is_empty()
+        && base_type.types.iter().all(|atomic| match atomic {
+            TAtomic::Object(TObject::Named(named)) => codebase
+                .get_declaring_property_class(named.name.as_bytes(), property_name.as_bytes())
+                .and_then(|class| codebase.get_property(class.as_bytes(), property_name.as_bytes()))
+                .is_some_and(|property| property.flags.is_readonly()),
+            _ => false,
+        })
+}

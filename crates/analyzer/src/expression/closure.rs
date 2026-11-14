@@ -35,6 +35,7 @@ use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::analyze_function_like;
 use crate::statement::function_like::resolve_closure_like_type;
 use crate::statement::function_like::unused_parameter;
+use crate::utils::expression::variable::is_readonly_property_chain;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
     fn analyze<'ctx, A>(
@@ -82,6 +83,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
         }
 
         let mut inner_block_context = BlockContext::new(scope, context.settings.register_super_globals);
+
+        if !inner_block_context.scope.is_static() {
+            for (variable_id, variable_type) in &block_context.locals {
+                if variable_id.as_bytes().starts_with(b"$this->")
+                    && is_readonly_property_chain(context.codebase, &block_context.locals, variable_id.as_bytes())
+                {
+                    inner_block_context.locals.insert(*variable_id, Rc::clone(variable_type));
+                }
+            }
+        }
 
         let mut variable_spans = HashMap::default();
         if let Some(use_clause) = self.use_clause.as_ref() {
@@ -167,7 +178,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
                         continue;
                     };
 
-                    if stripped_variable_id.starts_with(b"[") || stripped_variable_id.starts_with(b"-") {
+                    if stripped_variable_id.starts_with(b"[")
+                        || (stripped_variable_id.starts_with(b"-")
+                            && is_readonly_property_chain(
+                                context.codebase,
+                                &block_context.locals,
+                                variable_id.as_bytes(),
+                            ))
+                    {
                         let mut imported_type = Rc::clone(variable_type);
                         if is_by_reference {
                             let inner_descendant = Rc::make_mut(&mut imported_type);
