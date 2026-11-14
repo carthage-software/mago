@@ -741,7 +741,7 @@ where
                         has_changes = true;
                     }
 
-                    if !is_do {
+                    if !is_do || variable_id.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':')) {
                         variables_to_remove.push(variable_id);
                     }
                 }
@@ -872,6 +872,11 @@ where
                             );
                         }
                     }
+
+                    continue_context.locals.retain(|variable_id, _| {
+                        original_parent_context.locals.contains_key(variable_id)
+                            || !variable_id.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':'))
+                    });
                 }
 
                 pre_conditions_applied = true;
