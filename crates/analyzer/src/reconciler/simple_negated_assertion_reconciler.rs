@@ -380,6 +380,9 @@ where
                             .iter()
                             .filter(|inheritor| {
                                 !inheritor.as_bytes().eq_ignore_ascii_case(lowercase_subtracting_name.as_bytes())
+                                    && !context
+                                        .codebase
+                                        .is_instance_of(inheritor.as_bytes(), lowercase_subtracting_name.as_bytes())
                             })
                             .map(|inheritor| {
                                 let child = TNamedObject::new(
