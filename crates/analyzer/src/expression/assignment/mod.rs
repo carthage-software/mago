@@ -465,6 +465,12 @@ where
                 list.elements.as_slice(),
             )?;
         }
+        Expression::Variable(Variable::Indirect(indirect)) => {
+            indirect.expression.analyze(context, block_context, artifacts)?;
+        }
+        Expression::Variable(Variable::Nested(nested)) => {
+            nested.variable.analyze(context, block_context, artifacts)?;
+        }
         _ => {
             return Ok(false);
         }
