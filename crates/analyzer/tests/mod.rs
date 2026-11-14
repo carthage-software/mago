@@ -69,6 +69,12 @@ test_case!(rdkafka_producer);
 test_case!(rdkafka_consumer);
 test_case!(rdkafka_metadata);
 test_case!(rdkafka_type_errors);
+test_case!(override_attribute_property);
+test_case!(override_attribute_property_php84, {
+    let mut settings = default_test_settings();
+    settings.version = mago_php_version::PHPVersion::PHP84;
+    settings
+});
 test_case!(attribute_target_constant);
 test_case!(attribute_target_constant_php84, {
     let mut settings = default_test_settings();

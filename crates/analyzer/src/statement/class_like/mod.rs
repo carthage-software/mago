@@ -1099,6 +1099,7 @@ where
         check_unused_template_parameters(context, class_like_metadata);
     }
     check_class_like_properties(context, class_like_metadata);
+    override_attribute::check_property_override_attributes(class_like_metadata, context);
     check_docblock_declared_members(context, class_like_metadata, declaration_span);
     check_template_definitions(context, &class_like_metadata.template_types, name_span.unwrap_or(declaration_span));
 
