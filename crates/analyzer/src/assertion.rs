@@ -413,6 +413,34 @@ where
             _ => return if_types,
         }
     } else {
+        let ctype_assertion = |asserted: TString| {
+            let asserted = TAtomic::Scalar(TScalar::String(asserted));
+            let argument_type = function_call
+                .argument_list
+                .arguments
+                .first()
+                .map(mago_syntax::cst::Argument::value)
+                .and_then(|argument| artifacts.get_expression_type(argument));
+
+            if argument_type.is_some_and(|argument_type| {
+                argument_type.types.iter().any(
+                    |atomic| matches!(atomic, TAtomic::Scalar(TScalar::String(string)) if string.literal.is_some()),
+                ) || union_comparator::is_contained_by(
+                    assertion_context.codebase,
+                    argument_type,
+                    &TUnion::from_atomic(asserted.clone()),
+                    false,
+                    false,
+                    false,
+                    &mut ComparisonResult::new(),
+                )
+            }) {
+                return None;
+            }
+
+            Some((0, vec![Assertion::IsType(asserted)]))
+        };
+
         let get_builtin_assertion = |name: &[u8]| match name {
             b"array_key_exists" | b"key_exists" => function_call
                 .argument_list
@@ -422,36 +450,15 @@ where
                 .and_then(|array_key| get_expression_array_key(artifacts, array_key))
                 .map(|key| (1, vec![Assertion::HasArrayKey(key)])),
             b"is_countable" => Some((0, vec![Assertion::Countable])),
-            b"ctype_digit" => Some((
-                0,
-                vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(
-                    true,
-                    false,
-                    false,
-                    false,
-                    TStringCasing::Unspecified,
-                ))))],
-            )),
-            b"ctype_lower" => Some((
-                0,
-                vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(
-                    false,
-                    false,
-                    true,
-                    false,
-                    TStringCasing::Lowercase,
-                ))))],
-            )),
-            b"ctype_upper" => Some((
-                0,
-                vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::general_with_props(
-                    false,
-                    false,
-                    true,
-                    false,
-                    TStringCasing::Uppercase,
-                ))))],
-            )),
+            b"ctype_digit" => {
+                ctype_assertion(TString::general_with_props(true, false, false, false, TStringCasing::Unspecified))
+            }
+            b"ctype_lower" => {
+                ctype_assertion(TString::general_with_props(false, false, true, false, TStringCasing::Lowercase))
+            }
+            b"ctype_upper" => {
+                ctype_assertion(TString::general_with_props(false, false, true, false, TStringCasing::Uppercase))
+            }
             b"count" => Some((0, vec![Assertion::HasAtLeastCount(1)])),
             b"function_exists" => {
                 Some((0, vec![Assertion::IsType(TAtomic::Scalar(TScalar::String(TString::callable())))]))
