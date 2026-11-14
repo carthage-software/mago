@@ -382,6 +382,9 @@ class DateTime implements DateTimeInterface
     #[Mago\AvailableSince(80000)]
     public static function createFromInterface(DateTimeInterface $object): DateTime {} // TODO return type should be static
 
+    /**
+     * @return static|false
+     */
     public static function createFromFormat(
         string $format,
         string $datetime,
