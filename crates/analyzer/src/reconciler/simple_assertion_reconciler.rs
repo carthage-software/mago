@@ -1475,7 +1475,7 @@ where
                     acceptable_types.push(TAtomic::Scalar(TScalar::r#true()));
                 }
                 TAtomic::Array(TArray::List(mut list)) => {
-                    list.non_empty = true;
+                    list.make_non_empty();
                     acceptable_types.push(TAtomic::Array(TArray::List(list)));
                 }
                 TAtomic::Array(TArray::Keyed(mut keyed_array)) => {
@@ -1608,17 +1608,13 @@ where
 
     for atomic in new_var_type.types.to_mut().drain(..) {
         match atomic {
-            TAtomic::Array(TArray::List(TList { non_empty, element_type, known_elements, known_count })) => {
-                if !non_empty {
+            TAtomic::Array(TArray::List(mut list)) => {
+                if !list.non_empty {
                     did_remove_type = true;
                 }
 
-                acceptable_types.push(TAtomic::Array(TArray::List(TList {
-                    non_empty: true,
-                    element_type,
-                    known_elements,
-                    known_count,
-                })));
+                list.make_non_empty();
+                acceptable_types.push(TAtomic::Array(TArray::List(list)));
             }
             TAtomic::Array(TArray::Keyed(TKeyedArray { non_empty, parameters, known_items, known_non_list })) => {
                 if !non_empty {

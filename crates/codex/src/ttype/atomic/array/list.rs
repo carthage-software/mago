@@ -50,6 +50,19 @@ impl PartialEq for TList {
 }
 
 impl TList {
+    /// Marks the list as non-empty; a non-empty list always holds its first element.
+    #[inline]
+    pub fn make_non_empty(&mut self) {
+        self.non_empty = true;
+
+        if let Some(known_elements) = self.known_elements.as_mut()
+            && known_elements.get(&0).is_some_and(|(optional, _)| *optional)
+            && let Some(first) = Arc::make_mut(known_elements).get_mut(&0)
+        {
+            first.0 = false;
+        }
+    }
+
     /// Creates new metadata for a list type with the specified general element type.
     /// Initializes known elements/count as None, and `non_empty` as false.
     ///
