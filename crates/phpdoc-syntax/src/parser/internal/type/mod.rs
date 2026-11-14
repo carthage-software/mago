@@ -222,6 +222,7 @@ mod tests {
     use mago_span::Span;
 
     use crate::cst::r#type::CallableTypeKind;
+    use crate::cst::r#type::IntRangeType;
     use crate::cst::r#type::ReferenceKind;
     use crate::cst::r#type::Type;
     use crate::error::ParseError;
@@ -353,7 +354,8 @@ mod tests {
         let arena = LocalArena::new();
         assert!(matches!(parse(&arena, b"int<-5, 10>"), Type::IntRange(_)));
         assert!(matches!(parse(&arena, b"int<min, max>"), Type::IntRange(_)));
-        assert!(matches!(parse(&arena, b"int<0, 5,>"), Type::IntRange(_)));
+        assert!(matches!(parse(&arena, b"int<min, max>"), Type::IntRange(IntRangeType { trailing_comma: None, .. })));
+        assert!(matches!(parse(&arena, b"int<0, 5,>"), Type::IntRange(IntRangeType { trailing_comma: Some(_), .. })));
     }
 
     #[test]

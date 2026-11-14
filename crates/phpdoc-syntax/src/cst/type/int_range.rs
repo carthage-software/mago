@@ -21,6 +21,7 @@ pub struct IntRangeType<'arena> {
     pub min: IntOrKeyword<'arena>,
     pub comma: Span,
     pub max: IntOrKeyword<'arena>,
+    pub trailing_comma: Option<Span>,
     pub greater_than: Span,
 }
 
