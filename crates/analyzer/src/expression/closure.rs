@@ -29,6 +29,8 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::statement::attributes::AttributeTarget;
+use crate::statement::attributes::analyze_attributes;
 use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::analyze_function_like;
 use crate::statement::function_like::resolve_closure_like_type;
@@ -44,6 +46,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
     where
         A: Arena,
     {
+        analyze_attributes(
+            context,
+            block_context,
+            artifacts,
+            self.attribute_lists.as_slice(),
+            AttributeTarget::Function,
+        )?;
+
         let s = self.span();
 
         let Some(function_metadata) = context.codebase.get_closure_at(context.source_file, s) else {

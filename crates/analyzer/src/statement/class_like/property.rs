@@ -229,6 +229,16 @@ where
         AttributeTarget::Method,
     )?;
 
+    for parameter in hook.parameter_list.iter().flat_map(|parameter_list| parameter_list.parameters.iter()) {
+        analyze_attributes(
+            context,
+            parent_block_context,
+            artifacts,
+            parameter.attribute_lists.as_slice(),
+            AttributeTarget::Parameter,
+        )?;
+    }
+
     let hook_metadata = parent_block_context
         .scope
         .get_class_like()
