@@ -105,6 +105,7 @@ pub fn resolve_instance_properties<'ctx, 'ast, 'arena, A>(
     operator_span: Span,
     is_null_safe: bool,
     for_assignment: bool,
+    known_property: bool,
 ) -> Result<PropertyResolutionResult, AnalysisError>
 where
     A: Arena,
@@ -202,7 +203,7 @@ where
             TObject::Any => {
                 result.has_ambiguous_path = true;
 
-                if !block_context.flags.inside_isset() {
+                if !block_context.flags.inside_isset() && !known_property {
                     report_ambiguous_access(context, property_selector, object_expression.span(), word("object"));
                 }
 
@@ -228,7 +229,7 @@ where
                     }
                 } else {
                     result.has_ambiguous_path = true;
-                    if !block_context.flags.inside_isset() {
+                    if !block_context.flags.inside_isset() && !known_property {
                         report_ambiguous_access(
                             context,
                             property_selector,
@@ -264,7 +265,7 @@ where
                     }
                 } else {
                     result.has_ambiguous_path = true;
-                    if !block_context.flags.inside_isset() {
+                    if !block_context.flags.inside_isset() && !known_property {
                         report_ambiguous_access(
                             context,
                             property_selector,
@@ -297,7 +298,7 @@ where
 
                         result.has_ambiguous_path = true;
 
-                        if !block_context.flags.inside_isset() {
+                        if !block_context.flags.inside_isset() && !known_property {
                             report_ambiguous_access(
                                 context,
                                 property_selector,

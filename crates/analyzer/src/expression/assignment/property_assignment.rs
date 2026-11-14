@@ -52,6 +52,7 @@ where
         Some(context.codebase),
     );
 
+    let known_property = property_access_id.is_some_and(|id| block_context.locals.contains_key(&id));
     let was_inside_assignment = block_context.flags.inside_assignment();
     block_context.flags.set_inside_assignment(true);
     let resolution_result = resolve_instance_properties(
@@ -63,6 +64,7 @@ where
         property_access.arrow.span(),
         false, // `null_safe`
         true,  // `for_assignment`
+        known_property,
     )?;
     block_context.flags.set_inside_assignment(was_inside_assignment);
 
@@ -237,10 +239,11 @@ where
 
     let resulting_type = Rc::new(resulting_type.unwrap_or_else(get_never));
 
-    if context.settings.memoize_properties
-        && !resolution_result.has_unreadable_property
-        && let Some(property_access_id) = property_access_id
+    if let Some(property_access_id) = property_access_id
+        && (!context.settings.memoize_properties || resolution_result.has_unreadable_property)
     {
+        block_context.locals.remove(&property_access_id);
+    } else if let Some(property_access_id) = property_access_id {
         // Memoize the written value so later reads of the same access see it — but only to the
         // extent it survives a read. When writes and reads diverge — a magic property (read goes
         // through `__get`, yielding the `@property-read` type) or a hook property with a wider `set`

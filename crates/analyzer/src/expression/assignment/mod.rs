@@ -246,6 +246,9 @@ where
 
     if let (Some(target_variable_id), Some(existing_target_type)) = (&target_variable_id, &existing_target_type) {
         block_context.remove_descendants(context, *target_variable_id, existing_target_type, Some(&source_type));
+        if matches!(target_expression, Expression::Access(Access::Property(_))) {
+            block_context.locals.insert(*target_variable_id, Rc::clone(existing_target_type));
+        }
     } else {
         let root_var_id = get_root_expression_id(target_expression);
 

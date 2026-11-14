@@ -127,6 +127,7 @@ where
         arrow_span,
         is_null_safe,
         false, // `for_assignment`
+        false, // `known_property`
     )?;
 
     let mut resulting_expression_type = None;

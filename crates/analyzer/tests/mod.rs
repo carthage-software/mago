@@ -3231,6 +3231,7 @@ test_case!(conditional_is_never_takes_else);
 test_case!(magic_property_uses_get_and_set_types);
 test_case!(get_class_and_get_called_class_bind_templates);
 test_case!(array_merge_recursive_and_replace_keep_shapes);
+test_case!(property_write_after_isset_is_not_ambiguous);
 
 #[test]
 #[cfg_attr(miri, ignore)]
