@@ -697,7 +697,7 @@ pub fn populate_class_like_types(
             );
         }
 
-        if let Some(signature) = &mut constant.type_metadata {
+        for signature in [&mut constant.type_declaration, &mut constant.type_metadata].into_iter().flatten() {
             populate_union_type(
                 &mut signature.type_union,
                 codebase_symbols,
