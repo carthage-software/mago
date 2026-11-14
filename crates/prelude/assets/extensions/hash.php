@@ -12,6 +12,8 @@ final class HashContext
 }
 
 /**
+ * @return non-empty-string
+ *
  * @pure
  */
 function hash(string $algo, string $data, bool $binary = false, array $options = []): string {}

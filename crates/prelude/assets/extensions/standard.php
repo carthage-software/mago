@@ -1098,17 +1098,27 @@ function get_html_translation_table(
 ): array {}
 
 /**
+ * @return non-empty-string
+ *
  * @pure
  */
 function sha1(string $string, bool $binary = false): string {}
 
+/**
+ * @return non-empty-string|false
+ */
 function sha1_file(string $filename, bool $binary = false): string|false {}
 
 /**
+ * @return non-empty-string
+ *
  * @pure
  */
 function md5(string $string, bool $binary = false): string {}
 
+/**
+ * @return non-empty-string|false
+ */
 function md5_file(string $filename, bool $binary = false): string|false {}
 
 /**
