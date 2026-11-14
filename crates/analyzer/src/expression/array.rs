@@ -114,6 +114,7 @@ struct ArrayCreationInfo {
     known_non_list: bool,
     can_be_empty: bool,
     known_int_offset: bool,
+    unkeyed_minimum_count: usize,
 }
 
 fn report_unpacked_int_key_overflow<A>(context: &mut Context<'_, '_, A>, element_span: Span)
@@ -158,6 +159,7 @@ where
         known_non_list: false,
         can_be_empty: true,
         known_int_offset: true,
+        unkeyed_minimum_count: 0,
     };
 
     for element in elements {
@@ -297,6 +299,8 @@ where
                         value_array_element.value,
                     )
                 } else {
+                    array_creation_info.unkeyed_minimum_count += 1;
+
                     (None, get_int(), true, value_array_element.value)
                 }
             }
@@ -483,27 +487,27 @@ where
         )))
     };
 
+    let unkeyed_minimum_count = array_creation_info.unkeyed_minimum_count;
+    let with_unkeyed_minimum = |mut elements: BTreeMap<usize, (bool, TUnion)>, element_type: &TUnion| {
+        let known = elements.len();
+        elements.extend((known..known + unkeyed_minimum_count).map(|index| (index, (false, element_type.clone()))));
+        elements
+    };
+
     let array_type = if !array_creation_info.property_types.is_empty() {
         if array_creation_info.is_list {
+            let element_type = item_value_type.unwrap_or_else(get_never);
+            let known_elements = array_creation_info
+                .property_types
+                .into_iter()
+                .enumerate()
+                .map(|(index, (_, value_tuple))| (index, (value_tuple.0, value_tuple.1)))
+                .collect::<BTreeMap<_, _>>();
+
             TUnion::from_vec(vec![TAtomic::Array(TArray::List(TList {
-                known_count: if array_creation_info.known_int_offset {
-                    Some(array_creation_info.property_types.len())
-                } else {
-                    None
-                },
-                known_elements: Some(
-                    array_creation_info
-                        .property_types
-                        .into_iter()
-                        .enumerate()
-                        .map(|(index, (_, value_tuple))| (index, (value_tuple.0, value_tuple.1)))
-                        .collect::<BTreeMap<_, _>>()
-                        .into(),
-                ),
-                element_type: Arc::new(match item_value_type {
-                    Some(value) => value,
-                    None => get_never(),
-                }),
+                known_count: if array_creation_info.known_int_offset { Some(known_elements.len()) } else { None },
+                known_elements: Some(with_unkeyed_minimum(known_elements, &element_type).into()),
+                element_type: Arc::new(element_type),
                 non_empty: true,
             }))])
         } else {
@@ -526,9 +530,12 @@ where
     } else if item_key_type.is_none() && item_value_type.is_none() {
         get_empty_keyed_array()
     } else if array_creation_info.is_list {
+        let element_type = item_value_type.unwrap_or_else(get_mixed);
+
         TUnion::from_vec(vec![TAtomic::Array(TArray::List(TList {
-            known_elements: None,
-            element_type: Arc::new(item_value_type.unwrap_or_else(get_mixed)),
+            known_elements: (unkeyed_minimum_count > 0)
+                .then(|| with_unkeyed_minimum(BTreeMap::new(), &element_type).into()),
+            element_type: Arc::new(element_type),
             known_count: None,
             non_empty: !array_creation_info.can_be_empty,
         }))])
@@ -560,6 +567,20 @@ fn handle_variadic_array_element<'arena, A>(
     A: Arena,
 {
     let mut all_non_empty = true;
+
+    if let [TAtomic::Array(spread)] = variadic_array_element_type.types.as_ref()
+        && spread.is_non_empty()
+        && !match spread {
+            TArray::List(list) => {
+                list.known_elements.as_ref().is_some_and(|elements| elements.values().any(|(optional, _)| !optional))
+            }
+            TArray::Keyed(keyed) => {
+                keyed.known_items.as_ref().is_some_and(|items| items.values().any(|(optional, _)| !optional))
+            }
+        }
+    {
+        array_creation_info.unkeyed_minimum_count += 1;
+    }
 
     let spread_atomics: Vec<&TAtomic> = variadic_array_element_type
         .types
@@ -733,7 +754,18 @@ fn handle_variadic_array_element<'arena, A>(
                     &mut ComparisonResult::new(),
                 );
 
-            if is_string_key {
+            if is_string_key
+                || is_array_key_key
+                    && !union_comparator::is_contained_by(
+                        context.codebase,
+                        &key_type,
+                        &get_int(),
+                        false,
+                        false,
+                        false,
+                        &mut ComparisonResult::new(),
+                    )
+            {
                 array_creation_info.is_list = false;
             }
 

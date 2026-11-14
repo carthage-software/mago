@@ -3252,6 +3252,7 @@ test_case!(php85_symbols_exist);
 test_case!(not_empty_nullsafe_proves_root);
 test_case!(spl_stub_parameter_names_match_php8);
 test_case!(covariant_template_in_nested_input_position);
+test_case!(array_literal_spread_keeps_counts_and_string_keys);
 
 #[test]
 #[cfg_attr(miri, ignore)]
