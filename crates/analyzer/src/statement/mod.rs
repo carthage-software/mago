@@ -260,7 +260,10 @@ where
                             .with_note("This statement is unreachable because the block has already returned.")
                             .with_help("Consider removing this statement as it does not do anything in this context."),
                     );
-                } else if !is_declaration {
+                } else if !is_declaration
+                    && !matches!(statement, Statement::ClosingTag(_) | Statement::OpeningTag(_) | Statement::Noop(_))
+                    && !matches!(statement, Statement::Inline(inline) if inline.value.iter().all(u8::is_ascii_whitespace))
+                {
                     context.collector.report_with_code(
                         IssueCode::UnevaluatedCode,
                         Issue::help("Unreachable code detected.")
