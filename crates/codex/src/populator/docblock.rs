@@ -1048,11 +1048,50 @@ fn apply_property_inheritance_work(codebase: &mut CodebaseMetadata, inheritance_
             result
         });
 
-        let substituted_type = if let Some(template_result) = template_result.as_ref() {
+        let mut substituted_type = if let Some(template_result) = template_result.as_ref() {
             inferred_type_replacer::replace(&parent_docblock.type_union, template_result, codebase)
         } else {
             parent_docblock.type_union.clone()
         };
+
+        let self_class = if parent_metadata.kind.is_trait() {
+            child_metadata.all_parent_classes.iter().copied().find(|ancestor| {
+                codebase.class_likes.get(ancestor).is_some_and(|ancestor| ancestor.used_traits.contains(&parent_class))
+            })
+        } else {
+            Some(parent_class)
+        }
+        .and_then(|self_class| codebase.class_likes.get(&self_class));
+
+        let names_self = |name: &[u8]| {
+            name.eq_ignore_ascii_case(b"self")
+                || (parent_metadata.kind.is_trait() && name.eq_ignore_ascii_case(parent_metadata.name.as_bytes()))
+        };
+
+        if let Some(self_class) = self_class
+            && substituted_type.types.iter().any(|atomic| {
+                matches!(atomic, TAtomic::Object(TObject::Named(named))
+                    if names_self(named.name.as_bytes()) || named.name.as_bytes().eq_ignore_ascii_case(b"parent"))
+            })
+        {
+            let parent_of_self = self_class
+                .direct_parent_class
+                .and_then(|parent| codebase.class_likes.get(&parent))
+                .map(|parent| parent.original_name);
+
+            for atomic in substituted_type.types.to_mut() {
+                if let TAtomic::Object(TObject::Named(named)) = atomic {
+                    if names_self(named.name.as_bytes()) {
+                        named.name = self_class.original_name;
+                    } else if named.name.as_bytes().eq_ignore_ascii_case(b"parent")
+                        && let Some(parent_of_self) = parent_of_self
+                    {
+                        named.name = parent_of_self;
+                    }
+                }
+            }
+        }
+
         let mut inherited = TypeMetadata::from_docblock(substituted_type, parent_docblock.span);
 
         if !should_inherit_docblock_type(

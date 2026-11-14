@@ -3835,6 +3835,7 @@ fn check_class_like_properties<'ctx, A>(
             if !has_type_incompatibility
                 && let Some(declaring_type) = &property_metadata.type_metadata
                 && declaring_type.from_docblock
+                && !declaring_type.inferred
                 && let Some(parent_type) = &parent_property.type_metadata
                 && let Some(localized_parent_type) = &localized_parent_type
                 && is_property_type_variance_invalid(
