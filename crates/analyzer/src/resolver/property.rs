@@ -36,6 +36,7 @@ use mago_syntax::cst::Expression;
 use mago_syntax::cst::Variable;
 use mago_text_edit::TextEdit;
 use mago_word::Word;
+use mago_word::ascii_lowercase_word;
 use mago_word::concat_word;
 use mago_word::word;
 
@@ -1000,12 +1001,31 @@ where
                 for_assignment,
             );
 
+            let magic_method = |name: &[u8]| {
+                let method_id = context
+                    .codebase
+                    .get_declaring_method_identifier(&MethodIdentifier::new(class_id, ascii_lowercase_word(name)));
+
+                context.codebase.get_method_by_id(&method_id)
+            };
+
+            let magic_type = if for_assignment {
+                magic_method(b"__set")
+                    .and_then(|method| method.parameters.get(1))
+                    .and_then(|parameter| parameter.type_metadata.as_ref())
+            } else {
+                magic_method(b"__get").and_then(|method| method.return_type_metadata.as_ref())
+            }
+            .map(|type_metadata| type_metadata.type_union.clone())
+            .filter(|magic_type| !magic_type.has_template_types() && !magic_type.is_void())
+            .unwrap_or_else(get_mixed);
+
             return Some(ResolvedProperty {
                 lookup_class: None,
                 property_span: None,
                 property_name: prop_name,
                 declaring_class_id: Some(class_id),
-                property_type: get_mixed(),
+                property_type: magic_type,
                 is_magic: true,
                 // Undocumented access on a class with `__get`/`__set` (e.g. `stdClass` dynamic
                 // properties): the type is unknown, so the written value stays memoizable.

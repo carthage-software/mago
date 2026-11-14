@@ -3228,6 +3228,7 @@ test_case!(nullsafe_call_arguments_are_conditional);
 test_case!(template_used_in_other_tags);
 test_case!(docblock_quoted_literal_and_key_escapes);
 test_case!(conditional_is_never_takes_else);
+test_case!(magic_property_uses_get_and_set_types);
 
 #[test]
 #[cfg_attr(miri, ignore)]
