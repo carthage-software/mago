@@ -3303,6 +3303,7 @@ test_case!(unset_removes_object_shape_property);
 test_case!(static_property_write_forgets_other_spellings);
 test_case!(override_must_keep_by_reference_parameters);
 test_case!(sealed_shape_with_key_gap_is_not_a_list);
+test_case!(array_filter_first_class_callable_names);
 
 #[test]
 #[cfg_attr(miri, ignore)]
