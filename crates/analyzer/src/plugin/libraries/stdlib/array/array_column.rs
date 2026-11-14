@@ -13,6 +13,7 @@ use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::get_array_parameters;
+use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::union::TUnion;
 use mago_word::concat_word;
 use mago_word::word;
@@ -127,58 +128,55 @@ fn try_resolve_from_keyed_array(
         value_type.clone()
     };
 
-    let index_type = if let Some(index_key_type) = index_key_type {
-        if index_key_type.is_null() {
-            None
-        } else {
-            let key_str = index_key_type.get_single_literal_string_value()?;
-            let (_, value_type) = known_items.get(&ArrayKey::String(word(key_str)))?;
-            extract_scalar_for_key(value_type).cloned()
-        }
-    } else {
-        None
-    };
+    let index_type = index_key_type.filter(|index_key_type| !index_key_type.is_null()).map(|index_key_type| {
+        index_key_type
+            .get_single_literal_string_value()
+            .and_then(|key| known_items.get(&ArrayKey::String(word(key))))
+            .map_or_else(get_arraykey, |(_, value_type)| key_type_for_index(value_type))
+    });
 
     Some(build_result(column_type, index_type))
 }
 
-/// Try to extract the key scalar type from a value type (for use as array index).
-fn extract_scalar_for_key(value_type: &TUnion) -> Option<&TScalar> {
-    if !value_type.is_single() {
-        return None;
-    }
-
-    match value_type.get_single() {
-        TAtomic::Scalar(
-            scalar @ (TScalar::ArrayKey | TScalar::Integer(_) | TScalar::String(_) | TScalar::ClassLikeString(_)),
-        ) => Some(scalar),
-        _ => None,
-    }
+/// The array key PHP makes from an index column value.
+fn key_type_for_index(value_type: &TUnion) -> TUnion {
+    TUnion::from_vec(
+        value_type
+            .types
+            .iter()
+            .map(|atomic| match atomic {
+                TAtomic::Scalar(
+                    TScalar::ArrayKey | TScalar::Integer(_) | TScalar::String(_) | TScalar::ClassLikeString(_),
+                ) => atomic.clone(),
+                TAtomic::Scalar(TScalar::Float(_) | TScalar::Bool(_)) => TAtomic::Scalar(TScalar::int()),
+                TAtomic::Null => TAtomic::Scalar(TScalar::literal_string(word(""))),
+                _ => TAtomic::Scalar(TScalar::ArrayKey),
+            })
+            .collect(),
+    )
 }
 
 fn resolve_index_type_from_property(
     index_key_type: Option<&TUnion>,
     class_like: &ClassLikeMetadata,
     codebase: &CodebaseMetadata,
-) -> Option<TScalar> {
+) -> Option<TUnion> {
     let index_key_type = index_key_type?;
     if index_key_type.is_null() {
         return None;
     }
 
-    let prop_name = index_key_type.get_single_literal_string_value()?;
-    let prop_key = concat_word!(b"$", prop_name);
-    let prop_type = resolve_property_for_external_access(codebase, class_like, prop_key)?.declared_type(codebase);
+    let property_type = index_key_type.get_single_literal_string_value().and_then(|property_name| {
+        resolve_property_for_external_access(codebase, class_like, concat_word!(b"$", property_name))
+            .map(|property| property.declared_type(codebase))
+    });
 
-    extract_scalar_for_key(&prop_type).cloned()
+    Some(property_type.map_or_else(get_arraykey, |property_type| key_type_for_index(&property_type)))
 }
 
-fn build_result(column_type: TUnion, index_type: Option<TScalar>) -> TUnion {
-    if let Some(index_scalar) = index_type {
-        let keyed_array = TKeyedArray::new_with_parameters(
-            Arc::new(TUnion::from_atomic(TAtomic::Scalar(index_scalar))),
-            Arc::new(column_type),
-        );
+fn build_result(column_type: TUnion, index_type: Option<TUnion>) -> TUnion {
+    if let Some(index_type) = index_type {
+        let keyed_array = TKeyedArray::new_with_parameters(Arc::new(index_type), Arc::new(column_type));
 
         TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed_array)))
     } else {

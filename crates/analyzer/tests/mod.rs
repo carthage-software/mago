@@ -3215,6 +3215,7 @@ test_case!(object_shape_assertions_combine);
 test_case!(assertion_on_object_shape_property);
 test_case!(non_empty_assertion_on_list);
 test_case!(instanceof_self_static_and_this);
+test_case!(array_column_index_key_types);
 
 #[test]
 #[cfg_attr(miri, ignore)]
