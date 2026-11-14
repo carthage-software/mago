@@ -28,7 +28,7 @@ impl FormatArgs {
         let Some(filepath) = self.stdin_filepath.as_deref() else {
             let file = File::ephemeral(Cow::Borrowed(b"<stdin>"), Cow::Owned(content));
             let service = tool.service(&orchestrator, ReadDatabase::empty(), configuration);
-            return Ok(emit_stdin(service.format_file(&file)?, &file));
+            return Ok(emit_stdin(rayon::scope(|_| service.format_file(&file))?, &file));
         };
 
         let name = logical_name(filepath, &configuration.source.workspace);
@@ -44,7 +44,7 @@ impl FormatArgs {
             return Ok(emit_stdin(FileFormatStatus::Unchanged, &file));
         };
         let service = tool.service(&orchestrator, database.read_only(), configuration);
-        Ok(emit_stdin(service.format_file(&file)?, &file))
+        Ok(emit_stdin(rayon::scope(|_| service.format_file(&file))?, &file))
     }
 }
 
