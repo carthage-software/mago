@@ -312,8 +312,6 @@ where
 
     let mut template_result = TemplateResult::new(IndexMap::with_hasher(RandomState::default()), HashMap::default());
 
-    let is_spl_object_storage = classname_str.as_bytes().eq_ignore_ascii_case(b"splobjectstorage");
-
     if let Some(constructor) = context.codebase.get_method_by_id(&constructor_declraing_id) {
         has_inconsistent_constructor = has_inconsistent_constructor
             && !constructor.method_metadata.as_ref().is_some_and(|meta| meta.is_final || meta.is_abstract);
@@ -414,8 +412,6 @@ where
                 .unwrap_or_else(|| {
                     if template.default.is_some() { wrap_atomic(TAtomic::Placeholder) } else { get_mixed() }
                 })
-            } else if is_spl_object_storage {
-                get_never()
             } else {
                 wrap_atomic(TAtomic::Placeholder)
             };
@@ -451,13 +447,7 @@ where
 
         argument_list.analyze(context, block_context, artifacts)?;
     } else if !metadata.template_types.is_empty() {
-        type_parameters = Some(
-            metadata
-                .template_types
-                .iter()
-                .map(|(_, _)| if is_spl_object_storage { get_never() } else { wrap_atomic(TAtomic::Placeholder) })
-                .collect(),
-        );
+        type_parameters = Some(metadata.template_types.iter().map(|_| wrap_atomic(TAtomic::Placeholder)).collect());
     }
 
     if let Some(parameters) = &mut type_parameters
