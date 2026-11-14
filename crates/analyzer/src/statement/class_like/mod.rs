@@ -3261,6 +3261,46 @@ fn check_class_like_properties<'ctx, A>(
             continue;
         }
 
+        if let (Some(effective), Some(native)) =
+            (&property_metadata.type_metadata, &property_metadata.type_declaration_metadata)
+            && effective.from_docblock
+        {
+            let expansion_options =
+                TypeExpansionOptions { self_class: Some(class_like_metadata.original_name), ..Default::default() };
+            let mut effective_type = effective.type_union.clone();
+            expand_union(context.codebase, &mut effective_type, &expansion_options);
+            let mut native_type = native.type_union.clone();
+            expand_union(context.codebase, &mut native_type, &expansion_options);
+
+            if !effective_type.any_child_node(|node| matches!(node, TypeRef::Atomic(TAtomic::Reference(_))))
+                && !union_comparator::is_contained_by_with_erased_template_arguments(
+                    context.codebase,
+                    &effective_type,
+                    &native_type,
+                    &mut ComparisonResult::default(),
+                )
+            {
+                let docblock_type_str = effective_type.get_id();
+                let native_type_str = native.type_union.get_id();
+                let class_name = class_like_metadata.original_name;
+
+                context.collector.report_with_code(
+                    IssueCode::DocblockTypeMismatch,
+                    Issue::error(format!(
+                        "Docblock type `{docblock_type_str}` for property `{class_name}::{property_name}` is incompatible with native type `{native_type_str}`."
+                    ))
+                    .with_annotation(Annotation::primary(native.span).with_message(format!("Native type is `{native_type_str}`...")))
+                    .with_annotation(
+                        Annotation::secondary(effective.span).with_message(format!("...but docblock declares `{docblock_type_str}`")),
+                    )
+                    .with_note("The docblock type must be compatible with the native type declaration.")
+                    .with_help(format!(
+                        "Either change the docblock type to match `{native_type_str}`, or update the native type to be compatible with `{docblock_type_str}`."
+                    )),
+                );
+            }
+        }
+
         // Validate set hook parameter type is supertype of property type
         if let Some(set_hook) = property_metadata.hooks.get(&word("set"))
             && let Some(param) = &set_hook.parameter

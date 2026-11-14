@@ -842,6 +842,7 @@ test_case!(invalid_override_reported_by_default);
 test_case!(arithmetic_on_template_uses_bound);
 test_case!(implode_non_empty_pieces);
 test_case!(array_splice_int_keys_renumbered);
+test_case!(property_docblock_native_mismatch);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);
