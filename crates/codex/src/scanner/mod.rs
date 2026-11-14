@@ -159,6 +159,24 @@ where
         self.get_docblock_before(node.span().start.offset)
     }
 
+    /// The docblock of a closure, or of the `$name = ` assignment it is the value of.
+    pub fn get_closure_docblock(&self, node: impl HasSpan) -> Option<&'arena Trivia<'arena>> {
+        let start = node.span().start.offset;
+        if let Some(docblock) = self.get_docblock_before(start) {
+            return Some(docblock);
+        }
+
+        let before = self.file.contents.get(..start as usize)?.trim_ascii_end().strip_suffix(b"=")?.trim_ascii_end();
+        let name_start =
+            before.iter().rposition(|byte| !(byte.is_ascii_alphanumeric() || *byte == b'_' || *byte >= 0x80))?;
+        if before[name_start] != b'$' || name_start + 1 == before.len() {
+            return None;
+        }
+
+        self.get_docblock_before(name_start as u32)
+            .filter(|docblock| memchr::memmem::find(docblock.value, b"@var").is_none())
+    }
+
     pub fn get_docblock_before(&self, start_offset: u32) -> Option<&'arena Trivia<'arena>> {
         get_docblock_before_position(self.program.trivia.as_slice(), start_offset)
     }

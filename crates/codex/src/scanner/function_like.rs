@@ -50,7 +50,7 @@ use crate::scanner::docblock::apply_function_like_metadata_flag;
 use crate::scanner::docblock::assertion_subject_word;
 use crate::scanner::docblock::find_most_trusted_tag;
 use crate::scanner::docblock::for_each_tag_by_ascending_trust;
-use crate::scanner::docblock::parse_docblock;
+use crate::scanner::docblock::parse_docblock_trivia;
 use crate::scanner::parameter::scan_function_like_parameter;
 use crate::scanner::parameter::scan_function_like_parameter_with_constants;
 use crate::scanner::ttype::get_type_metadata_from_hint;
@@ -375,7 +375,13 @@ fn scan_function_like_docblock<A>(
 ) where
     A: Arena,
 {
-    let Some(document) = parse_docblock(context, span) else {
+    let docblock = if matches!(metadata.kind, FunctionLikeKind::Closure | FunctionLikeKind::ArrowFunction) {
+        context.get_closure_docblock(span)
+    } else {
+        context.get_docblock(span)
+    };
+
+    let Some(document) = docblock.map(|docblock| parse_docblock_trivia(context, docblock)) else {
         metadata.has_docblock = false;
 
         return;
