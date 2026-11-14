@@ -33,6 +33,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::cst::Argument;
+use mago_syntax::cst::ArrayAccess;
+use mago_syntax::cst::ArrayAppend;
 use mago_syntax::cst::BinaryOperator;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Literal;
@@ -546,6 +548,7 @@ where
             }
 
             new_type.set_by_reference(true);
+            refresh_array_root_type(context, block_context, artifacts, argument);
 
             let new_type = Rc::new(new_type);
             if constraint_type && let Some(argument_id) = argument_id {
@@ -607,6 +610,29 @@ where
     }
 
     Ok(())
+}
+
+fn refresh_array_root_type<A>(
+    context: &Context<'_, '_, A>,
+    block_context: &BlockContext<'_>,
+    artifacts: &mut AnalysisArtifacts,
+    argument: &Expression<'_>,
+) where
+    A: Arena,
+{
+    let mut root = argument;
+    while let Expression::ArrayAccess(ArrayAccess { array, .. }) | Expression::ArrayAppend(ArrayAppend { array, .. }) =
+        unwrap_expression(root)
+    {
+        root = array;
+    }
+
+    if !std::ptr::eq(root, argument)
+        && let Some(root_id) = get_block_expression_id(root, context, block_context)
+        && let Some(root_type) = block_context.locals.get(&root_id)
+    {
+        artifacts.set_rc_expression_type(root, Rc::clone(root_type));
+    }
 }
 
 /// Records a by-reference mutation in the enclosing loop scope so the multi-pass
