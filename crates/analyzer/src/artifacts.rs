@@ -69,6 +69,7 @@ pub struct AnalysisArtifacts {
     pub true_branch_only_assertions: HashMap<(u32, u32), WordMap<AssertionSet>>,
     pub(crate) short_circuit_assignment_types: HashMap<(u32, u32), ShortCircuitAssignmentTypes>,
     pub inferred_return_types: Vec<Rc<TUnion>>,
+    pub has_bare_return: bool,
     pub inferred_yield_key_types: Vec<TUnion>,
     pub inferred_yield_value_types: Vec<TUnion>,
     pub symbol_references: SymbolReferences,
@@ -103,6 +104,7 @@ impl AnalysisArtifacts {
         Self {
             expression_types: HashMap::default(),
             inferred_return_types: Vec::new(),
+            has_bare_return: false,
             inferred_yield_key_types: Vec::new(),
             inferred_yield_value_types: Vec::new(),
             if_true_assertions: HashMap::default(),

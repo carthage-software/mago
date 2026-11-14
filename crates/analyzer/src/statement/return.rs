@@ -303,6 +303,8 @@ pub fn handle_return_value<'ctx, A>(
 
     if return_value.is_some() {
         artifacts.inferred_return_types.push(Rc::clone(&inferred_return_type));
+    } else {
+        artifacts.has_bare_return = true;
     }
 
     if let Some(return_value) = return_value {

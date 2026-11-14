@@ -167,7 +167,7 @@ where
 
             if let Some(inferred_return_type) = inferred_return_type {
                 signature.return_type = Some(Arc::new(inferred_return_type));
-            } else if inner_has_returned {
+            } else if inner_has_returned && !inner_artifacts.has_bare_return {
                 signature.return_type = Some(Arc::new(get_never()));
             } else {
                 signature.return_type = Some(Arc::new(get_void()));
