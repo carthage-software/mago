@@ -1,11 +1,15 @@
 use mago_allocator::Arena;
 use mago_codex::ttype::TType;
+use mago_codex::ttype::expander;
+use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::cst::EnumCase;
 use mago_syntax::cst::EnumCaseBackedItem;
 use mago_syntax::cst::EnumCaseItem;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -108,7 +112,20 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for EnumCaseBackedItem<'arena> {
 
         let backing_type_str = backing_type.get_id();
 
-        if (backing_type.is_int() && !value_type.is_int()) || (backing_type.is_string() && !value_type.is_string()) {
+        let case_value_type =
+            current_enum.enum_cases.get(&word(self.name.value)).and_then(|case| case.value_type.clone()).map(
+                |value_type| {
+                    let mut value_type = TUnion::from_atomic(value_type);
+                    expander::expand_union(context.codebase, &mut value_type, &TypeExpansionOptions::default());
+                    value_type
+                },
+            );
+
+        let fits = |value_type: &TUnion| {
+            (!backing_type.is_int() || value_type.is_int()) && (!backing_type.is_string() || value_type.is_string())
+        };
+
+        if !fits(&value_type) && !case_value_type.as_ref().is_some_and(fits) {
             let value_type_str = value_type.get_id();
 
             context.collector.report_with_code(

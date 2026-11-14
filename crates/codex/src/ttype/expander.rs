@@ -1276,9 +1276,13 @@ fn expand_value_of(
     let mut target_type = return_type_value_of.get_target_type().clone();
     expand_union(codebase, &mut target_type, options);
 
-    let Some(new_return_types) = TValueOf::get_value_of_targets(&target_type.types, codebase, false) else {
+    let Some(mut new_return_types) = TValueOf::get_value_of_targets(&target_type.types, codebase, false) else {
         return vec![TAtomic::Derived(TDerived::ValueOf(return_type_value_of.clone()))];
     };
+
+    if new_return_types.is_expandable() {
+        expand_union(codebase, &mut new_return_types, options);
+    }
 
     new_return_types.types.into_owned()
 }

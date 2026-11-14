@@ -3198,6 +3198,7 @@ test_case!(generator_ends_without_return);
 test_case!(endless_loop_parent_variable_takes_break_type);
 test_case!(docblock_string_literal_escapes);
 test_case!(callable_parameter_default_must_be_null);
+test_case!(enum_case_value_from_constant);
 
 #[test]
 #[cfg_attr(miri, ignore)]
