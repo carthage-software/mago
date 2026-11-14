@@ -20,6 +20,7 @@ use mago_codex::ttype::TType;
 use mago_codex::ttype::TypeRef;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
+use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::combine_union_types;
@@ -2221,7 +2222,11 @@ fn check_abstract_method_signatures<'ctx, A>(
 
             let mut issues = method_signature::validate_method_signature_compatibility(
                 context.codebase,
-                class_like_metadata.name,
+                if appearing_class.kind.is_trait() || returns_static(overridden_method) {
+                    class_like_metadata.name
+                } else {
+                    method_fqcn
+                },
                 &substituted_appearing_method,
                 &substituted_overridden_method,
                 final_parent_class.is_some(),
@@ -2904,9 +2909,17 @@ fn check_interface_method_signatures<'ctx, A>(
             context.codebase,
         );
 
+        let method_scope = if returns_static(interface_method)
+            || context.codebase.get_class_like_by_name(class_fqcn_word).is_some_and(|c| c.kind.is_trait())
+        {
+            class_like_metadata.name
+        } else {
+            class_fqcn_word
+        };
+
         let mut issues = method_signature::validate_method_signature_compatibility(
             context.codebase,
-            class_like_metadata.name,
+            method_scope,
             &substituted_class_method,
             &substituted_interface_method,
             false,
@@ -4010,6 +4023,16 @@ fn check_readonly_class_trait_properties<'ctx, 'arena, A>(
             }
         }
     }
+}
+
+fn returns_static(method: &FunctionLikeMetadata) -> bool {
+    [&method.return_type_metadata, &method.return_type_declaration_metadata].into_iter().flatten().any(|return_type| {
+        return_type
+            .type_union
+            .types
+            .iter()
+            .any(|atomic| matches!(atomic, TAtomic::Object(TObject::Named(named_object)) if named_object.is_static))
+    })
 }
 
 #[cfg(test)]
