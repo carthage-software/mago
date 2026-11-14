@@ -836,6 +836,7 @@ test_case!(empty_literal_order_independent);
 test_case!(concat_small_int_range);
 test_case!(strval_and_interpolation_cast_like);
 test_case!(string_refinement_kept_by_narrowing);
+test_case!(trait_parent_resolves_to_using_class);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);

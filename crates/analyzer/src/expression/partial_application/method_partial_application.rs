@@ -68,7 +68,31 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
                     resolved_method.method_identifier.get_method_name(),
                 );
 
-                let Some(signature) = get_signature_of_function_like_identifier(&identifier, context.codebase) else {
+                let mut signature_identifier = identifier;
+                if let Some(declaring_trait) = context
+                    .codebase
+                    .get_class_like(resolved_method.method_identifier.get_class_name().as_bytes())
+                    .filter(|declaring_class| declaring_class.kind.is_trait())
+                {
+                    let mut candidate = context.codebase.get_class_like(resolved_method.classname.as_bytes());
+                    while let Some(candidate_metadata) = candidate {
+                        if candidate_metadata.used_traits.contains(&declaring_trait.name) {
+                            signature_identifier = FunctionLikeIdentifier::Method(
+                                candidate_metadata.name,
+                                resolved_method.method_identifier.get_method_name(),
+                            );
+                            break;
+                        }
+
+                        candidate = candidate_metadata
+                            .direct_parent_class
+                            .and_then(|parent| context.codebase.get_class_like_by_name(parent));
+                    }
+                }
+
+                let Some(signature) =
+                    get_signature_of_function_like_identifier(&signature_identifier, context.codebase)
+                else {
                     continue;
                 };
 

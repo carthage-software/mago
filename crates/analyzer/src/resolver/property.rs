@@ -1110,13 +1110,23 @@ where
         })
         .flatten();
 
+    let trait_user_parent = trait_user
+        .and_then(|trait_user| context.codebase.get_class_like(trait_user.as_bytes()))
+        .and_then(|trait_user| trait_user.direct_parent_class)
+        .and_then(|parent| context.codebase.get_class_like_by_name(parent))
+        .map(|parent| parent.original_name);
+
     let expand_and_localize = |ty: &mut TUnion| {
         if let Some(trait_user) = trait_user {
             for atomic in ty.types.to_mut() {
-                if let TAtomic::Object(TObject::Named(named_object)) = atomic
-                    && named_object.name.as_bytes().eq_ignore_ascii_case(declaring_class_metadata.name.as_bytes())
-                {
-                    named_object.name = trait_user;
+                if let TAtomic::Object(TObject::Named(named_object)) = atomic {
+                    if named_object.name.as_bytes().eq_ignore_ascii_case(declaring_class_metadata.name.as_bytes()) {
+                        named_object.name = trait_user;
+                    } else if let Some(trait_user_parent) = trait_user_parent
+                        && named_object.name.as_bytes().eq_ignore_ascii_case(b"parent")
+                    {
+                        named_object.name = trait_user_parent;
+                    }
                 }
             }
         }
