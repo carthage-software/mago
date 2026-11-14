@@ -53,6 +53,7 @@ use crate::formula::add_access_base_clauses;
 use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
 use crate::reconciler::reconcile_keyed_types;
+use crate::resolver::function::get_builtin_get_class_or_gettype_call;
 use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_literal_array_key;
 use crate::utils::misc::unwrap_expression;
@@ -331,6 +332,12 @@ where
         };
         let narrows_assignment_target =
             assignment_target.is_some_and(|target| self.assignment_target_holds_subject(target, &subject_type));
+        let subject_queries_type = get_builtin_get_class_or_gettype_call(
+            self.stmt.expression,
+            self.context.resolved_names,
+            self.context.codebase,
+        )
+        .is_some();
         for (i, expression_arm) in expression_arms.iter().enumerate() {
             is_exhaustive = is_exhaustive || {
                 running_else_context.locals.get(&subject_id).is_some_and(|t| t.is_never())
@@ -345,7 +352,7 @@ where
             let apply_original_subject_assertions = if assignment_target.is_some() {
                 narrows_assignment_target
             } else {
-                can_apply_original_subject_assertions && has_boolean_literal_conditions
+                subject_queries_type || (can_apply_original_subject_assertions && has_boolean_literal_conditions)
             };
             let (arm_status, new_else_clauses, new_original_else_clauses) = self.analyze_expression_arm(
                 &subject_for_conditions,
