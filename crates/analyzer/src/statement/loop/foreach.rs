@@ -72,38 +72,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
         let mut loop_block_context = block_context.clone();
         loop_block_context.flags.set_inside_loop(true);
         loop_block_context.break_types.push(BreakContext::Loop(self.span()));
-        let mut key_expression_id = None;
-        if let Some(key_expression) = self.target.key() {
-            key_expression_id = get_block_expression_id(key_expression, context, block_context);
-
-            let assigned = assign_to_expression(
-                context,
-                &mut loop_block_context,
-                artifacts,
-                key_expression,
-                key_expression_id,
-                None,
-                Rc::new(key_type),
-                false,
-                PropertyWriteKind::Direct,
-            )?;
-
-            if !assigned {
-                context.collector.report_with_code(
-                    IssueCode::InvalidForeachKey,
-                    Issue::error("The key expression in `foreach` is not assignable.")
-                        .with_annotation(
-                            Annotation::primary(key_expression.span())
-                                .with_message("This expression cannot be assigned to"),
-                        )
-                        .with_note("The key expression must be writable.")
-                        .with_help(
-                            "Ensure the key expression is a valid variable, array, or an object property. If using a complex expression, consider assigning it to a variable first.",
-                        ),
-                );
-            }
-        }
-
         let value_expression = match self.target.value() {
             Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Reference(_), operand }) => operand,
             value => value,
@@ -143,6 +111,38 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
                         "Ensure the value expression is a valid variable, array, or an object property. If using a complex expression, consider assigning it to a variable first.",
                     ),
             );
+        }
+
+        let mut key_expression_id = None;
+        if let Some(key_expression) = self.target.key() {
+            key_expression_id = get_block_expression_id(key_expression, context, block_context);
+
+            let assigned = assign_to_expression(
+                context,
+                &mut loop_block_context,
+                artifacts,
+                key_expression,
+                key_expression_id,
+                None,
+                Rc::new(key_type),
+                false,
+                PropertyWriteKind::Direct,
+            )?;
+
+            if !assigned {
+                context.collector.report_with_code(
+                    IssueCode::InvalidForeachKey,
+                    Issue::error("The key expression in `foreach` is not assignable.")
+                        .with_annotation(
+                            Annotation::primary(key_expression.span())
+                                .with_message("This expression cannot be assigned to"),
+                        )
+                        .with_note("The key expression must be writable.")
+                        .with_help(
+                            "Ensure the key expression is a valid variable, array, or an object property. If using a complex expression, consider assigning it to a variable first.",
+                        ),
+                );
+            }
         }
 
         if is_by_reference && let Expression::Variable(Variable::Direct(direct_variable)) = value_expression {
