@@ -55,6 +55,7 @@ impl Plugin for StdlibPlugin {
         registry.register_function_provider(array::ArrayMergeProvider);
         registry.register_function_provider(array::ArrayPadProvider);
         registry.register_function_provider(array::CompactProvider);
+        registry.register_function_provider(object::GetCalledClassProvider);
         registry.register_function_provider(object::GetObjectVarsProvider);
         registry.register_function_provider(url::ParseUrlProvider);
         registry.register_function_provider(filter::FilterVarProvider);
