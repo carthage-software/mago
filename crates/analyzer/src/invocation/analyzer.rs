@@ -719,7 +719,8 @@ where
                 .parameter_count()
                 .checked_sub(1)
                 .and_then(|idx| invocation.target.get_parameter(idx))
-                .is_some_and(|parameter| parameter.is_variadic());
+                .is_some_and(|parameter| parameter.is_variadic())
+                && !invocation.target.get_function_like_metadata().is_some_and(|metadata| metadata.flags.is_built_in());
 
             if !has_variadic_parameter {
                 has_named_argument_anomaly = true;
@@ -1913,7 +1914,8 @@ fn validate_keyed_array_elements<'ctx, 'arena, A>(
                 .parameter_count()
                 .checked_sub(1)
                 .and_then(|idx| invocation_target.get_parameter(idx))
-                .is_some_and(|parameter| parameter.is_variadic());
+                .is_some_and(|parameter| parameter.is_variadic())
+                && !invocation_target.get_function_like_metadata().is_some_and(|metadata| metadata.flags.is_built_in());
 
             if !has_variadic_parameter {
                 context.collector.report_with_code(
