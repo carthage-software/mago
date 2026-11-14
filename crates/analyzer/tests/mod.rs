@@ -822,6 +822,7 @@ test_case!(is_a_keeps_class_string_template);
 test_case!(do_while_first_pass_dead_code);
 test_case!(do_while_property_narrowing_resets);
 test_case!(binding_constructor_checks);
+test_case!(array_key_evaluated_before_value);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);

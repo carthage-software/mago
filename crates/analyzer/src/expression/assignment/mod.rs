@@ -138,6 +138,10 @@ where
         block_context.locals.insert(*target_variable_id, Rc::new(preliminary_type));
     }
 
+    if assignment_operator.is_none() && source_expression.is_some() {
+        analyze_assignment_target_indices(target_expression, context, block_context, artifacts)?;
+    }
+
     let mut assignment_operation_type = None;
     if let Some(source_expression) = source_expression {
         let was_inside_general_use = block_context.flags.inside_general_use();
@@ -1269,6 +1273,31 @@ where
             analyze_assignment_target(static_property_access.class, context, block_context, artifacts)?;
         }
         _ => {}
+    }
+
+    Ok(())
+}
+
+fn analyze_assignment_target_indices<'ctx, 'arena, A>(
+    expression: &Expression<'arena>,
+    context: &mut Context<'ctx, 'arena, A>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
+    let Expression::ArrayAccess(array_access) = expression else {
+        return Ok(());
+    };
+
+    analyze_assignment_target_indices(array_access.array, context, block_context, artifacts)?;
+
+    if artifacts.get_expression_type(array_access.index).is_none() {
+        let was_inside_general_use = block_context.flags.inside_general_use();
+        block_context.flags.set_inside_general_use(true);
+        array_access.index.analyze(context, block_context, artifacts)?;
+        block_context.flags.set_inside_general_use(was_inside_general_use);
     }
 
     Ok(())
