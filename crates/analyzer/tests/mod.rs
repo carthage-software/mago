@@ -3244,6 +3244,7 @@ test_case!(this_union_param_type_is_not_a_parameter_name);
 test_case!(static_class_and_count_mode_narrow);
 test_case!(static_on_template_receiver_is_the_template);
 test_case!(real_method_wins_over_sibling_pseudo_method);
+test_case!(pseudo_method_does_not_implement_abstract_method);
 
 #[test]
 #[cfg_attr(miri, ignore)]

@@ -920,15 +920,24 @@ where
                 }
             }
 
-            let Some(function_like) = context.codebase.get_method_by_id(method_id) else {
+            let Some(mut function_like) = context.codebase.get_method_by_id(method_id) else {
                 continue;
             };
+
+            let mut method_id = method_id;
+            if function_like.flags.is_magic_method()
+                && let Some((abstract_id, abstract_method)) =
+                    abstract_method_behind_pseudo_method(context.codebase, class_like_metadata, *method_name)
+            {
+                method_id = abstract_id;
+                function_like = abstract_method;
+            }
 
             let Some(method_metadata) = function_like.method_metadata.as_ref() else {
                 continue;
             };
 
-            if method_metadata.is_abstract {
+            if method_metadata.is_abstract && !function_like.flags.is_magic_method() {
                 let Some(declaring_class_like_metadata) =
                     context.codebase.get_class_like_by_name(method_id.get_class_name())
                 else {
@@ -4143,6 +4152,33 @@ fn check_readonly_class_trait_properties<'ctx, 'arena, A>(
             }
         }
     }
+}
+
+/// A `@method` tag implements nothing: finds the abstract method it hides when no
+/// real method implements it.
+fn abstract_method_behind_pseudo_method<'ctx>(
+    codebase: &'ctx CodebaseMetadata,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    method_name: Word,
+) -> Option<(&'ctx MethodIdentifier, &'ctx FunctionLikeMetadata)> {
+    let mut abstract_method = None;
+    for parent_method_id in class_like_metadata.overridden_method_ids.get(&method_name)?.values() {
+        let Some(parent_method) = codebase.get_method_by_id(parent_method_id) else {
+            continue;
+        };
+
+        if parent_method.flags.is_magic_method() {
+            continue;
+        }
+
+        if parent_method.method_metadata.as_ref().is_some_and(|metadata| metadata.is_abstract) {
+            abstract_method.get_or_insert((parent_method_id, parent_method));
+        } else {
+            return None;
+        }
+    }
+
+    abstract_method
 }
 
 fn check_trait_method_collisions<A>(context: &mut Context<'_, '_, A>, class_like_metadata: &ClassLikeMetadata)
