@@ -1693,9 +1693,19 @@ where
                     known_non_list,
                 })));
             }
-            TAtomic::Mixed(_) => {
+            TAtomic::Mixed(_) | TAtomic::Iterable(_) => {
                 did_remove_type = true;
                 acceptable_types.push(atomic);
+            }
+            TAtomic::GenericParameter(mut generic_parameter) => {
+                did_remove_type = true;
+                let constraint =
+                    reconcile_non_empty_countable(context, assertion, &generic_parameter.constraint, None, false, None);
+                if !constraint.is_never() {
+                    generic_parameter.constraint = Arc::new(constraint);
+                }
+
+                acceptable_types.push(TAtomic::GenericParameter(generic_parameter));
             }
             _ => {
                 acceptable_types.push(atomic);

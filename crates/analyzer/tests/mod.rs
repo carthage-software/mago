@@ -3218,6 +3218,7 @@ test_case!(instanceof_self_static_and_this);
 test_case!(array_column_index_key_types);
 test_case!(array_item_passed_by_reference_is_a_write);
 test_case!(build_dependent_version_constants);
+test_case!(non_empty_check_on_template_and_iterable);
 
 #[test]
 #[cfg_attr(miri, ignore)]
