@@ -3278,6 +3278,7 @@ test_case!(reference_after_coalesce_assignment);
 test_case!(array_walk_keeps_the_array_type);
 test_case!(instanceof_literal_class_string_variable);
 test_case!(isset_property_on_some_union_members);
+test_case!(inherited_generic_mixin_binds_parent_templates);
 
 #[test]
 #[cfg_attr(miri, ignore)]

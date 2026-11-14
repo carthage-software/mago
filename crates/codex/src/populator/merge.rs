@@ -6,6 +6,7 @@ use crate::metadata::flags::MetadataFlags;
 use crate::populator::methods::OverrideSeeds;
 use crate::populator::methods::inherit_methods_from_parent;
 use crate::populator::properties::inherit_properties_from_parent;
+use crate::populator::templates::bind_inherited_templates;
 use crate::populator::templates::extend_template_parameters;
 use crate::reference::SymbolReferences;
 use crate::visibility::Visibility;
@@ -125,13 +126,22 @@ pub fn merge_metadata_from_parent_class_like(
     metadata.all_parent_interfaces.extend(parent_metadata.all_parent_interfaces.iter().copied());
     metadata.used_traits.extend(parent_metadata.used_traits.iter().copied());
     metadata.invalid_dependencies.extend(parent_metadata.invalid_dependencies.iter().copied());
-    metadata.mixins.extend(parent_metadata.mixins.iter().cloned());
-
     if let Some(inheritors) = &parent_metadata.permitted_inheritors {
         metadata.permitted_inheritors.get_or_insert_default().extend(inheritors.iter().copied());
     }
 
     extend_template_parameters(metadata, parent_metadata, codebase);
+
+    let inherited_mixins = parent_metadata
+        .mixins
+        .iter()
+        .map(|mixin| {
+            let mut mixin = mixin.clone();
+            mixin.type_union = bind_inherited_templates(metadata, &mixin.type_union, codebase);
+            mixin
+        })
+        .collect::<Vec<_>>();
+    metadata.mixins.extend(inherited_mixins);
 
     inherit_methods_from_parent(metadata, parent_metadata, codebase, seeds);
     inherit_properties_from_parent(metadata, parent_metadata);

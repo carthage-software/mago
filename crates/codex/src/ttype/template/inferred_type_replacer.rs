@@ -14,6 +14,7 @@ use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::derived::TDerived;
 use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::object::TObject;
+use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::combiner;
@@ -304,6 +305,11 @@ fn replace_atomic(
                     replace_with_polarity(&old_intersection_types, template_result, codebase, polarity)
                         .types
                         .into_owned();
+            }
+        }
+        TAtomic::Reference(TReference::Symbol { parameters: Some(parameters), .. }) => {
+            for parameter in parameters {
+                *parameter = replace_with_polarity(parameter, template_result, codebase, polarity);
             }
         }
         TAtomic::Object(TObject::Named(named_object)) => {

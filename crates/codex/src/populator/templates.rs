@@ -93,6 +93,30 @@ pub fn extend_template_parameters(
     }
 }
 
+/// Resolves an inherited type's ancestor templates to the types the class supplies for them.
+pub fn bind_inherited_templates(
+    metadata: &ClassLikeMetadata,
+    inherited_type: &TUnion,
+    codebase: &CodebaseMetadata,
+) -> TUnion {
+    if !inherited_type.has_template_types() {
+        return inherited_type.clone();
+    }
+
+    let mut template_result = TemplateResult::default();
+    for (defining_entity, parameters) in &metadata.template_extended_parameters {
+        for (parameter_name, parameter_type) in parameters {
+            template_result.add_lower_bound(
+                *parameter_name,
+                GenericParent::ClassLike(*defining_entity),
+                parameter_type.clone(),
+            );
+        }
+    }
+
+    inferred_type_replacer::replace(inherited_type, &template_result, codebase)
+}
+
 /// Folds a parent's recorded ancestor parameterizations into the child, so that
 /// diamond inheritance through a non-generic parent preserves every path.
 fn inherit_template_extended_paths(metadata: &mut ClassLikeMetadata, parent_metadata: &ClassLikeMetadata) {
