@@ -614,17 +614,25 @@ where
             &mut comparison_result,
         );
 
-        let are_int_float_disjoint = target.is_single()
-            && subject.is_single()
-            && matches!(
-                (subject.effective_int_or_float(), target.effective_int_or_float()),
-                (Some(true), Some(false)) | (Some(false), Some(true))
-            );
+        let target_int_or_float = if target.is_single() { target.effective_int_or_float() } else { None };
+        let are_parts_disjoint = subject.types.iter().all(|subject_part| {
+            let subject_part = TUnion::from_atomic(subject_part.clone());
 
-        let are_disjoint = are_int_float_disjoint
+            matches!(
+                (subject_part.effective_int_or_float(), target_int_or_float),
+                (Some(true), Some(false)) | (Some(false), Some(true))
+            ) || !union_comparator::can_expression_types_be_identical(
+                context.codebase,
+                &subject_part,
+                &target,
+                false,
+                false,
+            )
+        });
+
+        let are_disjoint = are_parts_disjoint
             || (subject.is_always_truthy() && target.is_always_falsy())
-            || shapes_are_disjoint(context, &subject, &target)
-            || !union_comparator::can_expression_types_be_identical(context.codebase, &subject, &target, false, false);
+            || shapes_are_disjoint(context, &subject, &target);
 
         if are_disjoint {
             return if negated { then_type.types.into_owned() } else { otherwise_type.types.into_owned() };
