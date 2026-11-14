@@ -18,10 +18,12 @@ use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::mixed::truthiness::TMixedTruthiness;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::combiner::CombinerOptions;
+use mago_codex::ttype::combiner::combine;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::get_array_parameters;
 use mago_codex::ttype::get_keyed_array;
+use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 
@@ -80,10 +82,7 @@ impl FunctionReturnTypeProvider for ArrayFilterProvider {
             let assertions = callback_metadata.if_true_assertions.get(&param_name)?.clone();
 
             return filter_arrays(array_type, codebase, |value_type| {
-                let mut narrowed = value_type;
-                for assertion in &assertions {
-                    narrowed = apply_assertion_to_narrow_type(narrowed, assertion, codebase);
-                }
+                let narrowed = narrow_by_assertions(value_type, &assertions, codebase);
                 if narrowed.types.is_empty() { FilterOutcome::Removed } else { FilterOutcome::KeptAsOptional(narrowed) }
             });
         }
@@ -222,6 +221,34 @@ fn narrow_atomic_to_truthy(atomic: TAtomic) -> TAtomic {
     }
 }
 
+/// Narrows `value_type` by the assertions of one `@assert-if-true` tag: type assertions are
+/// alternatives (`int|string`), so their results are joined; others apply in turn.
+pub(super) fn narrow_by_assertions(
+    value_type: TUnion,
+    assertions: &[Assertion],
+    codebase: &CodebaseMetadata,
+) -> TUnion {
+    if assertions.len() > 1 && assertions.iter().all(|assertion| matches!(assertion, Assertion::IsType(_))) {
+        let narrowed: Vec<TAtomic> = assertions
+            .iter()
+            .flat_map(|assertion| {
+                let narrowed = apply_assertion_to_narrow_type(value_type.clone(), assertion, codebase);
+                if narrowed == value_type { vec![] } else { narrowed.types.into_owned() }
+            })
+            .collect();
+
+        return if narrowed.is_empty() {
+            value_type
+        } else {
+            TUnion::from_vec(combine(narrowed, codebase, CombinerOptions::default()))
+        };
+    }
+
+    assertions
+        .iter()
+        .fold(value_type, |narrowed, assertion| apply_assertion_to_narrow_type(narrowed, assertion, codebase))
+}
+
 pub(super) fn apply_assertion_to_narrow_type(
     original_type: TUnion,
     assertion: &Assertion,
@@ -258,6 +285,12 @@ pub(super) fn apply_assertion_to_narrow_type(
 
                 if asserted_is_subtype {
                     retained.push(atomic.clone());
+                } else if let Some(intersection) = intersect_union_types(
+                    &TUnion::from_atomic(variant.clone()),
+                    &TUnion::from_atomic(atomic.clone()),
+                    codebase,
+                ) {
+                    retained.extend(intersection.types.iter().filter(|atomic| !atomic.is_never()).cloned());
                 }
             }
 

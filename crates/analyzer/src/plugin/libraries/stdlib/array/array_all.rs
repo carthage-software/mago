@@ -18,7 +18,7 @@ use mago_word::word;
 
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
-use crate::plugin::libraries::stdlib::array::array_filter::apply_assertion_to_narrow_type;
+use crate::plugin::libraries::stdlib::array::array_filter::narrow_by_assertions;
 use crate::plugin::provider::Provider;
 use crate::plugin::provider::ProviderMeta;
 use crate::plugin::provider::assertion::FunctionAssertionProvider;
@@ -68,10 +68,7 @@ impl FunctionAssertionProvider for ArrayAllAssertionProvider {
             };
 
             let (key_type, value_type) = get_array_parameters(array, codebase);
-            let mut narrowed_value = value_type;
-            for assertion in callback_assertions {
-                narrowed_value = apply_assertion_to_narrow_type(narrowed_value, assertion, codebase);
-            }
+            let narrowed_value = narrow_by_assertions(value_type, callback_assertions, codebase);
 
             // Preserve known-items shape when present so a `$array{0: int}`
             // input doesn't lose its known entry on narrowing.

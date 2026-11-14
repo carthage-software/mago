@@ -3184,6 +3184,7 @@ test_case!(negated_type_checks_split_callable);
 test_case!(isset_strips_null_from_template_bound);
 test_case!(static_call_on_bare_enum_string);
 test_case!(switch_assignments_count_in_try);
+test_case!(array_filter_string_callable_and_union_assertion);
 
 #[test]
 #[cfg_attr(miri, ignore)]
