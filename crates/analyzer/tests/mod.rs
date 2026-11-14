@@ -3185,6 +3185,7 @@ test_case!(isset_strips_null_from_template_bound);
 test_case!(static_call_on_bare_enum_string);
 test_case!(switch_assignments_count_in_try);
 test_case!(array_filter_string_callable_and_union_assertion);
+test_case!(narrower_native_return_keeps_fitting_docblock);
 
 #[test]
 #[cfg_attr(miri, ignore)]

@@ -34,6 +34,29 @@ use crate::ttype::template::TemplateResult;
 use crate::ttype::template::inferred_type_replacer;
 use crate::ttype::union::TUnion;
 
+/// Keeps the members of an inherited docblock type that fit the child's narrower native type,
+/// when some, but not all, of them do.
+fn keep_members_fitting_native(native: &TUnion, docblock: &TUnion, codebase: &CodebaseMetadata) -> Option<TUnion> {
+    let fitting: Vec<TAtomic> = docblock
+        .types
+        .iter()
+        .filter(|atomic| {
+            union_comparator::is_contained_by(
+                codebase,
+                &TUnion::from_atomic((*atomic).clone()),
+                native,
+                false,
+                false,
+                false,
+                &mut ComparisonResult::new(),
+            )
+        })
+        .cloned()
+        .collect();
+
+    (!fitting.is_empty() && fitting.len() < docblock.types.len()).then(|| TUnion::from_vec(fitting))
+}
+
 /// Narrows an inherited `iterable<K, V>` to `array<K, V>` for a child that declares a native `array`.
 fn narrow_inherited_iterable_to_array(
     child_native: &TUnion,
@@ -161,7 +184,8 @@ fn should_inherit_docblock_type(
                 false,
                 false,
                 &mut ComparisonResult::new(),
-            ) || narrow_inherited_iterable_to_array(child_native, &docblock_type, codebase).is_some();
+            ) || narrow_inherited_iterable_to_array(child_native, &docblock_type, codebase).is_some()
+                || keep_members_fitting_native(child_native, &docblock_type, codebase).is_some();
         }
 
         let parent_docblock_contained_in_child = union_comparator::is_contained_by(
@@ -236,7 +260,8 @@ fn should_inherit_docblock_type(
             );
 
             return docblock_compatible_with_child
-                || narrow_inherited_iterable_to_array(child_native, &docblock_type, codebase).is_some();
+                || narrow_inherited_iterable_to_array(child_native, &docblock_type, codebase).is_some()
+                || keep_members_fitting_native(child_native, &docblock_type, codebase).is_some();
         }
 
         false
@@ -832,6 +857,7 @@ fn resolve_method_inheritance(
                     };
 
                     narrow_inherited_iterable_to_array(&child_native_return.type_union, &type_union, codebase)
+                        .or_else(|| keep_members_fitting_native(&child_native_return.type_union, &type_union, codebase))
                         .unwrap_or(type_union)
                 }
             } else {
