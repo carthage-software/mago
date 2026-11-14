@@ -29,6 +29,8 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::utils::expression::get_block_expression_id;
+use crate::visibility::ProtectedMember;
+use crate::visibility::is_member_visible_from_scope;
 use mago_word::concat_word;
 use mago_word::word;
 
@@ -61,7 +63,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                 block_context.references_possibly_from_confusing_scope.remove(value_id);
             }
 
-            check_property_unset(context, artifacts, self.unset.span, value);
+            check_property_unset(context, block_context, artifacts, self.unset.span, value);
             forget_shape_property(context, block_context, value);
 
             'array_access: {
@@ -379,15 +381,22 @@ where
     }
 }
 
-fn check_property_unset<'arena, A>(
-    context: &mut Context<'_, 'arena, A>,
+fn check_property_unset<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
+    block_context: &BlockContext<'ctx>,
     artifacts: &AnalysisArtifacts,
     unset_keyword_span: Span,
     value: &Expression<'arena>,
 ) where
     A: Arena,
 {
-    let Expression::Access(Access::Property(property_access)) = value else {
+    let mut property = value;
+    while let Expression::ArrayAccess(array_access) = property {
+        property = array_access.array;
+    }
+
+    let unsets_item = !std::ptr::eq(property, value);
+    let Expression::Access(Access::Property(property_access)) = property else {
         return;
     };
 
@@ -395,8 +404,14 @@ fn check_property_unset<'arena, A>(
         return;
     };
 
-    let Some(object_type) = artifacts.get_expression_type(property_access.object) else {
-        return;
+    let object_type = match artifacts.get_expression_type(property_access.object) {
+        Some(object_type) => object_type,
+        None => match get_block_expression_id(property_access.object, context, block_context)
+            .and_then(|object_id| block_context.locals.get(&object_id))
+        {
+            Some(object_type) => object_type.as_ref(),
+            None => return,
+        },
     };
 
     for atomic in object_type.types.as_ref() {
@@ -419,6 +434,58 @@ fn check_property_unset<'arena, A>(
             context.codebase.get_class_like(class_name.as_bytes()).is_some_and(|class| class.flags.is_readonly());
 
         let qualified = format!("{}::${}", BytesDisplay(class_name.as_bytes()), BytesDisplay(property_name.value));
+
+        if unsets_item {
+            if (property_metadata.flags.is_readonly() || class_is_readonly)
+                && artifacts
+                    .get_expression_type(property)
+                    .is_some_and(|property_type| property_type.types.iter().all(TAtomic::is_array))
+            {
+                context.collector.report_with_code(
+                    IssueCode::InvalidUnset,
+                    Issue::error(format!("Cannot unset an item of readonly property `{qualified}`."))
+                        .with_annotation(
+                            Annotation::primary(value.span()).with_message("This item belongs to a readonly property."),
+                        )
+                        .with_annotation(Annotation::secondary(unset_keyword_span).with_message("`unset` used here."))
+                        .with_note(
+                            "Unsetting an item modifies the readonly property, which throws an `Error` at runtime.",
+                        )
+                        .with_help("Build a new array without the item where the property is initialized."),
+                );
+            }
+
+            return;
+        }
+
+        if !property_metadata.flags.is_readonly()
+            && !class_is_readonly
+            && property_metadata.write_visibility != property_metadata.read_visibility
+            && let Some(declaring_class) =
+                context.codebase.get_declaring_property_class(class_name.as_bytes(), qualified_property_name.as_bytes())
+            && !is_member_visible_from_scope(
+                context.codebase,
+                property_metadata.write_visibility,
+                declaring_class.as_bytes(),
+                ProtectedMember::Property(qualified_property_name),
+                block_context.scope.get_class_like_name(),
+            )
+        {
+            let visibility = property_metadata.write_visibility;
+            context.collector.report_with_code(
+                IssueCode::InvalidUnset,
+                Issue::error(format!("Cannot unset {visibility}(set) property `{qualified}` from this scope."))
+                    .with_annotation(
+                        Annotation::primary(value.span())
+                            .with_message(format!("This property can only be modified from {visibility} scope.")),
+                    )
+                    .with_annotation(Annotation::secondary(unset_keyword_span).with_message("`unset` used here."))
+                    .with_note("Unsetting a property is a write, and its set visibility forbids writes here.")
+                    .with_help("Remove this property from the `unset` statement, or unset it inside the class."),
+            );
+
+            return;
+        }
 
         if property_metadata.flags.is_readonly() || class_is_readonly {
             context.collector.report_with_code(
