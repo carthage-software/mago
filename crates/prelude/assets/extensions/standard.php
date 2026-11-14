@@ -3619,7 +3619,7 @@ function array_replace_recursive(array $array, array ...$replacements): array {}
  * @param V $filter_value
  * @param bool $strict
  *
- * @return ($array is non-empty-array|non-empty-list ? non-empty-list<K> : list<K>)
+ * @return ($filter_value is null ? ($array is non-empty-array|non-empty-list ? non-empty-list<K> : list<K>) : list<K>)
  *
  * @pure
  */
