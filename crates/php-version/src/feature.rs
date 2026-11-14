@@ -100,6 +100,7 @@ pub enum Feature {
     NoDiscardAttribute,
     AsymmetricVisibilityForStaticProperties,
     ClosureCreationInConstantExpressions,
+    CastInConstantExpressions,
     DeprecatedAttribute,
     PipeOperator,
     CloneWith,

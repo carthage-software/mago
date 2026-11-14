@@ -105,7 +105,14 @@ impl<'arena> Expression<'arena> {
                     && operation.rhs.is_constant(version, initialization)
             }
             Self::UnaryPrefix(operation) => {
-                operation.operator.is_constant() && operation.operand.is_constant(version, initialization)
+                (operation.operator.is_constant()
+                    || (operation.operator.is_cast()
+                        && !matches!(
+                            operation.operator,
+                            UnaryPrefixOperator::VoidCast(..) | UnaryPrefixOperator::UnsetCast(..)
+                        )
+                        && version.is_supported(Feature::CastInConstantExpressions)))
+                    && operation.operand.is_constant(version, initialization)
             }
             Self::UnaryPostfix(operation) => {
                 operation.operator.is_constant() && operation.operand.is_constant(version, initialization)

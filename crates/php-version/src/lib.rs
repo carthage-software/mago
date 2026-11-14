@@ -318,6 +318,7 @@ impl PHPVersion {
             | Feature::CloneWith
             | Feature::AsymmetricVisibilityForStaticProperties
             | Feature::ClosureCreationInConstantExpressions
+            | Feature::CastInConstantExpressions
             | Feature::PipeOperator => self.0 >= 0x08_05_00,
             Feature::CallableInstanceMethods
             | Feature::LegacyConstructor
