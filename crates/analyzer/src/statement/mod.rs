@@ -238,7 +238,18 @@ pub fn analyze_statements<'ctx, 'arena, A>(
 where
     A: Arena,
 {
-    for statement in statements {
+    for (index, statement) in statements.iter().enumerate() {
+        if let Statement::Use(_) = statement
+            && PrecedingDocblocks::new(context.comments, statement.span().start.offset).next().is_some()
+        {
+            for following in statements[index..].iter().map_while(|statement| match statement {
+                Statement::Use(r#use) => Some(r#use),
+                _ => None,
+            }) {
+                context.scope.populate_from_use(following);
+            }
+        }
+
         let is_declaration = statement.is_declaration();
 
         if block.flags.has_returned() {

@@ -3193,6 +3193,7 @@ test_case!(constant_initialized_with_new);
 test_case!(unpack_template_bounded_by_iterable);
 test_case!(class_against_object_shape_property_types);
 test_case!(lone_var_docblock_drops_known_elements);
+test_case!(header_docblock_before_use_statements);
 
 #[test]
 #[cfg_attr(miri, ignore)]
