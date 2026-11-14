@@ -69,6 +69,7 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
         let mut any_argument_non_empty = false;
         let mut all_arguments_are_lists = true;
         let mut all_lists_are_closed = true;
+        let mut next_int_key: Option<i64> = Some(0);
 
         for invocation_argument in arguments {
             let argument_expr = invocation_argument.value()?;
@@ -110,12 +111,70 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
                         }
 
                         if let Some(items) = keyed.known_items.as_deref() {
-                            for (key, value) in items {
-                                merged_items.insert(*key, value.clone());
+                            for (key, (optional, value)) in items {
+                                if let ArrayKey::Integer(_) = key {
+                                    match next_int_key {
+                                        Some(index) if !optional => {
+                                            merged_items.insert(ArrayKey::Integer(index), (false, value.clone()));
+                                            next_int_key = Some(index + 1);
+                                        }
+                                        _ => {
+                                            next_int_key = None;
+                                            has_parameters = true;
+                                            merged_key_type = Some(match merged_key_type {
+                                                Some(existing) => combine_union_types(
+                                                    &existing,
+                                                    &get_int(),
+                                                    codebase,
+                                                    CombinerOptions::default(),
+                                                ),
+                                                None => get_int(),
+                                            });
+                                            merged_value_type = Some(match merged_value_type {
+                                                Some(existing) => combine_union_types(
+                                                    &existing,
+                                                    value,
+                                                    codebase,
+                                                    CombinerOptions::default(),
+                                                ),
+                                                None => value.clone(),
+                                            });
+                                        }
+                                    }
+
+                                    continue;
+                                }
+
+                                let merged_value = match merged_items.get(key) {
+                                    Some((earlier_optional, earlier)) if *optional => (
+                                        *earlier_optional,
+                                        combine_union_types(earlier, value, codebase, CombinerOptions::default()),
+                                    ),
+                                    _ => (*optional, value.clone()),
+                                };
+
+                                merged_items.insert(*key, merged_value);
                             }
                         }
 
                         if let Some((key_type, value_type)) = &keyed.parameters {
+                            if key_type.has_int() {
+                                next_int_key = None;
+                            }
+
+                            if key_type.has_string() || key_type.is_array_key() {
+                                for (key, (_, existing)) in merged_items.iter_mut() {
+                                    if !matches!(key, ArrayKey::Integer(_)) {
+                                        *existing = combine_union_types(
+                                            existing,
+                                            value_type,
+                                            codebase,
+                                            CombinerOptions::default(),
+                                        );
+                                    }
+                                }
+                            }
+
                             has_parameters = true;
                             merged_key_type = Some(match merged_key_type {
                                 Some(existing) => {
@@ -135,6 +194,17 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
                         if list.non_empty {
                             any_argument_non_empty = true;
                         }
+
+                        next_int_key = match (next_int_key, list.known_elements.as_deref()) {
+                            (Some(index), Some(known_elements))
+                                if list.element_type.is_never()
+                                    && known_elements.values().all(|(optional, _)| !optional) =>
+                            {
+                                Some(index + known_elements.len() as i64)
+                            }
+                            (Some(index), None) if list.element_type.is_never() => Some(index),
+                            _ => None,
+                        };
 
                         let is_list_closed = list.element_type.is_never();
                         if !is_list_closed {
