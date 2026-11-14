@@ -4,6 +4,8 @@ namespace {
     class PDOException extends RuntimeException
     {
         public ?array $errorInfo;
+
+        /** @var int|string */
         protected $code;
     }
 

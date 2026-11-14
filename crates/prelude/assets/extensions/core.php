@@ -143,8 +143,10 @@ interface Throwable extends Stringable
 
 class Exception implements Throwable
 {
+    /** @var string */
     protected $message;
 
+    /** @var int */
     protected $code;
 
     protected string $file;
@@ -202,8 +204,10 @@ class Exception implements Throwable
 
 class Error implements Throwable
 {
+    /** @var string */
     protected $message;
 
+    /** @var int */
     protected $code;
 
     protected string $file;
