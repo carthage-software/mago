@@ -398,6 +398,10 @@ where
                             .map(TObject::Named)
                             .map(TAtomic::Object),
                     );
+
+                    if existing_metadata.kind.is_class() && !existing_metadata.flags.is_abstract() {
+                        acceptable_types.push(atomic);
+                    }
                 } else {
                     // Either not a sealed class, or we're subtracting something that's not in the permitted list,
                     // or this is a concrete class (not abstract/interface) - just keep it

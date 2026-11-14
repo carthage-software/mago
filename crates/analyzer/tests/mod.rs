@@ -854,6 +854,7 @@ test_case!(array_push_unshift_add_int_keys);
 test_case!(builtin_variadic_rejects_unknown_named_argument);
 test_case!(finally_sees_try_body_exits);
 test_case!(closing_tag_after_exit_is_not_code);
+test_case!(sealed_concrete_base_kept_after_negated_instanceof);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);
