@@ -2322,6 +2322,8 @@ where
                     || context.codebase.get_declaring_method_identifier(&method_id) != method_id
                 {
                     acceptable_types.push(atomic.clone());
+                } else if context.codebase.get_class_like(class_name.as_bytes()).is_some_and(|m| m.flags.is_final()) {
+                    did_remove_type = true;
                 } else {
                     let mut new_named = named_object.clone();
                     new_named.add_intersection_type(TAtomic::Object(TObject::new_has_method(method_name)));
