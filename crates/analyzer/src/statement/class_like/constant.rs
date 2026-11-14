@@ -63,7 +63,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassLikeConstantItem<'arena> {
         if let Some(class_metadata) = block_context.scope.get_class_like()
             && let Some(constant_metadata) = class_metadata.constants.get(&word(self.name.value))
         {
-            if let Some(type_metadata) = &constant_metadata.type_metadata {
+            let native_type = constant_metadata.type_declaration.as_ref().filter(|native| {
+                constant_metadata.type_metadata.as_ref().is_some_and(|effective| effective.span != native.span)
+            });
+
+            for type_metadata in [constant_metadata.type_metadata.as_ref(), native_type].into_iter().flatten() {
                 check_type_metadata(context, type_metadata);
             }
 
@@ -82,40 +86,45 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassLikeConstantItem<'arena> {
                     )
                     .with_note("Mago could not determine a value for this constant from its initializer."),
                 );
-            } else if let Some(declared_type_metadata) = constant_metadata.type_metadata.as_ref()
-                && let Some(value_type) = artifacts.get_expression_type(&self.value)
-                && !value_type.is_never()
-                && !declared_type_metadata.type_union.is_mixed()
-                && !declared_type_metadata.type_union.has_template_types()
-                && !declared_type_metadata.type_union.is_generic_parameter()
-            {
-                let mut declared_type = declared_type_metadata.type_union.clone();
-                expand_union(
-                    context.codebase,
-                    &mut declared_type,
-                    &TypeExpansionOptions {
-                        self_class: Some(class_metadata.original_name),
-                        static_class_type: StaticClassType::Name(class_metadata.original_name),
-                        ..Default::default()
-                    },
-                );
+            } else if let Some(value_type) = artifacts.get_expression_type(&self.value) {
+                for declared_type_metadata in
+                    [constant_metadata.type_metadata.as_ref(), native_type].into_iter().flatten()
+                {
+                    if value_type.is_never()
+                        || declared_type_metadata.type_union.is_mixed()
+                        || declared_type_metadata.type_union.has_template_types()
+                        || declared_type_metadata.type_union.is_generic_parameter()
+                    {
+                        continue;
+                    }
 
-                let mut comparison_result = ComparisonResult::new();
-                if !union_comparator::is_contained_by(
-                    context.codebase,
-                    value_type,
-                    &declared_type,
-                    true,
-                    true,
-                    false,
-                    &mut comparison_result,
-                ) {
-                    let value_type_str = value_type.get_id();
-                    let declared_type_str = declared_type.get_id();
-                    let class_name = class_metadata.original_name;
-                    let constant_name = mago_bytes::BytesDisplay(self.name.value);
+                    let mut declared_type = declared_type_metadata.type_union.clone();
+                    expand_union(
+                        context.codebase,
+                        &mut declared_type,
+                        &TypeExpansionOptions {
+                            self_class: Some(class_metadata.original_name),
+                            static_class_type: StaticClassType::Name(class_metadata.original_name),
+                            ..Default::default()
+                        },
+                    );
 
-                    let issue = Issue::error(format!(
+                    let mut comparison_result = ComparisonResult::new();
+                    if !union_comparator::is_contained_by(
+                        context.codebase,
+                        value_type,
+                        &declared_type,
+                        true,
+                        true,
+                        false,
+                        &mut comparison_result,
+                    ) {
+                        let value_type_str = value_type.get_id();
+                        let declared_type_str = declared_type.get_id();
+                        let class_name = class_metadata.original_name;
+                        let constant_name = mago_bytes::BytesDisplay(self.name.value);
+
+                        let issue = Issue::error(format!(
                         "Value for constant `{class_name}::{constant_name}` is not assignable to its declared type."
                     ))
                     .with_annotation(
@@ -131,7 +140,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassLikeConstantItem<'arena> {
                         "Change the value to match the declared type, or update the declared type to accept the value.",
                     );
 
-                    context.collector.report_with_code(IssueCode::InvalidConstantValue, issue);
+                        context.collector.report_with_code(IssueCode::InvalidConstantValue, issue);
+
+                        break;
+                    }
                 }
             }
         }
