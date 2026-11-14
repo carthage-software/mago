@@ -3160,6 +3160,7 @@ test_case!(list_index_range_outside_known_keys);
 test_case!(type_alias_scoped_to_its_class);
 test_case!(class_template_used_in_type_alias);
 test_case!(static_override_inherits_this_return);
+test_case!(named_ancestor_call_forwards_this);
 
 #[test]
 #[cfg_attr(miri, ignore)]

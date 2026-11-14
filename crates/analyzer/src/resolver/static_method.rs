@@ -533,11 +533,21 @@ where
         }
     }
 
-    let static_class_type =
-        get_static_class_type(context, current_class_metadata, classname, fq_class_id, defining_class_metadata);
-
     // Get the class it was called on - need original name for callable creation
     let called_on_class_metadata = context.codebase.get_class_like_by_name(fq_class_id)?;
+
+    let static_class_type = match current_class_metadata {
+        Some(current)
+            if classname.is_named()
+                && !block_context.scope.is_static()
+                && !function_like.method_metadata.as_ref().is_some_and(|method| method.is_static)
+                && (current.name == called_on_class_metadata.name
+                    || current.has_parent(called_on_class_metadata.name)) =>
+        {
+            StaticClassType::Object(get_metadata_object(context, current, current))
+        }
+        _ => get_static_class_type(context, current_class_metadata, classname, fq_class_id, defining_class_metadata),
+    };
 
     Some(ResolvedMethod {
         // Use the original name of the class it was called on
