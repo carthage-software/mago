@@ -46,8 +46,23 @@ pub const DECLARE_DIRECTIVES: [&[u8]; 3] =
     [STRICT_TYPES_DECLARE_DIRECTIVE, ENCODING_DECLARE_DIRECTIVE, TICKS_DECLARE_DIRECTIVE];
 
 // a list of soft reserved keywords in PHP, minus the ones that symbols are allowed to use as names
-pub const SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED: [&[u8]; 7] =
-    [b"parent", b"self", b"true", b"false", b"list", b"null", b"readonly"];
+pub const SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED: [&[u8]; 15] = [
+    b"parent",
+    b"self",
+    b"true",
+    b"false",
+    b"list",
+    b"null",
+    b"readonly",
+    b"bool",
+    b"float",
+    b"int",
+    b"string",
+    b"void",
+    b"iterable",
+    b"object",
+    b"mixed",
+];
 
 // a list of reserved keywords in PHP
 pub const RESERVED_KEYWORDS: [&[u8]; 78] = [
