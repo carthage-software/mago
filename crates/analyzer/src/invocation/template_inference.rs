@@ -772,6 +772,14 @@ fn infer_templates_from_input_and_container_types<A>(
                                     });
                                 }
 
+                                if is_bound_by_receiver(
+                                    template_result,
+                                    generic_parameter.parameter_name,
+                                    &generic_parameter.defining_entity,
+                                ) {
+                                    continue;
+                                }
+
                                 let appearance_depth = usize::from(!top_level);
                                 insert_bound_type(
                                     template_result,
@@ -919,12 +927,14 @@ fn infer_templates_from_input_and_container_types<A>(
 
         let template_parameter_name = &container_generic.parameter_name;
 
-        let should_add_bound = !options.infer_only_if_new
-            || template_result
-                .lower_bounds
-                .get(template_parameter_name)
-                .and_then(|map| map.get(&container_generic.defining_entity))
-                .is_none_or(std::vec::Vec::is_empty);
+        let should_add_bound =
+            !is_bound_by_receiver(template_result, *template_parameter_name, &container_generic.defining_entity)
+                && (!options.infer_only_if_new
+                    || template_result
+                        .lower_bounds
+                        .get(template_parameter_name)
+                        .and_then(|map| map.get(&container_generic.defining_entity))
+                        .is_none_or(std::vec::Vec::is_empty));
 
         if !should_add_bound {
             continue;
@@ -1325,4 +1335,13 @@ fn resolve_atomic_unbound_templates(atomic: &TAtomic) -> TAtomic {
         }
         _ => atomic.clone(),
     }
+}
+
+fn is_bound_by_receiver(template_result: &TemplateResult, name: Word, defining_entity: &GenericParent) -> bool {
+    matches!(defining_entity, GenericParent::ClassLike(_))
+        && template_result
+            .lower_bounds
+            .get(&name)
+            .and_then(|map| map.get(defining_entity))
+            .is_some_and(|bounds| bounds.iter().any(|bound| bound.argument_offset.is_none()))
 }

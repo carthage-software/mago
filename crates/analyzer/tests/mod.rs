@@ -817,6 +817,7 @@ test_case!(isset_on_template_union_shape);
 test_case!(this_matches_static_in_invariant_template);
 test_case!(final_method_static_return_keeps_static);
 test_case!(returned_closure_takes_declared_types);
+test_case!(receiver_bound_template_not_widened);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);
