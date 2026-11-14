@@ -17,6 +17,8 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::combiner::CombinerOptions;
+use mago_codex::ttype::comparator::ComparisonResult;
+use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -480,6 +482,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             let mut finally_block_context = block_context.clone();
             finally_block_context.assigned_variable_ids = WordMap::default();
             finally_block_context.possibly_assigned_variable_ids = WordSet::default();
+            let finally_entry_locals = finally_scope.locals.clone();
             finally_block_context.locals = finally_scope.locals;
             for var_id in finally_block_context.locals.keys() {
                 if !old_block_context_locals.contains_key(var_id) {
@@ -497,6 +500,47 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
             finally_has_returned = finally_block_context.flags.has_returned();
             block_context.possibly_undefined_variable_ids.extend(finally_block_context.possibly_undefined_variable_ids);
+
+            for variable_id in &finally_block_context.possibly_assigned_variable_ids {
+                if !finally_block_context.locals.contains_key(variable_id)
+                    && !variable_id.as_bytes().contains(&b'[')
+                    && !variable_id.as_bytes().contains(&b'-')
+                    && !variable_id.as_bytes().contains(&b':')
+                {
+                    block_context.remove_variable(variable_id.as_bytes(), true, context);
+                }
+            }
+
+            for (variable_id, finally_type) in &finally_block_context.locals {
+                if finally_block_context.assigned_variable_ids.contains_key(variable_id)
+                    || finally_entry_locals.get(variable_id) == Some(finally_type)
+                {
+                    continue;
+                }
+
+                let Some(current_type) = block_context.locals.get(variable_id) else {
+                    continue;
+                };
+
+                if current_type != finally_type
+                    && union_comparator::is_contained_by(
+                        context.codebase,
+                        finally_type,
+                        current_type,
+                        false,
+                        false,
+                        false,
+                        &mut ComparisonResult::default(),
+                    )
+                {
+                    let mut narrowed_type = (**finally_type).clone();
+                    narrowed_type.set_possibly_undefined(
+                        current_type.possibly_undefined(),
+                        Some(current_type.possibly_undefined_from_try()),
+                    );
+                    block_context.locals.insert(*variable_id, Rc::new(narrowed_type));
+                }
+            }
 
             for (variable_id, _) in finally_block_context.assigned_variable_ids {
                 let finally_variable_type = finally_block_context.locals.remove(&variable_id);

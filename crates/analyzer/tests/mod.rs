@@ -807,6 +807,7 @@ test_case!(is_iterable_on_object_narrows_to_traversable);
 test_case!(method_exists_narrows_final_classes);
 test_case!(foreach_key_assigned_after_value);
 test_case!(unset_in_branch_is_possibly_undefined);
+test_case!(finally_narrowing_reaches_code_after);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);
