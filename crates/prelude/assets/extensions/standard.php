@@ -4621,22 +4621,35 @@ function metaphone(string $string, int $max_phonemes = 0): string {}
  * @template K
  * @template V
  * @template T
- * @template O
  *
  * @param object|array<K, V> $array
- * @param (callable(V, K, T): O) $callback
+ * @param (callable(V, K, T): mixed) $callback
  * @param T|null $arg
  *
  * @param-out ($array is object ? object : (
  *    $array is list<V> ? (
- *      $array is non-empty-list<V> ? non-empty-list<O> : list<O>
+ *      $array is non-empty-list<V> ? non-empty-list<V> : list<V>
  *    ) : (
- *      $array is non-empty-array<K, V> ? non-empty-array<K, O> : array<K, O>
+ *      $array is non-empty-array<K, V> ? non-empty-array<K, V> : array<K, V>
  *    )
  * )) $array
  */
 function array_walk(object|array &$array, callable $callback, mixed $arg = null): true {}
 
+/**
+ * @template K
+ * @template V
+ *
+ * @param object|array<K, V> $array
+ *
+ * @param-out ($array is object ? object : (
+ *    $array is list<V> ? (
+ *      $array is non-empty-list<V> ? non-empty-list<V> : list<V>
+ *    ) : (
+ *      $array is non-empty-array<K, V> ? non-empty-array<K, V> : array<K, V>
+ *    )
+ * )) $array
+ */
 function array_walk_recursive(object|array &$array, callable $callback, mixed $arg = null): true {}
 
 /**

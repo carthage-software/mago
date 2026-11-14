@@ -15,7 +15,7 @@ function multiply_by(array $integers, int|float $by): array
 
 /**
  * @param array<string, int> $integers
- * @return array<string, string>
+ * @return array<string, int>
  */
 function multiply_assoc_by(array $integers, int|float $by): array
 {
