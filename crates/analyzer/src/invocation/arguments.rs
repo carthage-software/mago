@@ -117,10 +117,14 @@ where
     let was_inside_general_use = block_context.flags.inside_general_use();
     let was_inside_call = block_context.flags.inside_call();
     let was_inside_variable_reference = block_context.flags.inside_variable_reference();
+    let was_inside_isset = block_context.flags.inside_isset();
+    let was_inside_unset = block_context.flags.inside_unset();
 
     block_context.flags.set_inside_general_use(true);
     block_context.flags.set_inside_call(true);
     block_context.flags.set_inside_variable_reference(referenced_parameter);
+    block_context.flags.set_inside_isset(false);
+    block_context.flags.set_inside_unset(false);
 
     match argument_expression {
         Expression::ArrayAppend(append) if referenced_parameter => {
@@ -139,6 +143,8 @@ where
     block_context.flags.set_inside_general_use(was_inside_general_use);
     block_context.flags.set_inside_call(was_inside_call);
     block_context.flags.set_inside_variable_reference(was_inside_variable_reference);
+    block_context.flags.set_inside_isset(was_inside_isset);
+    block_context.flags.set_inside_unset(was_inside_unset);
     artifacts.inferred_parameter_types = inferred_parameter_types;
     artifacts.inferred_return_type = inferred_return_type;
 

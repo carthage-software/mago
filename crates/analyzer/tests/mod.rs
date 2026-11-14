@@ -3332,6 +3332,7 @@ test_case!(loop_entry_with_numeric_string_or_float_bound);
 test_case!(always_entered_loop_keeps_possibly_undefined);
 test_case!(generic_mixin_property_binds_type_arguments);
 test_case!(stdclass_subclass_allows_undocumented_properties);
+test_case!(call_argument_inside_isset_is_a_plain_read);
 
 #[test]
 #[cfg_attr(miri, ignore)]
