@@ -3246,6 +3246,7 @@ test_case!(static_on_template_receiver_is_the_template);
 test_case!(real_method_wins_over_sibling_pseudo_method);
 test_case!(pseudo_method_does_not_implement_abstract_method);
 test_case!(bare_template_skips_input_matched_by_sibling);
+test_case!(callable_string_literal_must_name_a_callable);
 
 #[test]
 #[cfg_attr(miri, ignore)]

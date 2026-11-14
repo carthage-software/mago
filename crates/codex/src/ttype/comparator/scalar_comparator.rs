@@ -46,15 +46,8 @@ pub fn is_contained_by(
         }
         (TAtomic::Scalar(TScalar::String(c)), TAtomic::Scalar(TScalar::String(i))) => {
             if c.is_callable {
-                let is_input_callable = i.is_callable || {
-                    if let Some(literal) = i.get_known_literal_value() {
-                        // if it contains `::` - thats enough, no need to check class/method further
-                        // unless we need to at some point..
-                        memchr::memmem::find(literal, b"::").is_some() || codebase.function_exists(literal)
-                    } else {
-                        false
-                    }
-                };
+                let is_input_callable = i.is_callable
+                    || i.get_known_literal_value().is_some_and(|literal| is_callable_literal(codebase, literal));
 
                 if !is_input_callable {
                     return false;
@@ -138,6 +131,21 @@ pub fn is_contained_by(
     }
 
     false
+}
+
+/// Whether `is_callable()` holds for a literal string: a function name, or a
+/// `Class::method` pair naming an existing method, either with a leading `\`.
+fn is_callable_literal(codebase: &CodebaseMetadata, literal: &[u8]) -> bool {
+    let literal = literal.strip_prefix(b"\\").unwrap_or(literal);
+    let Some(separator) = memchr::memmem::find(literal, b"::") else {
+        return codebase.function_exists(literal);
+    };
+
+    let (class, method) = (&literal[..separator], &literal[separator + 2..]);
+
+    [b"self".as_slice(), b"parent", b"static"].iter().any(|keyword| class.eq_ignore_ascii_case(keyword))
+        || codebase.method_exists(class, method)
+        || codebase.method_exists(class, b"__callStatic")
 }
 
 #[cfg(test)]
