@@ -1188,8 +1188,38 @@ fn check_class_like_extends<'ctx, 'arena, A>(
     let using_name = class_like_metadata.original_name;
     let using_class_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
 
+    let extends_itself = extends.types.iter().any(|extended_type| {
+        context.resolved_names.get(&extended_type).eq_ignore_ascii_case(class_like_metadata.name.as_bytes())
+    });
+
+    if !extends_itself
+        && (class_like_metadata.all_parent_classes.contains(&class_like_metadata.name)
+            || class_like_metadata.all_parent_interfaces.contains(&class_like_metadata.name))
+    {
+        context.collector.report_with_code(
+            IssueCode::InvalidExtend,
+            Issue::error(format!("{using_kind_capitalized} `{using_name}` extends itself through its parents."))
+                .with_annotation(Annotation::primary(using_class_span).with_message("This inheritance forms a cycle"))
+                .with_note("PHP cannot declare a type that is its own ancestor."),
+        );
+    }
+
+    let mut seen = HashSet::default();
     for extended_type in &extends.types {
         let extended_type_str = context.resolved_names.get(&extended_type);
+        if !seen.insert(extended_type_str.to_ascii_lowercase()) {
+            context.collector.report_with_code(
+                IssueCode::InvalidExtend,
+                Issue::error(format!(
+                    "{using_kind_capitalized} `{using_name}` extends `{}` more than once.",
+                    BytesDisplay(extended_type_str)
+                ))
+                .with_annotation(Annotation::primary(extended_type.span()).with_message("Listed again here")),
+            );
+
+            continue;
+        }
+
         let extended_class_metadata = context.codebase.get_class_like(extended_type_str);
 
         // Case: The extended type does not exist.
@@ -1380,8 +1410,22 @@ fn check_class_like_implements<'ctx, 'arena, A>(
     let using_name = class_like_metadata.original_name;
     let using_class_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
 
+    let mut seen = HashSet::default();
     for implemented_type in &implements.types {
         let implemented_type_str = context.resolved_names.get(&implemented_type);
+        if !seen.insert(implemented_type_str.to_ascii_lowercase()) {
+            context.collector.report_with_code(
+                IssueCode::InvalidImplement,
+                Issue::error(format!(
+                    "{using_kind_capitalized} `{using_name}` implements `{}` more than once.",
+                    BytesDisplay(implemented_type_str)
+                ))
+                .with_annotation(Annotation::primary(implemented_type.span()).with_message("Listed again here")),
+            );
+
+            continue;
+        }
+
         let implemented_interface_metadata = context.codebase.get_class_like(implemented_type_str);
 
         if let Some(implemented_metadata) = implemented_interface_metadata {
