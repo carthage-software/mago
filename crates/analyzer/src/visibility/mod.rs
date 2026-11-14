@@ -122,7 +122,13 @@ where
 
     let declaring_class =
         context.codebase.get_declaring_method_class_by_id(&lookup_id).unwrap_or_else(|| method_id.get_class_name());
-    let is_visible = is_visible_from_scope(context.codebase, visibility, declaring_class.as_bytes(), calling_class);
+    let is_visible = is_member_visible_from_scope(
+        context.codebase,
+        visibility,
+        declaring_class.as_bytes(),
+        ProtectedMember::Method(lookup_id.get_method_name()),
+        calling_class,
+    );
     if !is_visible {
         let declaring_class_name = context
             .codebase
@@ -188,10 +194,11 @@ where
     let declaring_class =
         context.codebase.get_declaring_method_class_by_id(&lookup_id).unwrap_or_else(|| method_id.get_class_name());
 
-    is_visible_from_scope(
+    is_member_visible_from_scope(
         context.codebase,
         visibility,
         declaring_class.as_bytes(),
+        ProtectedMember::Method(lookup_id.get_method_name()),
         block_context.scope.get_class_like_name(),
     )
 }
@@ -297,10 +304,11 @@ where
     }
 
     let visibility = property_metadata.read_visibility;
-    let is_visible = is_visible_from_scope(
+    let is_visible = is_member_visible_from_scope(
         context.codebase,
         visibility,
         declaring_class_metadata.name.as_bytes(),
+        ProtectedMember::Property(property_name),
         block_context.scope.get_class_like_name(),
     );
 
@@ -386,10 +394,11 @@ where
 
     let visibility = effective_write_visibility(property_metadata, context.settings.version);
 
-    let is_visible = is_visible_from_scope(
+    let is_visible = is_member_visible_from_scope(
         context.codebase,
         visibility,
         declaring_class_metadata.name.as_bytes(),
+        ProtectedMember::Property(property_name),
         block_context.scope.get_class_like_name(),
     );
     if !is_visible {
@@ -517,6 +526,49 @@ pub(crate) fn effective_write_visibility(property: &PropertyMetadata, version: P
     match property.write_visibility {
         Visibility::Public => Visibility::Protected,
         visibility => visibility,
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum ProtectedMember {
+    Property(Word),
+    Method(Word),
+}
+
+/// PHP checks a protected member against the class that first declared it, so an override is
+/// visible wherever the member it overrides is.
+pub(crate) fn is_member_visible_from_scope(
+    codebase: &CodebaseMetadata,
+    visibility: Visibility,
+    declaring_class_id: &[u8],
+    member: ProtectedMember,
+    current_class_opt: Option<Word>,
+) -> bool {
+    if is_visible_from_scope(codebase, visibility, declaring_class_id, current_class_opt) {
+        return true;
+    }
+
+    if visibility != Visibility::Protected {
+        return false;
+    }
+
+    let Some(declaring_metadata) = codebase.get_class_like(declaring_class_id) else {
+        return false;
+    };
+
+    match member {
+        ProtectedMember::Property(name) => {
+            declaring_metadata.overridden_property_ids.get(&name).is_some_and(|parents| {
+                parents
+                    .iter()
+                    .any(|parent| is_visible_from_scope(codebase, visibility, parent.as_bytes(), current_class_opt))
+            })
+        }
+        ProtectedMember::Method(name) => declaring_metadata.overridden_method_ids.get(&name).is_some_and(|parents| {
+            parents
+                .keys()
+                .any(|parent| is_visible_from_scope(codebase, visibility, parent.as_bytes(), current_class_opt))
+        }),
     }
 }
 

@@ -791,6 +791,7 @@ test_case!(properties_of_skips_static_properties);
 test_case!(extract_takes_any_array);
 test_case!(comparison_past_int_range);
 test_case!(private_members_on_subclass_instances);
+test_case!(protected_member_redeclared_in_sibling);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);
