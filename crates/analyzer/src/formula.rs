@@ -782,7 +782,7 @@ fn collect_conditional_assertions_inner(
 
             if let Some(assigned_types) = assigned_types {
                 let branch_types = if when_true { &assigned_types.when_true } else { &assigned_types.when_false };
-                for (variable, ty) in branch_types {
+                for (variable, ty) in branch_types.iter().filter(|(_, ty)| !ty.is_vanilla_mixed()) {
                     assertions
                         .entry(*variable)
                         .or_default()
