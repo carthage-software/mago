@@ -374,7 +374,7 @@ where
         }
 
         let unary_operand_span = unary_prefix.operand.span();
-        let negated = negate_formula(
+        let mut negated = negate_formula(
             &get_base_formula(
                 conditional_object_id,
                 unary_operand_span,
@@ -386,6 +386,17 @@ where
             )?,
             algebra_thresholds,
         )?;
+
+        if let Expression::Construct(Construct::Empty(empty)) = unwrap_expression(unary_prefix.operand) {
+            add_access_base_clauses(
+                empty.value,
+                &mut negated,
+                conditional_object_id,
+                creating_object_id,
+                assertion_context,
+                artifacts,
+            );
+        }
 
         return if negated.len() > usize::from(formula_size_threshold) { None } else { Some(negated) };
     }
