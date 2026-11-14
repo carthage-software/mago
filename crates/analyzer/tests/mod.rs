@@ -3324,6 +3324,7 @@ test_case!(string_length_comparisons_narrow);
 test_case!(isset_on_uninitialized_typed_property);
 test_case!(closure_inherits_symbol_existence_guards);
 test_case!(closure_keeps_declared_return_over_mixed_body);
+test_case!(literal_class_name_checked_like_class_constant);
 
 #[test]
 #[cfg_attr(miri, ignore)]

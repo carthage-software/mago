@@ -596,6 +596,16 @@ pub(crate) fn can_be_identical(
     {
         return match (class_string, string.get_known_literal_value()) {
             (TClassLikeString::Literal { value }, Some(str_value)) => value.as_bytes().eq_ignore_ascii_case(str_value),
+            (_, Some(str_value)) => {
+                let name = str_value.strip_prefix(b"\\").unwrap_or(str_value);
+
+                match (codebase.get_class_like(name), class_string.constraint()) {
+                    (Some(metadata), Some(TAtomic::Object(TObject::Named(constraint)))) => {
+                        codebase.is_instance_of(metadata.name.as_bytes(), constraint.name.as_bytes())
+                    }
+                    _ => true,
+                }
+            }
             _ => true,
         };
     }
