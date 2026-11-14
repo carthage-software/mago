@@ -1128,6 +1128,11 @@ where
                     continue;
                 }
 
+                if is_callable && existing_string.is_numeric {
+                    did_remove_type = true;
+                    continue;
+                }
+
                 if (is_numeric && !existing_string.is_numeric)
                     || (is_truthy && !existing_string.is_truthy)
                     || (is_non_empty && !existing_string.is_non_empty)
@@ -1162,8 +1167,11 @@ where
             }
             TAtomic::Scalar(TScalar::Numeric) => {
                 did_remove_type = true;
-                acceptable_types
-                    .push(get_string_with_props(true, is_truthy, is_non_empty, is_callable, casing).get_single_owned());
+                if !is_callable {
+                    acceptable_types.push(
+                        get_string_with_props(true, is_truthy, is_non_empty, is_callable, casing).get_single_owned(),
+                    );
+                }
             }
             TAtomic::GenericParameter(generic_parameter) => {
                 did_remove_type = true;

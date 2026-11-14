@@ -549,6 +549,12 @@ where
                 return Some(first_type);
             }
         }
+        (TAtomic::Scalar(TScalar::String(string)), class_string @ TAtomic::Scalar(TScalar::ClassLikeString(_)))
+        | (class_string @ TAtomic::Scalar(TScalar::ClassLikeString(_)), TAtomic::Scalar(TScalar::String(string)))
+            if string.is_unspecified_literal() && !string.is_numeric =>
+        {
+            return Some(class_string.clone());
+        }
         (TAtomic::Array(TArray::Keyed(first_array)), TAtomic::Array(TArray::Keyed(second_array))) => {
             return intersect_keyed_arrays(context, first_array, second_array);
         }
