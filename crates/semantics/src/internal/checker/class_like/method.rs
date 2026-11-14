@@ -28,6 +28,9 @@ pub fn check_method<'ast, 'arena>(
     context: &mut Context<'_, 'ast, 'arena>,
 ) {
     check_parameter_list_trailing_comma(&method.parameter_list, context);
+    if !method_name.eq_ignore_ascii_case(b"__construct") {
+        check_for_promoted_properties_outside_constructor(&method.parameter_list, context);
+    }
 
     let method_name_bytes = method_name;
     let method_name = BytesDisplay(method_name);
@@ -450,9 +453,7 @@ pub fn check_method<'ast, 'arena>(
         }
     }
 
-    if !method_name_bytes.eq_ignore_ascii_case(b"__construct") {
-        check_for_promoted_properties_outside_constructor(&method.parameter_list, context);
-    } else if is_abstract {
+    if is_abstract && method_name_bytes.eq_ignore_ascii_case(b"__construct") {
         for parameter in &method.parameter_list.parameters {
             if parameter.is_promoted_property() {
                 context.report(
