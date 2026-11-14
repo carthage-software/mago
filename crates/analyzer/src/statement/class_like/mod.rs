@@ -49,11 +49,15 @@ use mago_syntax::cst::ClassLikeMember;
 use mago_syntax::cst::Enum;
 use mago_syntax::cst::EnumCaseItem;
 use mago_syntax::cst::Extends;
+use mago_syntax::cst::Identifier;
 use mago_syntax::cst::Implements;
 use mago_syntax::cst::Interface;
 use mago_syntax::cst::Property;
 use mago_syntax::cst::Trait;
 use mago_syntax::cst::TraitUse;
+use mago_syntax::cst::TraitUseAdaptation;
+use mago_syntax::cst::TraitUseMethodReference;
+use mago_syntax::cst::TraitUseSpecification;
 use mago_word::Word;
 use mago_word::ascii_lowercase_word;
 use mago_word::word;
@@ -862,8 +866,11 @@ where
     for member in members {
         if let ClassLikeMember::TraitUse(used_trait) = member {
             check_class_like_use(context, class_like_metadata, used_trait);
+            check_trait_use_adaptations(context, class_like_metadata, used_trait);
         }
     }
+
+    check_trait_method_collisions(context, class_like_metadata);
 
     let has_complete_hierarchy = !class_like_metadata.has_incomplete_hierarchy();
 
@@ -4059,6 +4066,141 @@ fn check_readonly_class_trait_properties<'ctx, 'arena, A>(
                     }
                 }
             }
+        }
+    }
+}
+
+fn check_trait_method_collisions<A>(context: &mut Context<'_, '_, A>, class_like_metadata: &ClassLikeMetadata)
+where
+    A: Arena,
+{
+    let mut providers: IndexMap<Word, Vec<(Word, MethodIdentifier)>> = IndexMap::default();
+    for trait_name in class_like_metadata.direct_trait_names() {
+        let Some(trait_metadata) = context.codebase.get_class_like_by_name(trait_name) else {
+            continue;
+        };
+
+        for (method_name, declaring_id) in &trait_metadata.declaring_method_ids {
+            if class_like_metadata.excludes_trait_method(trait_metadata.name, *method_name, context.codebase)
+                || context
+                    .codebase
+                    .get_method_by_id(declaring_id)
+                    .and_then(|method| method.method_metadata.as_ref())
+                    .is_none_or(|method| method.is_abstract)
+            {
+                continue;
+            }
+
+            providers.entry(*method_name).or_default().push((trait_metadata.original_name, *declaring_id));
+        }
+    }
+
+    for (method_name, traits) in providers {
+        let [(first_trait, first_id), (second_trait, second_id), ..] = traits.as_slice() else {
+            continue;
+        };
+
+        if first_id == second_id
+            || class_like_metadata
+                .declaring_method_ids
+                .get(&method_name)
+                .is_some_and(|declaring| declaring.get_class_name() == class_like_metadata.name)
+        {
+            continue;
+        }
+
+        let method = context.codebase.get_method_by_id(first_id).map_or(method_name, |method| method.original_name);
+
+        context.collector.report_with_code(
+            IssueCode::InvalidTraitUse,
+            Issue::error(format!(
+                "Trait method `{second_trait}::{method}` collides with `{first_trait}::{method}` in `{}`.",
+                class_like_metadata.original_name
+            ))
+            .with_annotation(
+                Annotation::primary(class_like_metadata.name_span.unwrap_or(class_like_metadata.span))
+                    .with_message(format!("`{method}` comes from both `{first_trait}` and `{second_trait}`")),
+            )
+            .with_note("PHP refuses to compile a class that gets the same method from two traits.")
+            .with_help(format!(
+                "Pick one with `{first_trait}::{method} insteadof {second_trait};`, or define `{method}` in the class."
+            )),
+        );
+    }
+}
+
+fn check_trait_use_adaptations<A>(
+    context: &mut Context<'_, '_, A>,
+    class_like_metadata: &ClassLikeMetadata,
+    trait_use: &TraitUse<'_>,
+) where
+    A: Arena,
+{
+    let TraitUseSpecification::Concrete(specification) = &trait_use.specification else {
+        return;
+    };
+
+    let used_traits: Vec<Word> = class_like_metadata.direct_trait_names().collect();
+    let resolve = |context: &Context<'_, '_, A>, name: &Identifier<'_>| {
+        ascii_lowercase_word(&context.scope.resolve(NameKind::Default, name.value()).0)
+    };
+
+    let report = |context: &mut Context<'_, '_, A>, span: Span, message: String| {
+        context.collector.report_with_code(
+            IssueCode::InvalidTraitUse,
+            Issue::error(message)
+                .with_annotation(Annotation::primary(span).with_message("PHP refuses to compile this adaptation")),
+        );
+    };
+
+    for adaptation in &specification.adaptations {
+        let (trait_names, method_name) = match adaptation {
+            TraitUseAdaptation::Precedence(precedence) => (
+                std::iter::once(&precedence.method_reference.trait_name)
+                    .chain(precedence.trait_names.iter())
+                    .collect::<Vec<_>>(),
+                &precedence.method_reference.method_name,
+            ),
+            TraitUseAdaptation::Alias(alias) => match &alias.method_reference {
+                TraitUseMethodReference::Absolute(reference) => (vec![&reference.trait_name], &reference.method_name),
+                TraitUseMethodReference::Identifier(identifier) => (vec![], identifier),
+            },
+        };
+
+        let method = ascii_lowercase_word(method_name.value);
+        let has_method = |context: &Context<'_, '_, A>, trait_name: Word| {
+            context
+                .codebase
+                .get_class_like_by_name(trait_name)
+                .is_none_or(|metadata| metadata.declaring_method_ids.contains_key(&method))
+        };
+
+        for trait_name in &trait_names {
+            let resolved = resolve(context, trait_name);
+            if !used_traits.contains(&resolved) {
+                report(
+                    context,
+                    trait_name.span(),
+                    format!(
+                        "Trait `{}` is not used by `{}`.",
+                        BytesDisplay(trait_name.value()),
+                        class_like_metadata.original_name
+                    ),
+                );
+            }
+        }
+
+        let exists = match trait_names.first() {
+            Some(source) => has_method(context, resolve(context, source)),
+            None => used_traits.iter().any(|trait_name| has_method(context, *trait_name)),
+        };
+
+        if !exists {
+            report(
+                context,
+                method_name.span(),
+                format!("No used trait defines a method `{}`.", BytesDisplay(method_name.value)),
+            );
         }
     }
 }

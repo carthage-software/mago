@@ -3175,6 +3175,7 @@ test_case!(final_non_traversable_class_is_never_iterable);
 test_case!(null_coalesce_rhs_assignment_is_conditional);
 test_case!(short_circuit_assignment_drops_old_clauses);
 test_case!(static_in_generic_parent_method_uses_own_templates);
+test_case!(trait_method_collisions_and_bad_adaptations);
 
 #[test]
 #[cfg_attr(miri, ignore)]

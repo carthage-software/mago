@@ -24,7 +24,8 @@ pub(crate) struct TraitMethodModifiers {
 }
 
 impl ClassLikeMetadata {
-    pub(crate) fn excludes_trait_method(&self, source: Word, method: Word, codebase: &CodebaseMetadata) -> bool {
+    #[must_use]
+    pub fn excludes_trait_method(&self, source: Word, method: Word, codebase: &CodebaseMetadata) -> bool {
         self.trait_method_adaptations.as_ref().is_some_and(|adaptations| {
             adaptations.excluded_methods.iter().any(|excluded| {
                 excluded.get_method_name() == method

@@ -33,6 +33,7 @@ trait TraitB
 class MultiTraitUser
 {
     use TraitA, TraitB {
+        // @mago-expect analysis:invalid-trait-use
         TraitA::SHARED insteadof TraitB;
     }
 
