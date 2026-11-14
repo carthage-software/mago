@@ -176,22 +176,22 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
                     }
                     None => loop_scope.variables_defined_at_every_break = Some(defined_here),
                 }
+            }
 
-                for (var_id, var_type) in &block_context.locals {
-                    if !loop_scope.parent_context_variables.contains_key(var_id) {
-                        loop_scope.possibly_defined_loop_parent_variables.insert(
-                            *var_id,
-                            match loop_scope.possibly_defined_loop_parent_variables.get(var_id) {
-                                Some(existing_type) => Rc::new(combine_union_types(
-                                    existing_type,
-                                    var_type,
-                                    context.codebase,
-                                    CombinerOptions::default(),
-                                )),
-                                None => Rc::clone(var_type),
-                            },
-                        );
-                    }
+            for (var_id, var_type) in &block_context.locals {
+                if !loop_scope.parent_context_variables.contains_key(var_id) {
+                    loop_scope.possibly_defined_loop_parent_variables.insert(
+                        *var_id,
+                        match loop_scope.possibly_defined_loop_parent_variables.get(var_id) {
+                            Some(existing_type) => Rc::new(combine_union_types(
+                                existing_type,
+                                var_type,
+                                context.codebase,
+                                CombinerOptions::default(),
+                            )),
+                            None => Rc::clone(var_type),
+                        },
+                    );
                 }
             }
 
