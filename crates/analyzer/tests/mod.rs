@@ -3197,6 +3197,7 @@ test_case!(header_docblock_before_use_statements);
 test_case!(generator_ends_without_return);
 test_case!(endless_loop_parent_variable_takes_break_type);
 test_case!(docblock_string_literal_escapes);
+test_case!(callable_parameter_default_must_be_null);
 
 #[test]
 #[cfg_attr(miri, ignore)]

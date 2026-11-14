@@ -1515,6 +1515,26 @@ fn check_parameter_default_value<'ctx, 'arena, A>(
         return;
     }
 
+    if !default_type.is_null()
+        && parameter_metadata.type_declaration_metadata.as_ref().is_some_and(|native| {
+            native.type_union.types.iter().any(|atomic| matches!(atomic, TAtomic::Callable(_)))
+                && native.type_union.types.iter().all(|atomic| matches!(atomic, TAtomic::Callable(_) | TAtomic::Null))
+        })
+    {
+        context.collector.report_with_code(
+            IssueCode::InvalidParameterDefaultValue,
+            Issue::error(format!("A `callable` parameter `{}` can only default to `null`.", parameter_metadata.name.0))
+                .with_annotation(
+                    Annotation::primary(default_expression.span())
+                        .with_message(format!("This default value has type `{}`", default_type.get_id())),
+                )
+                .with_note("PHP refuses to compile a `callable` parameter with any default other than `null`.")
+                .with_help("Default to `null` and fall back to the callable inside the function."),
+        );
+
+        return;
+    }
+
     let allow_implicit_null_default =
         default_type.is_null() && context.settings.version.is_supported(Feature::ImplicitlyNullableParameterTypes);
 
