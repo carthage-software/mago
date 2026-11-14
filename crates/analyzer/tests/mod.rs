@@ -809,6 +809,7 @@ test_case!(foreach_key_assigned_after_value);
 test_case!(unset_in_branch_is_possibly_undefined);
 test_case!(finally_narrowing_reaches_code_after);
 test_case!(unset_in_loop_is_possibly_undefined);
+test_case!(property_check_narrows_object_shape);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);

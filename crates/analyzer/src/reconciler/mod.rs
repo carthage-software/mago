@@ -365,6 +365,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
                     changed_var_ids,
                     &result_type,
                     context,
+                    !has_inverted_isset,
                 );
             }
 
@@ -434,6 +435,15 @@ pub fn reconcile_keyed_types<'ctx, A>(
             }
         } else if !has_negation && !has_truthy_or_falsy_or_empty && !has_isset && !has_relational_comparison {
             changed_var_ids.insert(*key);
+        } else if has_isset && !has_negation && memchr::memmem::find(key_str, b"->").is_some() {
+            adjust_object_property_type(
+                borrow_path_parts(key_str),
+                block_context,
+                changed_var_ids,
+                &result_type,
+                context,
+                true,
+            );
         }
 
         if !has_object_array_access {
@@ -810,6 +820,7 @@ fn adjust_object_property_type<A>(
     changed_var_ids: &mut WordSet,
     result_type: &TUnion,
     context: &Context<'_, '_, A>,
+    update_shape: bool,
 ) where
     A: Arena,
 {
@@ -837,8 +848,22 @@ fn adjust_object_property_type<A>(
     let atomic_types = std::mem::take(existing_type.types.to_mut());
     let original_len = atomic_types.len();
     let mut compatible_types = Vec::with_capacity(original_len);
+    let mut shape_changed = false;
 
     for base_atomic_type in atomic_types {
+        if update_shape
+            && let TAtomic::Object(TObject::WithProperties(shape)) = &base_atomic_type
+            && !result_type.possibly_undefined()
+            && let Some((optional, property_type)) = shape.known_properties.get(&word(property_name))
+            && (*optional || property_type != result_type)
+        {
+            let mut shape = shape.clone();
+            shape.known_properties.insert(word(property_name), (false, result_type.clone()));
+            compatible_types.push(TAtomic::Object(TObject::WithProperties(shape)));
+            shape_changed = true;
+            continue;
+        }
+
         let should_check = match &base_atomic_type {
             TAtomic::Object(TObject::Named(named)) => {
                 let fq_class_name = named.get_name();
@@ -871,8 +896,12 @@ fn adjust_object_property_type<A>(
         }
     }
 
-    if !compatible_types.is_empty() && compatible_types.len() < original_len {
+    if !compatible_types.is_empty() && (shape_changed || compatible_types.len() < original_len) {
         *existing_type.types.to_mut() = compatible_types;
+        if shape_changed {
+            adjust_object_property_type(key_parts, block_context, changed_var_ids, &existing_type, context, true);
+        }
+
         block_context.locals.insert(base_key_atom, Rc::new(existing_type));
         changed_var_ids.insert(base_key_atom);
     }

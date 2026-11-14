@@ -2415,10 +2415,30 @@ where
             TAtomic::Object(TObject::Enum(_)) => {
                 did_remove_type = true;
             }
-            TAtomic::Object(TObject::Any | TObject::WithProperties(_)) => {
+            TAtomic::Object(TObject::Any) => {
                 acceptable_types.push(TAtomic::Object(TObject::new_has_property(property_name)));
                 did_remove_type = true;
             }
+            TAtomic::Object(TObject::WithProperties(shape)) => match shape.known_properties.get(&property_name) {
+                Some((false, _)) => {
+                    acceptable_types.push(atomic.clone());
+                }
+                Some((true, property_type)) => {
+                    let mut shape = shape.clone();
+                    shape.known_properties.insert(property_name, (false, property_type.clone()));
+                    acceptable_types.push(TAtomic::Object(TObject::WithProperties(shape)));
+                    did_remove_type = true;
+                }
+                None if shape.sealed => {
+                    did_remove_type = true;
+                }
+                None => {
+                    let mut shape = shape.clone();
+                    shape.known_properties.insert(property_name, (false, get_mixed()));
+                    acceptable_types.push(TAtomic::Object(TObject::WithProperties(shape)));
+                    did_remove_type = true;
+                }
+            },
             TAtomic::Object(TObject::Named(named_object)) => {
                 let mut new_named = named_object.clone();
                 new_named.add_intersection_type(TAtomic::Object(TObject::new_has_property(property_name)));
