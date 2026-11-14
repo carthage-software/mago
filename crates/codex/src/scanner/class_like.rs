@@ -1521,7 +1521,7 @@ fn create_enum_methods(codebase: &mut CodebaseMetadata, class_like: &mut ClassLi
             codebase.function_likes.insert(method_id, Box::new(function_like_metadata));
         };
 
-    let enum_name_word = class_like.name;
+    let enum_name_word = class_like.original_name;
     let backing_type = class_like.enum_type.clone();
 
     if let Some(backing_type) = backing_type {
