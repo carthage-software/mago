@@ -14,12 +14,14 @@ use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::MethodMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
+use mago_codex::ttype::TypeRef;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
@@ -962,9 +964,52 @@ fn infer_templates_from_input_and_container_types<A>(
         }
     }
 
-    for container_atomic_part in generic_container_parts {
+    for container_atomic_part in &generic_container_parts {
         let TAtomic::GenericParameter(container_generic) = container_atomic_part else {
             continue;
+        };
+
+        let mentions_other_template = |node: TypeRef<'_>| match node {
+            TypeRef::Atomic(TAtomic::GenericParameter(TGenericParameter {
+                parameter_name, defining_entity, ..
+            }))
+            | TypeRef::Atomic(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
+                parameter_name,
+                defining_entity,
+                ..
+            }))) => {
+                *parameter_name != container_generic.parameter_name
+                    || *defining_entity != container_generic.defining_entity
+            }
+            _ => false,
+        };
+
+        let residual_input_type = {
+            let unmatched: Vec<TAtomic> = residual_input_type
+                .types
+                .iter()
+                .filter(|input_atomic| {
+                    !generic_container_parts.iter().any(|sibling| {
+                        !sibling.is_generic_parameter()
+                            && !mentions_other_template(TypeRef::Atomic(sibling))
+                            && !sibling.any_child_node(mentions_other_template)
+                            && atomic_comparator::is_contained_by(
+                                context.codebase,
+                                input_atomic,
+                                &resolve_atomic_unbound_templates(sibling),
+                                false,
+                                &mut ComparisonResult::default(),
+                            )
+                    })
+                })
+                .cloned()
+                .collect();
+
+            if unmatched.is_empty() {
+                continue;
+            }
+
+            TUnion::from_vec(unmatched)
         };
 
         let template_parameter_name = &container_generic.parameter_name;
