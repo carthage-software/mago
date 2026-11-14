@@ -380,6 +380,20 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
             UnaryPrefixOperator::IntCast(_, _) | UnaryPrefixOperator::IntegerCast(_, _) => {
                 let resulting_type = match operand_type {
                     Some(t) => {
+                        if has_array_in_cast_operand(&t) {
+                            context.collector.report_with_code(
+                                IssueCode::ArrayToIntCast,
+                                Issue::warning("Casting an array to int instead of counting its elements.")
+                                    .with_annotation(
+                                        Annotation::primary(self.span())
+                                            .with_message("Casting an array to int always returns 1 if the array is non-empty, regardless of the number of elements."),
+                                    )
+                                    .with_help("Use count() to get the number of elements in an array.")
+                                    .with_note("An empty array ([]) casts to 0.")
+                                    .with_note("Any non-empty array casts to 1, not its element count."),
+                            );
+                        }
+
                         // we intentionally do not report redundant casts here, as
                         // what we think is an integer, might be a float at runtime.
                         //
@@ -1640,6 +1654,14 @@ impl NumericInterval {
 
         Some(TInteger::from_bounds(Some(minimum as i64), Some(maximum as i64)))
     }
+}
+
+fn has_array_in_cast_operand(operand_type: &TUnion) -> bool {
+    operand_type.types.iter().any(|atomic| {
+        atomic.is_array()
+            || atomic.is_iterable()
+            || atomic.map_generic_parameter_constraint(has_array_in_cast_operand).unwrap_or(false)
+    })
 }
 
 fn cast_type_to_int<A>(

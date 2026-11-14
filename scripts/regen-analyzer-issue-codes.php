@@ -111,6 +111,7 @@ final class AnalyzerCodeModuleGenerator
         'possibly-undefined-string-array-index',
         'property-type-coercion',
         'redundant-cast',
+        'array-to-int-cast',
         'redundant-null-coalesce',
         'implicit-to-string-cast',
         'redundant-isset-check',
