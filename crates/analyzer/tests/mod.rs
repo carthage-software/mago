@@ -3162,6 +3162,7 @@ test_case!(class_template_used_in_type_alias);
 test_case!(static_override_inherits_this_return);
 test_case!(named_ancestor_call_forwards_this);
 test_case!(ctype_check_on_implied_type_is_not_redundant);
+test_case!(truthy_nullsafe_assignment_narrows_receiver);
 
 #[test]
 #[cfg_attr(miri, ignore)]

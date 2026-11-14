@@ -591,6 +591,16 @@ fn add_access_condition_clauses<A>(
                 add_null_equality_base_clauses(argument.value(), formula, assertion_context, artifacts);
             }
         }
+        Expression::Assignment(assignment) if matches!(assignment.operator, AssignmentOperator::Assign(_)) => {
+            add_access_base_clauses(
+                assignment.rhs,
+                formula,
+                conditional_object_id,
+                creating_object_id,
+                assertion_context,
+                artifacts,
+            );
+        }
         _ => add_access_base_clauses(
             expression,
             formula,
