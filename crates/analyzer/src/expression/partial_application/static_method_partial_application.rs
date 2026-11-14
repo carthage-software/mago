@@ -9,6 +9,7 @@ use mago_codex::ttype::get_never;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
+use mago_syntax::cst::Expression;
 use mago_syntax::cst::StaticMethodPartialApplication;
 use mago_word::WordMap;
 use mago_word::ascii_lowercase_word;
@@ -51,10 +52,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodPartialApplication<'
                 false,
             );
 
-            identifiers.push(FunctionLikeIdentifier::Method(
-                resolved_method.classname,
-                resolved_method.method_identifier.get_method_name(),
-            ));
+            let receiver = match self.class {
+                Expression::Parent(_) | Expression::Self_(_) | Expression::Static(_) => {
+                    block_context.scope.get_class_like().map_or(resolved_method.classname, |class| class.original_name)
+                }
+                _ => resolved_method.classname,
+            };
+
+            identifiers
+                .push(FunctionLikeIdentifier::Method(receiver, resolved_method.method_identifier.get_method_name()));
         }
 
         let resulting_type = if self.argument_list.is_first_class_callable() {
