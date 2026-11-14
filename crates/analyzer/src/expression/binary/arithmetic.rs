@@ -13,6 +13,7 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
+use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
@@ -906,9 +907,17 @@ fn compose_array_plus<A>(left: &TArray, right: &TArray, context: &Context<'_, '_
 where
     A: Arena,
 {
-    if let (TArray::Keyed(left_keyed), TArray::Keyed(right_keyed)) = (left, right) {
-        let composed = compose_keyed_plus(left_keyed, right_keyed);
-        return vec![TAtomic::Array(TArray::Keyed(composed))];
+    match (left, right) {
+        (TArray::Keyed(left_keyed), TArray::Keyed(right_keyed)) => {
+            return vec![TAtomic::Array(TArray::Keyed(compose_keyed_plus(left_keyed, right_keyed)))];
+        }
+        (TArray::Keyed(left_keyed), TArray::List(right_list)) => {
+            return vec![TAtomic::Array(TArray::Keyed(compose_keyed_plus(left_keyed, &list_as_keyed(right_list))))];
+        }
+        (TArray::List(left_list), TArray::Keyed(right_keyed)) => {
+            return vec![TAtomic::Array(TArray::Keyed(compose_keyed_plus(&list_as_keyed(left_list), right_keyed)))];
+        }
+        (TArray::List(_), TArray::List(_)) => {}
     }
 
     let mut combined = combiner::combine(
@@ -928,6 +937,22 @@ where
     }
 
     combined
+}
+
+fn list_as_keyed(list: &TList) -> TKeyedArray {
+    TKeyedArray {
+        known_items: list.known_elements.as_deref().map(|elements| {
+            elements
+                .iter()
+                .map(|(index, (optional, value))| (ArrayKey::Integer(*index as i64), (*optional, value.clone())))
+                .collect::<std::collections::BTreeMap<_, _>>()
+                .into()
+        }),
+        parameters: (!list.element_type.is_never())
+            .then(|| (Arc::new(get_non_negative_int()), Arc::clone(&list.element_type))),
+        non_empty: list.non_empty,
+        known_non_list: false,
+    }
 }
 
 /// `+` composition for two keyed shapes.
