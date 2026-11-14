@@ -428,6 +428,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         }
 
         if let Some(redefined_variables) = if_scope.redefined_variables {
+            for (variable_id, variable_type) in &redefined_variables {
+                if let Some(existing_type) = block_context.locals.get(variable_id).cloned()
+                    && existing_type != *variable_type
+                {
+                    block_context.remove_descendants(context, *variable_id, &existing_type, Some(variable_type));
+                }
+            }
+
             for (variable_id, variable_type) in redefined_variables {
                 block_context.locals.insert(variable_id, variable_type);
 

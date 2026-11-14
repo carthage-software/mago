@@ -3221,6 +3221,7 @@ test_case!(build_dependent_version_constants);
 test_case!(non_empty_check_on_template_and_iterable);
 test_case!(constant_cast_of_unknown_value);
 test_case!(array_map_with_several_arrays_is_a_list);
+test_case!(if_branch_offset_write_forgets_narrowing);
 
 #[test]
 #[cfg_attr(miri, ignore)]
