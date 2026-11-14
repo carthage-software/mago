@@ -109,22 +109,27 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
             loop_scope_ref = loop_scope_ref.and_then(|loop_scope| loop_scope.parent_loop.as_deref_mut());
         }
 
-        if target_is_switch && loops_inside_target > 0 {
-            loop_scope_ref = loop_scope_ref.and_then(|loop_scope| {
-                loop_scope.final_actions.insert(ControlAction::Break);
-
-                loop_scope.parent_loop.as_deref_mut()
-            });
-        }
-
+        let exits_loop = !target_is_switch || loops_inside_target > 0;
         let has_loop_scope = loop_scope_ref.is_some();
         if let Some(loop_scope) = loop_scope_ref {
-            if target_is_switch {
-                loop_scope.final_actions.insert(ControlAction::LeaveSwitch);
-            } else {
+            if exits_loop {
                 loop_scope.final_actions.insert(ControlAction::Break);
+                if target_is_switch && let Some(parent_loop) = loop_scope.parent_loop.as_deref_mut() {
+                    parent_loop.final_actions.insert(ControlAction::LeaveSwitch);
+                }
+            } else {
+                loop_scope.final_actions.insert(ControlAction::LeaveSwitch);
+            }
+        }
+
+        if let Some(loop_scope) = artifacts.loop_scope.as_mut().filter(|_| exits_loop).and_then(|innermost| {
+            let mut loop_scope = Some(innermost);
+            for _ in 0..loops_inside_target.saturating_sub(usize::from(target_is_switch)) {
+                loop_scope = loop_scope.and_then(|loop_scope| loop_scope.parent_loop.as_deref_mut());
             }
 
+            loop_scope
+        }) {
             let mut removed_var_ids = WordSet::default();
             let redefined_vars =
                 block_context.get_redefined_locals(&loop_scope.parent_context_variables, false, &mut removed_var_ids);
