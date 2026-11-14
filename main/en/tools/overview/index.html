@@ -480,6 +480,33 @@
       
     </details>
     
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Twig Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/en/tools/twig-linter">
+            <span>Twig linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../main/en/tools/twig-linter/rules">
+            <span>Rules</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
   </details>
   
   <details class="sidebar-section">
@@ -827,6 +854,8 @@
 <p>Enforces dependency rules and structural conventions. Useful when you want to forbid certain <code>use</code> paths, codify layer boundaries, or assert that code in one part of the project never imports code from another.</p>
 <h2 id="twig-formatter"><a href="../../../../main/en/tools/formatter/twig">Twig formatter</a></h2>
 <p><code>mago twig:fmt</code> formats Twig syntax with its own <code>[twig.formatter]</code> settings. It keeps template text unchanged and does not rewrite HTML. The PHP formatter and <code>mago fix</code> do not run it.</p>
+<h2 id="twig-linter"><a href="../../../../main/en/tools/twig-linter">Twig linter</a></h2>
+<p><code>mago twig:lint</code> checks Twig templates with its own rules and settings. It supports native reports, baselines, pragmas, staged files, stdin, and safe fixes. The PHP commands do not run Twig lint rules.</p>
 
     </article>
 
@@ -856,6 +885,10 @@
     
     <li class="doc-toc__item doc-toc__item--lvl2">
       <a class="doc-toc__link" href="#twig-formatter">Twig formatter</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#twig-linter">Twig linter</a>
     </li>
     
   </ol>

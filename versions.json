@@ -73,7 +73,9 @@
                 "tools/linter/overview",
                 "tools/linter/rules",
                 "tools/linter/usage",
-                "tools/overview"
+                "tools/overview",
+                "tools/twig-linter",
+                "tools/twig-linter/rules"
             ]
         },
         {

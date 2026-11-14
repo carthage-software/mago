@@ -69,6 +69,8 @@
   <url><loc>https://mago.carthage.software/main/en/tools/linter/rules</loc></url>
   <url><loc>https://mago.carthage.software/main/en/tools/linter/usage</loc></url>
   <url><loc>https://mago.carthage.software/main/en/tools/overview</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/tools/twig-linter</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/tools/twig-linter/rules</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/benchmarks</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/contributing</loc></url>
@@ -113,6 +115,8 @@
   <url><loc>https://mago.carthage.software/main/fr/tools/linter/rules</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/tools/linter/usage</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/tools/overview</loc></url>
+  <url><loc>https://mago.carthage.software/main/fr/tools/twig-linter</loc></url>
+  <url><loc>https://mago.carthage.software/main/fr/tools/twig-linter/rules</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/benchmarks</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/contributing</loc></url>
@@ -157,4 +161,6 @@
   <url><loc>https://mago.carthage.software/main/zh/tools/linter/rules</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/tools/linter/usage</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/tools/overview</loc></url>
+  <url><loc>https://mago.carthage.software/main/zh/tools/twig-linter</loc></url>
+  <url><loc>https://mago.carthage.software/main/zh/tools/twig-linter/rules</loc></url>
 </urlset>
