@@ -137,7 +137,10 @@ where
             Some(name) => name,
             None => return get_bool(),
         },
-        _ => return get_bool(),
+        _ => match artifacts.get_expression_type(binary.rhs).and_then(TUnion::get_single_class_string_value) {
+            Some(class_name) => class_name,
+            None => return get_bool(),
+        },
     };
 
     let target_is_static = matches!(binary.rhs, Expression::Static(_))
