@@ -308,8 +308,8 @@ mod tests {
                         exit('If $end is greater than $start, then $step must be positive or null.');
                     }
 
-                    $result = [];
-                    for ($i = $start; $i <= $end; $i += $step) {
+                    $result = [$start];
+                    for ($i = $start + $step; $i <= $end; $i += $step) {
                         $result[] = $i;
                     }
 
@@ -324,8 +324,8 @@ mod tests {
                     exit('If $start is greater than $end, then $step must be negative or null.');
                 }
 
-                $result = [];
-                for ($i = $start; $i >= $end; $i += $step) {
+                $result = [$start];
+                for ($i = $start + $step; $i >= $end; $i += $step) {
                     $result[] = $i;
                 }
 

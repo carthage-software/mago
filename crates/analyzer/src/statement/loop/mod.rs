@@ -52,6 +52,9 @@ use mago_syntax::cst::Foreach;
 use mago_syntax::cst::Literal;
 use mago_syntax::cst::LiteralInteger;
 use mago_syntax::cst::Statement;
+use mago_syntax::cst::UnaryPrefix;
+use mago_syntax::cst::UnaryPrefixOperator;
+use mago_syntax::cst::Variable;
 use mago_word::Word;
 use mago_word::WordSet;
 use mago_word::word;
@@ -313,6 +316,11 @@ fn inherit_loop_block_context<'ctx, A>(
                 if block_context.locals.contains_key(&variable)
                     || variable.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':'))
                 {
+                    continue;
+                }
+
+                if loop_scope.variables_defined_by_condition.contains(&variable) {
+                    block_context.locals.insert(variable, variable_type);
                     continue;
                 }
 
@@ -1401,47 +1409,33 @@ fn get_assignment_map_depth(
 /// allow the comparison to be false. For example, `int(0) < int<0, max>`
 /// can be false when `$n = 0`.
 #[allow(clippy::similar_names)]
-fn can_condition_be_initially_false(pre_condition: &Expression<'_>, artifacts: &AnalysisArtifacts) -> bool {
+fn can_condition_be_initially_false(
+    pre_condition: &Expression<'_>,
+    artifacts: &AnalysisArtifacts,
+    loop_parent_context: &BlockContext<'_>,
+) -> bool {
     let Expression::Binary(binary) = pre_condition else {
         return artifacts.get_expression_type(pre_condition).is_none_or(|ct| !ct.is_always_truthy());
     };
 
     match binary.operator {
         BinaryOperator::And(_) | BinaryOperator::LowAnd(_) => {
-            return can_condition_be_initially_false(binary.lhs, artifacts)
-                || can_condition_be_initially_false(binary.rhs, artifacts);
+            return can_condition_be_initially_false(binary.lhs, artifacts, loop_parent_context)
+                || can_condition_be_initially_false(binary.rhs, artifacts, loop_parent_context);
         }
         BinaryOperator::Or(_) | BinaryOperator::LowOr(_) => {
-            return can_condition_be_initially_false(binary.lhs, artifacts)
-                && can_condition_be_initially_false(binary.rhs, artifacts);
+            return can_condition_be_initially_false(binary.lhs, artifacts, loop_parent_context)
+                && can_condition_be_initially_false(binary.rhs, artifacts, loop_parent_context);
         }
         _ => {}
     }
 
-    let Some(left_type) = artifacts.get_expression_type(binary.lhs) else {
-        return false;
+    let (Some((left_lb, left_ub)), Some((right_lb, right_ub))) = (
+        initial_int_bounds(binary.lhs, artifacts, loop_parent_context),
+        initial_int_bounds(binary.rhs, artifacts, loop_parent_context),
+    ) else {
+        return true;
     };
-
-    let Some(right_type) = artifacts.get_expression_type(binary.rhs) else {
-        return false;
-    };
-
-    let left_int = left_type.types.iter().find_map(|a| match a {
-        TAtomic::Scalar(TScalar::Integer(i)) => Some(i),
-        _ => None,
-    });
-
-    let right_int = right_type.types.iter().find_map(|a| match a {
-        TAtomic::Scalar(TScalar::Integer(i)) => Some(i),
-        _ => None,
-    });
-
-    let (Some(left_int), Some(right_int)) = (left_int, right_int) else {
-        return false;
-    };
-
-    let (left_lb, left_ub) = left_int.get_bounds();
-    let (right_lb, right_ub) = right_int.get_bounds();
 
     match &binary.operator {
         BinaryOperator::LessThan(_) => match (left_ub, right_lb) {
@@ -1460,8 +1454,33 @@ fn can_condition_be_initially_false(pre_condition: &Expression<'_>, artifacts: &
             (None, _) | (_, None) => true,
             (Some(a), Some(b)) => a < b,
         },
-        _ => false,
+        _ => true,
     }
+}
+
+fn initial_int_bounds(
+    expression: &Expression<'_>,
+    artifacts: &AnalysisArtifacts,
+    loop_parent_context: &BlockContext<'_>,
+) -> Option<(Option<i64>, Option<i64>)> {
+    if let Expression::UnaryPrefix(UnaryPrefix { operator, operand }) = expression
+        && let Expression::Variable(Variable::Direct(variable)) = operand
+        && let Some(value) =
+            loop_parent_context.locals.get(&Word::from(variable.name)).and_then(|t| t.get_single_literal_int_value())
+    {
+        let value = match operator {
+            UnaryPrefixOperator::PreIncrement(_) => value.checked_add(1)?,
+            UnaryPrefixOperator::PreDecrement(_) => value.checked_sub(1)?,
+            _ => return None,
+        };
+
+        return Some((Some(value), Some(value)));
+    }
+
+    artifacts.get_expression_type(expression)?.types.iter().find_map(|atomic| match atomic {
+        TAtomic::Scalar(TScalar::Integer(integer)) => Some(integer.get_bounds()),
+        _ => None,
+    })
 }
 
 fn condition_has_call(expression: &Expression<'_>) -> bool {
@@ -1528,7 +1547,7 @@ where
             // The condition is indeterminate (bool). Check if the loop condition
             // can be false with the initial variable values by testing the boundary
             // of integer ranges involved in the comparison.
-            if can_condition_be_initially_false(pre_condition, artifacts)
+            if can_condition_be_initially_false(pre_condition, artifacts, loop_parent_context)
                 && let Some(loop_scope) = artifacts.get_loop_scope_mut()
             {
                 loop_scope.truthy_pre_conditions = false;
@@ -1541,6 +1560,19 @@ where
 
     let always_assigned_before_loop_body_variables =
         BlockContext::get_new_or_updated_locals(loop_context, loop_parent_context);
+
+    if first_application && let Some(loop_scope) = artifacts.get_loop_scope_mut() {
+        loop_scope.variables_defined_by_condition.extend(
+            loop_context
+                .locals
+                .keys()
+                .filter(|variable_id| {
+                    !loop_parent_context.locals.contains_key(*variable_id)
+                        && !variable_id.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':'))
+                })
+                .copied(),
+        );
+    }
 
     loop_context.clauses = saturate_shared_clauses(
         loop_parent_context.clauses.iter().cloned().chain(pre_condition_clauses.iter().cloned().map(Rc::new)),
