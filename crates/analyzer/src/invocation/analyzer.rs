@@ -635,38 +635,26 @@ where
                         )
                         .with_help("Remove one of the duplicate named arguments."),
                     );
-                } else if let Some(previous_span) = assigned_parameters_by_position.get(&parameter_offset) {
+                } else if let Some(previous_span) =
+                    assigned_parameters_by_position.get(&parameter_offset).filter(|_| !parameter_ref.is_variadic())
+                {
                     has_named_argument_anomaly = true;
                     let target_name_str = invocation.target.guess_name(context);
-                    if parameter_ref.is_variadic() {
-                        context.collector.report_with_code(
-                            IssueCode::NamedArgumentAfterPositional,
-                             Issue::warning(format!(
-                                "Named argument `${}` for {} `{}` targets a variadic parameter that has already captured positional arguments.",
-                                named_value_display, target_kind_str, target_name_str
-                            ))
-                            .with_annotation(Annotation::primary(named_argument.name.span()).with_message("Named argument for variadic parameter"))
-                            .with_annotation(Annotation::secondary(*previous_span).with_message("Positional arguments already captured by variadic here"))
-                            .with_note("Mixing positional and named arguments for the same variadic parameter can be confusing and may lead to unexpected behavior depending on PHP version and argument unpacking.")
-                            .with_help("Consider providing all arguments for the variadic parameter either positionally or via unpacking a named array."),
-                        );
-                    } else {
-                        context.collector.report_with_code(
-                            IssueCode::NamedArgumentOverridesPositional,
-                            Issue::error(format!(
-                                "Named argument `${}` for {} `{}` targets a parameter already provided positionally.",
-                                named_value_display, target_kind_str, target_name_str
-                            ))
-                            .with_annotation(
-                                Annotation::primary(named_argument.name.span()).with_message("This named argument"),
-                            )
-                            .with_annotation(
-                                Annotation::secondary(*previous_span)
-                                    .with_message("Parameter already filled by positional argument here"),
-                            )
-                            .with_help("Provide the argument either positionally or by name, but not both."),
-                        );
-                    }
+                    context.collector.report_with_code(
+                        IssueCode::NamedArgumentOverridesPositional,
+                        Issue::error(format!(
+                            "Named argument `${}` for {} `{}` targets a parameter already provided positionally.",
+                            named_value_display, target_kind_str, target_name_str
+                        ))
+                        .with_annotation(
+                            Annotation::primary(named_argument.name.span()).with_message("This named argument"),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(*previous_span)
+                                .with_message("Parameter already filled by positional argument here"),
+                        )
+                        .with_help("Provide the argument either positionally or by name, but not both."),
+                    );
                     assigned_parameters_by_name.insert(parameter_offset, named_argument.name.span());
                 } else {
                     assigned_parameters_by_name.insert(parameter_offset, named_argument.name.span());
