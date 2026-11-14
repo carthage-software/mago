@@ -3242,6 +3242,7 @@ test_case!(intersection_member_keeps_its_type_arguments);
 test_case!(no_named_arguments_parent_allows_renamed_parameter);
 test_case!(this_union_param_type_is_not_a_parameter_name);
 test_case!(static_class_and_count_mode_narrow);
+test_case!(static_on_template_receiver_is_the_template);
 
 #[test]
 #[cfg_attr(miri, ignore)]

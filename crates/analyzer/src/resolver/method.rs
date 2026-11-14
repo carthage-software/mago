@@ -206,11 +206,12 @@ where
             report_redundant_nullsafe(context, operator_span, object, object_type, true);
         }
 
-        let mut object_atomics = object_type.types.iter().collect::<Vec<_>>();
+        let mut object_atomics = object_type.types.iter().map(|atomic| (atomic, None)).collect::<Vec<_>>();
 
-        while let Some(object_atomic) = object_atomics.pop() {
-            if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = object_atomic {
-                object_atomics.extend(constraint.types.iter());
+        while let Some((object_atomic, generic_receiver)) = object_atomics.pop() {
+            if let TAtomic::GenericParameter(parameter) = object_atomic {
+                let receiver = generic_receiver.or(Some(parameter));
+                object_atomics.extend(parameter.constraint.types.iter().map(|atomic| (atomic, receiver)));
                 continue;
             }
 
@@ -278,7 +279,7 @@ where
             );
 
             for &method_name in &method_names {
-                let resolved_methods = resolve_method_from_object(
+                let mut resolved_methods = resolve_method_from_object(
                     context,
                     block_context,
                     object,
@@ -289,6 +290,14 @@ where
                     !resolved_magic_call_method.is_empty(),
                     &mut result,
                 );
+
+                if let Some(parameter) = generic_receiver {
+                    for resolved_method in &mut resolved_methods {
+                        if matches!(resolved_method.static_class_type, StaticClassType::Object(_)) {
+                            resolved_method.static_class_type = StaticClassType::Generic(parameter.clone());
+                        }
+                    }
+                }
 
                 if resolved_methods.is_empty() {
                     collect_asserted_descendant_method_references(
