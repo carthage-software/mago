@@ -1125,9 +1125,19 @@ where
                 // Inside isset() but array has NO generic parameters - key definitely doesn't exist
                 // However, if we're processing a union type, check if ANY other member has this key
                 // Only report error if NONE of the union members have the key (type narrowing is valid otherwise)
-                let should_report_error = if array_like_type.types.len() > 1 {
+                let mut variants = Vec::new();
+                let mut pending: Vec<&TAtomic> = array_like_type.types.iter().collect();
+                while let Some(atomic_type) = pending.pop() {
+                    if let TAtomic::GenericParameter(parameter) = atomic_type {
+                        pending.extend(parameter.constraint.types.iter());
+                    } else {
+                        variants.push(atomic_type);
+                    }
+                }
+
+                let should_report_error = if variants.len() > 1 {
                     // This is a union type - check if any other atomic type has this key
-                    !array_like_type.types.iter().any(|atomic_type| {
+                    !variants.iter().any(|atomic_type| {
                         match atomic_type {
                             TAtomic::Array(TArray::Keyed(other_keyed)) => {
                                 // Array with generic parameters might have any key
