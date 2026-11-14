@@ -207,6 +207,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         let mut definitely_newly_assigned_var_ids = newly_assigned_variable_ids;
         let mut previously_caught_types = WordSet::default();
 
+        let mut continuing_catch_seen = false;
         for (i, catch_clause) in self.catch_clauses.iter().enumerate() {
             let mut catch_block_context = original_block_context.clone();
             catch_block_context.flags.set_has_returned(false);
@@ -369,8 +370,31 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 let end_action_only =
                     try_block_control_actions.len() == 1 && try_block_control_actions.contains(ControlAction::End);
 
+                let first_continuing_catch = !continuing_catch_seen;
+                continuing_catch_seen = true;
+
+                if end_action_only && !first_continuing_catch {
+                    let missing_here = block_context
+                        .locals
+                        .keys()
+                        .filter(|variable_id| {
+                            !catch_block_context.locals.contains_key(*variable_id)
+                                && !old_block_context_locals.contains_key(*variable_id)
+                        })
+                        .copied()
+                        .collect::<Vec<_>>();
+
+                    for variable_id in missing_here {
+                        if let Some(variable_type) = block_context.locals.get_mut(&variable_id) {
+                            Rc::make_mut(variable_type).set_possibly_undefined(true, None);
+                        }
+
+                        block_context.possibly_undefined_variable_ids.insert(variable_id);
+                    }
+                }
+
                 for (variable_id, variable_type) in &catch_block_context.locals {
-                    if end_action_only {
+                    if end_action_only && first_continuing_catch {
                         block_context.locals.insert(*variable_id, Rc::clone(variable_type));
                     } else if let Some(existing_type) = block_context.locals.get(variable_id) {
                         block_context.locals.insert(
