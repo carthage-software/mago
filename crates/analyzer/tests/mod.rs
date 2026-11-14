@@ -3311,6 +3311,7 @@ test_case!(magic_property_without_get_on_open_types);
 test_case!(promoted_parameter_inherits_property_docblock);
 test_case!(intersection_static_members_from_any_part);
 test_case!(array_union_of_shape_and_list);
+test_case!(consensus_does_not_drop_needed_clauses);
 
 #[test]
 #[cfg_attr(miri, ignore)]

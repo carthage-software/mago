@@ -557,12 +557,19 @@ fn saturate_clause_handles<'clause>(
                 .collect();
 
             for (clause_a_idx, clause_a) in simplified_clauses.iter().enumerate() {
-                for (clause_b_idx, clause_b) in simplified_clauses.iter().enumerate().skip(clause_a_idx + 1) {
-                    if singleton_masks[clause_a_idx] & singleton_masks[clause_b_idx] == 0 {
+                'pairs: for (clause_b_idx, clause_b) in simplified_clauses.iter().enumerate().skip(clause_a_idx + 1) {
+                    if singleton_masks[clause_a_idx] & singleton_masks[clause_b_idx] == 0
+                        || !clause_a.reconcilable
+                        || clause_a.wedge
+                        || !clause_b.reconcilable
+                        || clause_b.wedge
+                        || removed_hashes.contains(&clause_a.hash)
+                        || removed_hashes.contains(&clause_b.hash)
+                    {
                         continue;
                     }
 
-                    let mut common_negated_keys: HashSet<Word> = HashSet::default();
+                    let mut negated_key = None;
                     for (index, (&common_key, a_possibilities)) in clause_a.possibilities.iter().enumerate() {
                         if a_possibilities.len() != 1 {
                             continue;
@@ -583,17 +590,18 @@ fn saturate_clause_handles<'clause>(
                                 .values()
                                 .next()
                                 .is_some_and(|a| b_possibilities.values().next().is_some_and(|b| a.is_negation_of(b)))
+                            && negated_key.replace(common_key).is_some()
                         {
-                            common_negated_keys.insert(common_key);
+                            continue 'pairs;
                         }
                     }
 
-                    if !common_negated_keys.is_empty() {
+                    if let Some(negated_key) = negated_key {
                         let mut new_possibilities: AssertionMap<Word, AssertionMap<u64, Assertion>> =
                             AssertionMap::default();
 
                         for (var_id, possibilities) in &clause_a.possibilities {
-                            if !common_negated_keys.contains(var_id) {
+                            if *var_id != negated_key {
                                 new_possibilities
                                     .entry(*var_id)
                                     .or_default()
@@ -602,7 +610,7 @@ fn saturate_clause_handles<'clause>(
                         }
 
                         for (var_id, possibilities) in &clause_b.possibilities {
-                            if !common_negated_keys.contains(var_id) {
+                            if *var_id != negated_key {
                                 new_possibilities
                                     .entry(*var_id)
                                     .or_default()
@@ -1352,13 +1360,25 @@ mod tests {
     }
 
     #[test]
-    fn consensus_removes_every_shared_negated_variable() {
+    fn consensus_keeps_a_clause_implied_only_by_a_double_clash() {
         let first = clause(1, &[("$x", Assertion::Truthy), ("$y", Assertion::Truthy), ("$p", Assertion::Truthy)]);
         let second = clause(2, &[("$x", Assertion::Falsy), ("$y", Assertion::Falsy), ("$q", Assertion::Truthy)]);
         let consensus = clause(3, &[("$p", Assertion::Truthy), ("$q", Assertion::Truthy)]);
-        let expected = [first.clone(), second.clone()];
+        let expected = [first.clone(), second.clone(), consensus.clone()];
 
         assert_exact(&saturate_clauses(&[first, second, consensus], &AlgebraThresholds::default()), &expected);
+    }
+
+    #[test]
+    fn consensus_does_not_remove_a_parent_of_a_removed_clause() {
+        let first = clause(1, &[("$p", Assertion::Truthy), ("$v", Assertion::Truthy)]);
+        let second = clause(2, &[("$v", Assertion::Falsy), ("$u", Assertion::Truthy)]);
+        let third = clause(3, &[("$p", Assertion::Truthy), ("$u", Assertion::Truthy)]);
+        let fourth = clause(4, &[("$u", Assertion::Falsy), ("$v", Assertion::Truthy)]);
+        let input = [first, second, third, fourth];
+        let output = saturate_clauses(&input, &AlgebraThresholds::default());
+
+        assert_eq!(output.len(), 3);
     }
 
     #[test]
