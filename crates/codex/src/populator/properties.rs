@@ -66,7 +66,7 @@ pub fn inherit_properties_from_parent(metadata: &mut ClassLikeMetadata, parent_m
         }
 
         if is_overridable {
-            metadata.inheritable_property_ids.insert(*property_name, *inheritable_classlike);
+            metadata.inheritable_property_ids.entry(*property_name).or_insert(*inheritable_classlike);
         }
     }
 }

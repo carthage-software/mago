@@ -3294,6 +3294,7 @@ test_case!(static_property_array_item_write_is_checked);
 test_case!(inline_var_self_keeps_class_casing);
 test_case!(datetime_create_from_format_returns_static);
 test_case!(modulo_and_shift_by_truncated_float);
+test_case!(redeclared_property_inherits_nearest_docblock);
 
 #[test]
 #[cfg_attr(miri, ignore)]
