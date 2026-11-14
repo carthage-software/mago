@@ -3268,6 +3268,7 @@ test_case!(instanceof_generic_descendant_takes_ancestor_arguments);
 test_case!(string_callable_with_too_many_required_parameters);
 test_case!(shape_intersected_with_array_is_open_shape);
 test_case!(numeric_string_array_key_type_is_int);
+test_case!(downstream_psl_and_sdk_patterns);
 
 #[test]
 #[cfg_attr(miri, ignore)]

@@ -79,6 +79,7 @@ use crate::formula::negate_or_synthesize;
 use crate::reconciler::reconcile_keyed_types;
 use crate::statement::r#loop::assignment_map_visitor::get_assignment_map;
 use crate::statement::r#loop::cleaner::clean_nodes;
+use crate::utils::misc::unwrap_expression;
 
 mod assignment_map_visitor;
 mod cleaner;
@@ -1466,7 +1467,17 @@ fn can_condition_be_initially_false(
         initial_int_bounds(binary.lhs, artifacts, loop_parent_context),
         initial_int_bounds(binary.rhs, artifacts, loop_parent_context),
     ) else {
-        return true;
+        let is_ordering = matches!(
+            binary.operator,
+            BinaryOperator::LessThan(_)
+                | BinaryOperator::LessThanOrEqual(_)
+                | BinaryOperator::GreaterThan(_)
+                | BinaryOperator::GreaterThanOrEqual(_)
+        );
+
+        return !is_ordering
+            || matches!(unwrap_expression(binary.lhs), Expression::Literal(_))
+            || matches!(unwrap_expression(binary.rhs), Expression::Literal(_));
     };
 
     match &binary.operator {
@@ -1544,12 +1555,15 @@ fn condition_needs_analyzed_types(expression: &Expression<'_>) -> bool {
         Expression::Call(_) => true,
         Expression::Parenthesized(parenthesized) => condition_needs_analyzed_types(parenthesized.expression),
         Expression::UnaryPrefix(unary) => condition_needs_analyzed_types(unary.operand),
-        Expression::Binary(binary) => {
-            (matches!(binary.operator, BinaryOperator::Identical(_) | BinaryOperator::NotIdentical(_))
-                && [binary.lhs, binary.rhs].iter().any(|side| side.is_true() || side.is_false()))
-                || condition_needs_analyzed_types(binary.lhs)
-                || condition_needs_analyzed_types(binary.rhs)
-        }
+        Expression::Binary(binary) => match binary.operator {
+            BinaryOperator::Identical(_) | BinaryOperator::NotIdentical(_) => {
+                [binary.lhs, binary.rhs].iter().any(|side| side.is_true() || side.is_false())
+            }
+            BinaryOperator::And(_) | BinaryOperator::Or(_) | BinaryOperator::LowAnd(_) | BinaryOperator::LowOr(_) => {
+                condition_needs_analyzed_types(binary.lhs) || condition_needs_analyzed_types(binary.rhs)
+            }
+            _ => false,
+        },
         Expression::Assignment(assignment) => condition_needs_analyzed_types(assignment.rhs),
         _ => false,
     }

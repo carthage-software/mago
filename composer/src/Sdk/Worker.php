@@ -321,6 +321,7 @@ final class Worker
                 $registeredIssueFilterHooks = [];
                 foreach ($registry->getIssueFilterHooks() as $hook) {
                     $codes = $hook->getCodes();
+                    // @mago-expect analysis:redundant-comparison,impossible-condition
                     if ($codes === []) {
                         throw new InvalidArgumentException(
                             "An issue-filter hook in `{$definition->identifier}` has no target codes.",
@@ -483,6 +484,7 @@ final class Worker
         $registered = [];
         foreach ($callbacks as $callback) {
             $targets = $callback->getTargets();
+            // @mago-expect analysis:redundant-comparison,impossible-condition
             if ($targets === []) {
                 throw new InvalidArgumentException("A {$kind} in `{$plugin}` has no targets.");
             }

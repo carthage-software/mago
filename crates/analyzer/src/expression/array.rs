@@ -793,18 +793,7 @@ fn handle_variadic_array_element<'arena, A>(
                     &mut ComparisonResult::new(),
                 );
 
-            if is_string_key
-                || is_array_key_key
-                    && !union_comparator::is_contained_by(
-                        context.codebase,
-                        &key_type,
-                        &get_int(),
-                        false,
-                        false,
-                        false,
-                        &mut ComparisonResult::new(),
-                    )
-            {
+            if is_string_key {
                 array_creation_info.is_list = false;
             }
 

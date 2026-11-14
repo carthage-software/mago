@@ -465,6 +465,26 @@ fn scrape_type_properties(
         return;
     }
 
+    if let TAtomic::GenericParameter(parameter) = &atomic
+        && let Some(existing) = combination.value_types.values_mut().find_map(|existing| match existing {
+            TAtomic::GenericParameter(existing)
+                if existing.parameter_name == parameter.parameter_name
+                    && existing.defining_entity == parameter.defining_entity
+                    && existing.intersection_types == parameter.intersection_types =>
+            {
+                Some(existing)
+            }
+            _ => None,
+        })
+    {
+        if existing.constraint != parameter.constraint {
+            existing.constraint =
+                Arc::new(combine_union_types(&existing.constraint, &parameter.constraint, codebase, options));
+        }
+
+        return;
+    }
+
     if let TAtomic::Mixed(mixed) = atomic {
         if mixed.is_isset_from_loop() {
             if combination.flags.contains(CombinationFlags::GENERIC_MIXED) {

@@ -47,7 +47,7 @@ final class ThrowTypeProviderTest extends TestCase
         $this->expectException(ProtocolException::class);
 
         // This deliberately violates the static contract to exercise the runtime guard.
-        // @mago-ignore analysis:possibly-invalid-argument
+        // @mago-ignore analysis:invalid-argument
         Protocol::writeThrowTypeResponse(['']);
     }
 

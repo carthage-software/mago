@@ -194,6 +194,24 @@ fn is_contained_by_atomic(
     let mut some_type_coerced = false;
     let mut some_type_coerced_from_nested_mixed = false;
 
+    if let TAtomic::Scalar(TScalar::String(input_string)) = input_type_part
+        && input_string.literal.is_none()
+        && !input_string.is_non_empty
+        && !input_string.is_truthy
+        && container_atomic_types.iter().any(|atomic| atomic.get_literal_string_value().is_some_and(<[u8]>::is_empty))
+        && container_atomic_types.iter().any(|atomic| {
+            matches!(atomic, TAtomic::Scalar(TScalar::String(container_string))
+                if container_string.literal.is_none()
+                    && container_string.is_non_empty
+                    && !container_string.is_truthy
+                    && (!container_string.is_numeric || input_string.is_numeric)
+                    && (!container_string.is_callable || input_string.is_callable)
+                    && (container_string.casing.is_unspecified() || container_string.casing == input_string.casing))
+        })
+    {
+        return true;
+    }
+
     if matches!(input_type_part, TAtomic::Scalar(TScalar::ArrayKey)) {
         if container_type.has_int_and_string() {
             return true;

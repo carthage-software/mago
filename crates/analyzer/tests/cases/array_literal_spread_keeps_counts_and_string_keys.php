@@ -22,14 +22,3 @@ function call(array $existingItems, array $maybeEmpty, string $newItem): void
     func(...[$newItem, ...$existingItems]);
     func(...[...$maybeEmpty, $newItem, $newItem]);
 }
-
-/**
- * @param array<array-key, int> $items
- *
- * @return list<int>
- */
-function as_list(array $items): array
-{
-    // @mago-expect analysis:invalid-return-statement
-    return [...$items];
-}

@@ -2106,9 +2106,9 @@ fn check_template_variance_positions<'ctx, A>(
 
 /// Collects the templates of the class that sit in a position their variance
 /// forbids: covariant ones in an input position, contravariant ones in an output
-/// position. A callable's parameters flip the position; containers keep it when
-/// their own template is covariant, flip it when contravariant, and are skipped
-/// when invariant.
+/// position. A callable's parameters flip the position; arrays and iterables
+/// keep it. Generic objects are not entered: `compare(Option<T> $other)` in a
+/// covariant `Option<T>` is the accepted comparable pattern.
 fn collect_misplaced_templates(
     codebase: &CodebaseMetadata,
     union: &TUnion,
@@ -2118,8 +2118,6 @@ fn collect_misplaced_templates(
     contravariant_templates: &[Word],
     misplaced: &mut Vec<Word>,
 ) {
-    use mago_codex::ttype::template::variance::Variance;
-
     let recurse = |union: &TUnion, is_input: bool, misplaced: &mut Vec<Word>| {
         collect_misplaced_templates(
             codebase,
@@ -2158,19 +2156,6 @@ fn collect_misplaced_templates(
 
                 if let Some(return_type) = signature.get_return_type() {
                     recurse(return_type, is_input, misplaced);
-                }
-            }
-            TAtomic::Object(TObject::Named(named)) => {
-                let Some(class_like) = codebase.get_class_like(named.name.as_bytes()) else {
-                    continue;
-                };
-
-                for (index, argument) in named.get_type_parameters().unwrap_or_default().iter().enumerate() {
-                    match class_like.template_variance.get(index) {
-                        Some(Variance::Covariant) => recurse(argument, is_input, misplaced),
-                        Some(Variance::Contravariant) => recurse(argument, !is_input, misplaced),
-                        _ => {}
-                    }
                 }
             }
             _ => {}

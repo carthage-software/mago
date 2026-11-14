@@ -312,7 +312,7 @@ mod tests {
              * @param T $end
              * @param T|null $step
              *
-             * @return non-empty-list<int|float>
+             * @return non-empty-list<T>
              */
             function range(int|float $start, int|float $end, int|float|null $step = null): array
             {
@@ -322,6 +322,7 @@ mod tests {
 
                 if ($start < $end) {
                     if (null === $step) {
+                        /** @var T $step */
                         $step = 1;
                     }
 
@@ -329,8 +330,8 @@ mod tests {
                         exit('If $end is greater than $start, then $step must be positive or null.');
                     }
 
-                    $result = [$start];
-                    for ($i = $start + $step; $i <= $end; $i += $step) {
+                    $result = [];
+                    for ($i = $start; $i <= $end; $i += $step) {
                         $result[] = $i;
                     }
 
@@ -338,6 +339,7 @@ mod tests {
                 }
 
                 if (null === $step) {
+                    /** @var T $step */
                     $step = -1;
                 }
 
@@ -345,8 +347,8 @@ mod tests {
                     exit('If $start is greater than $end, then $step must be negative or null.');
                 }
 
-                $result = [$start];
-                for ($i = $start + $step; $i >= $end; $i += $step) {
+                $result = [];
+                for ($i = $start; $i >= $end; $i += $step) {
                     $result[] = $i;
                 }
 

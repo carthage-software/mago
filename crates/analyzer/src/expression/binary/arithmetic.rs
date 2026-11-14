@@ -60,6 +60,15 @@ where
     let fallback = Rc::new(get_mixed());
     let left_type = artifacts.get_rc_expression_type(&binary.lhs).cloned().unwrap_or_else(|| Rc::clone(&fallback));
     let right_type = artifacts.get_rc_expression_type(&binary.rhs).cloned().unwrap_or_else(|| Rc::clone(&fallback));
+    if matches!(
+        binary.operator,
+        BinaryOperator::Addition(_) | BinaryOperator::Subtraction(_) | BinaryOperator::Multiplication(_)
+    ) && is_same_template(&left_type, &right_type)
+    {
+        assign_arithmetic_type(artifacts, (*left_type).clone(), binary);
+        return Ok(());
+    }
+
     let left_type = generic_bound(&left_type).map_or(left_type, Rc::new);
     let right_type = generic_bound(&right_type).map_or(right_type, Rc::new);
 
@@ -577,6 +586,14 @@ where
     assign_arithmetic_type(artifacts, final_type, binary);
 
     Ok(())
+}
+
+fn is_same_template(left: &TUnion, right: &TUnion) -> bool {
+    matches!(
+        (left.types.as_ref(), right.types.as_ref()),
+        ([TAtomic::GenericParameter(left)], [TAtomic::GenericParameter(right)])
+            if left.parameter_name == right.parameter_name && left.defining_entity == right.defining_entity
+    )
 }
 
 fn generic_bound(union: &TUnion) -> Option<TUnion> {

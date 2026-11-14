@@ -23,6 +23,10 @@ pub fn check_override_attribute<'ctx, 'arena, A>(
         return;
     }
 
+    if metadata.kind.is_trait() && !context.settings.check_missing_override {
+        return;
+    }
+
     let class_name = metadata.original_name;
     for member in members {
         let ClassLikeMember::Method(method) = member else {
