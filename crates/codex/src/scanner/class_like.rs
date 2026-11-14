@@ -823,7 +823,7 @@ where
 
             class_like_metadata.require_extends.insert(required_name.to_ascii_lowercase());
             if let Some(required_params) = required_params {
-                class_like_metadata.add_template_extended_offset(required_name, required_params);
+                class_like_metadata.add_template_extended_offset(required_name.to_ascii_lowercase(), required_params);
             }
         }
 
@@ -905,7 +905,8 @@ where
 
             class_like_metadata.require_implements.insert(required_name.to_ascii_lowercase());
             if let Some(required_parameters) = required_parameters {
-                class_like_metadata.add_template_extended_offset(required_name, required_parameters);
+                class_like_metadata
+                    .add_template_extended_offset(required_name.to_ascii_lowercase(), required_parameters);
             }
         }
 
