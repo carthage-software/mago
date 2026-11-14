@@ -73,10 +73,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         let mut try_block_context = block_context.clone();
 
         if self.finally_clause.is_some() {
-            try_block_context.finally_scope = Some(Rc::new(RefCell::new(FinallyScope::new())));
+            let entry_locals = block_context
+                .locals
+                .iter()
+                .filter(|(variable_id, _)| {
+                    !variable_id.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':'))
+                })
+                .map(|(variable_id, variable_type)| (*variable_id, Rc::clone(variable_type)))
+                .collect();
+
+            try_block_context.finally_scope = Some(Rc::new(RefCell::new(FinallyScope { locals: entry_locals })));
         }
 
         let assigned_variable_ids = std::mem::take(&mut block_context.assigned_variable_ids);
+
+        let outer_finally_scope = if self.finally_clause.is_some() {
+            Some(std::mem::replace(&mut block_context.finally_scope, try_block_context.finally_scope.clone()))
+        } else {
+            None
+        };
 
         let was_inside_try = block_context.flags.inside_try();
         block_context.flags.set_inside_try(true);
@@ -111,6 +126,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             }
         }
         block_context.flags.set_inside_try(was_inside_try);
+        if let Some(outer_finally_scope) = outer_finally_scope {
+            block_context.finally_scope = outer_finally_scope;
+        }
+
         if !self.catch_clauses.is_empty() {
             block_context.flags.set_has_returned(false);
         }
