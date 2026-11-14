@@ -488,7 +488,7 @@ where
         return None;
     };
 
-    if !metadata.is_available_in_version(context.settings.version) {
+    if !skip_error_on_not_found && !metadata.is_available_in_version(context.settings.version) {
         let display_name = display_function_like_identifier(context, &identifier);
         match identifier {
             FunctionLikeIdentifier::Function(_) => {

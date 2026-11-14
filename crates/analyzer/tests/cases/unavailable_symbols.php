@@ -106,3 +106,10 @@ function uses_gap(): void
 {
     gap_fn();
 }
+
+function guarded_future(): void
+{
+    if (function_exists('shiny_fn')) {
+        shiny_fn();
+    }
+}
