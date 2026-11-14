@@ -5,13 +5,14 @@ use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::float::TFloat;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
+use crate::ttype::atomic::scalar::string::escape_literal;
 
 pub(super) fn write_scalar(scalar: &TScalar, output: &mut Vec<u8>) {
     match scalar {
         TScalar::String(string) => {
             if let Some(TStringLiteral::Value(value)) = string.literal {
                 output.extend_from_slice(b"string('");
-                output.extend_from_slice(value.as_bytes());
+                output.extend_from_slice(&escape_literal(value.as_bytes()));
                 output.extend_from_slice(b"')");
             } else {
                 output.extend_from_slice(string.get_id().as_bytes());

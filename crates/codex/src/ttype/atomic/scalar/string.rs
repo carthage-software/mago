@@ -421,7 +421,9 @@ impl TType for TString {
     #[inline]
     fn get_id(&self) -> Word {
         let literal_infix: &[u8] = match &self.literal {
-            Some(TStringLiteral::Value(s)) => return concat_word!(b"string('", s, b"')"),
+            Some(TStringLiteral::Value(s)) => {
+                return concat_word!(b"string('", escape_literal(s.as_bytes()).as_ref(), b"')");
+            }
             Some(_) => b"literal-",
             None => b"",
         };
@@ -502,5 +504,42 @@ where
     /// Derives properties from the literal value.
     fn from(value: T) -> Self {
         Self::known_literal(word(value.as_ref()))
+    }
+}
+
+/// Escapes quotes and control bytes so a literal prints on one line and cannot send escape
+/// codes to a terminal.
+pub(crate) fn escape_literal(value: &[u8]) -> std::borrow::Cow<'_, [u8]> {
+    if !value.iter().any(|byte| matches!(byte, b'\'' | 0x00..=0x1F | 0x7F)) {
+        return std::borrow::Cow::Borrowed(value);
+    }
+
+    let mut escaped = Vec::with_capacity(value.len() + 8);
+    for &byte in value {
+        match byte {
+            b'\'' => escaped.extend_from_slice(b"\\'"),
+            b'\n' => escaped.extend_from_slice(b"\\n"),
+            b'\t' => escaped.extend_from_slice(b"\\t"),
+            b'\r' => escaped.extend_from_slice(b"\\r"),
+            0x00..=0x1F | 0x7F => escaped.extend_from_slice(format!("\\{byte:03o}").as_bytes()),
+            _ => escaped.push(byte),
+        }
+    }
+
+    std::borrow::Cow::Owned(escaped)
+}
+
+#[cfg(test)]
+mod literal_id_tests {
+    use mago_word::word;
+
+    use crate::ttype::TType;
+    use crate::ttype::get_literal_string;
+
+    #[test]
+    fn literal_id_escapes_quotes_and_control_bytes() {
+        let literal = get_literal_string(word(b"\x1b[31m'a'\nb\0c\\d"));
+
+        assert_eq!(literal.get_id().as_bytes(), br"string('\033[31m\'a\'\nb\000c\d')");
     }
 }

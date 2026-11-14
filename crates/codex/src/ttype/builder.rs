@@ -370,7 +370,7 @@ pub fn get_union_from_type(
         Type::UnspecifiedLiteralFloat(_) => get_unspecified_literal_float(),
         Type::LiteralFloat(lit) => get_literal_float(*lit.value),
         Type::LiteralInt(lit) => get_literal_int(lit.value as i64),
-        Type::LiteralString(lit) => get_literal_string(word(lit.value)),
+        Type::LiteralString(lit) => get_literal_string(word(unescape_literal_string(lit.value, lit.raw))),
         Type::Negated(negated) => match negated.operand {
             Type::LiteralInt(lit) => get_literal_int(-(lit.value as i64)),
             Type::LiteralFloat(lit) => get_literal_float(-(*lit.value)),
@@ -578,6 +578,45 @@ fn get_array_key_from_shape_key(key: &ShapeKey<'_>, scope: &NamespaceScope, clas
             ArrayKey::ClassLikeConstant { class_like_name, constant_name: word(constant_name.value) }
         }
     }
+}
+
+/// Reads the escapes of a docblock string literal the way PHP reads them in source code.
+fn unescape_literal_string<'value>(value: &'value [u8], raw: &[u8]) -> Cow<'value, [u8]> {
+    if !value.contains(&b'\\') {
+        return Cow::Borrowed(value);
+    }
+
+    let double_quoted = raw.first() == Some(&b'"');
+    let mut result = Vec::with_capacity(value.len());
+    let mut bytes = value.iter().copied().peekable();
+    while let Some(byte) = bytes.next() {
+        if byte != b'\\' {
+            result.push(byte);
+            continue;
+        }
+
+        let escaped = match bytes.peek().copied() {
+            Some(b'\\') => b'\\',
+            Some(b'\'') if !double_quoted => b'\'',
+            Some(b'"') if double_quoted => b'"',
+            Some(b'$') if double_quoted => b'$',
+            Some(b'n') if double_quoted => b'\n',
+            Some(b't') if double_quoted => b'\t',
+            Some(b'r') if double_quoted => b'\r',
+            Some(b'v') if double_quoted => 0x0B,
+            Some(b'e') if double_quoted => 0x1B,
+            Some(b'f') if double_quoted => 0x0C,
+            _ => {
+                result.push(byte);
+                continue;
+            }
+        };
+
+        bytes.next();
+        result.push(escaped);
+    }
+
+    Cow::Owned(result)
 }
 
 fn collect_intersection_members<'arena>(ttype: &'arena Type<'arena>, members: &mut Vec<&'arena Type<'arena>>) {
