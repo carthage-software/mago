@@ -682,3 +682,20 @@ fn callable_return_type_stops_at_a_union() {
     let TagValue::Param(param) = &tag.value else { panic!() };
     assert!(matches!(param.r#type, Type::Union(_)));
 }
+
+#[test]
+fn callable_parameter_keeps_an_equals_after_its_name() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** @param callable(int $x, string $y=): void $c */");
+    let tag = first_tag(&document);
+
+    let TagValue::Param(param) = &tag.value else { panic!() };
+    let Type::Callable(callable) = param.r#type else { panic!("expected callable, got {:?}", param.r#type) };
+    let Some(specification) = callable.specification.as_ref() else { panic!() };
+    let parameters: Vec<_> = specification.parameters.entries.iter().collect();
+
+    assert!(!parameters[0].is_optional());
+    assert!(parameters[1].is_optional());
+    assert!(parameters[1].equals.is_none());
+    assert!(parameters[1].trailing_equals.is_some());
+}

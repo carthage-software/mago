@@ -49,6 +49,8 @@ pub struct CallableTypeParameter<'arena> {
     pub equals: Option<Span>,
     pub ellipsis: Option<Span>,
     pub variable: Option<Variable<'arena>>,
+    /// The `=` written after the parameter name (`string $y=`).
+    pub trailing_equals: Option<Span>,
     pub comma: Option<Span>,
 }
 
@@ -83,7 +85,7 @@ impl CallableTypeParameter<'_> {
     #[inline]
     #[must_use]
     pub const fn is_optional(&self) -> bool {
-        self.equals.is_some()
+        self.equals.is_some() || self.trailing_equals.is_some()
     }
 
     #[inline]
@@ -132,6 +134,7 @@ impl HasSpan for CallableTypeParameter<'_> {
 
         let end = self
             .comma
+            .or(self.trailing_equals)
             .or(self.variable.as_ref().map(mago_span::HasSpan::span))
             .or(self.ellipsis)
             .or(self.equals)
@@ -172,6 +175,10 @@ impl std::fmt::Display for CallableTypeParameter<'_> {
 
         if let Some(variable) = &self.variable {
             write!(f, " {variable}")?;
+        }
+
+        if self.trailing_equals.is_some() {
+            write!(f, "=")?;
         }
 
         Ok(())
