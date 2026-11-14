@@ -161,61 +161,21 @@ pub fn get_union_from_type(
                 return Ok(wrap_atomic(TAtomic::Object(TObject::new_has_method(word("__invoke")))));
             }
 
-            let left = get_union_from_type(intersection.left, scope, type_context, classname)?;
-            let right = get_union_from_type(intersection.right, scope, type_context, classname)?;
+            let mut members = vec![];
+            collect_intersection_members(ttype, &mut members);
 
-            let left_str = left.get_id();
-            let left_types = left.types.into_owned();
-            let right_types = right.types.into_owned();
-            let mut intersection_types = vec![];
-            for left_type in left_types {
-                for right_type in &right_types {
-                    if let Some(string) = left_type.intersect_strings(right_type) {
-                        intersection_types.push(string);
-                        continue;
-                    }
+            let mut members = members.into_iter();
+            let mut result = match members.next() {
+                Some(first) => get_union_from_type(first, scope, type_context, classname)?,
+                None => get_mixed(),
+            };
 
-                    let (mut intersection, intersected_type) = if left_type.can_be_intersected() {
-                        if !right_type.can_be_intersected()
-                            && let Some(deferred) = create_deferred_intersection(right_type.clone())
-                        {
-                            (deferred, left_type.clone())
-                        } else {
-                            (left_type.clone(), right_type.clone())
-                        }
-                    } else if let Some(deferred) = create_deferred_intersection(left_type.clone()) {
-                        (deferred, right_type.clone())
-                    } else if let Some(deferred) = create_deferred_intersection(right_type.clone()) {
-                        (deferred, left_type.clone())
-                    } else {
-                        return Err(TypeError::InvalidType(
-                            ttype.to_string(),
-                            format!(
-                                "Types `{}` and `{}` cannot be intersected",
-                                left_type.get_id(),
-                                right_type.get_id(),
-                            ),
-                            ttype.span(),
-                        ));
-                    };
-
-                    if !intersection.add_intersection_type(intersected_type) {
-                        return Err(TypeError::InvalidType(
-                            ttype.to_string(),
-                            format!(
-                                "Type `{}` used in intersection cannot be intersected with another type ( `{}` )",
-                                right_type.get_id(),
-                                left_str,
-                            ),
-                            ttype.span(),
-                        ));
-                    }
-
-                    intersection_types.push(intersection);
-                }
+            for member in members {
+                let right = get_union_from_type(member, scope, type_context, classname)?;
+                result = intersect_unions(result, right, ttype)?;
             }
 
-            TUnion::from_vec(intersection_types)
+            result
         }
         Type::Slice(slice) => {
             wrap_atomic(get_array_type(None, Some(slice.inner), false, scope, type_context, classname)?)
@@ -618,6 +578,68 @@ fn get_array_key_from_shape_key(key: &ShapeKey<'_>, scope: &NamespaceScope, clas
             ArrayKey::ClassLikeConstant { class_like_name, constant_name: word(constant_name.value) }
         }
     }
+}
+
+fn collect_intersection_members<'arena>(ttype: &'arena Type<'arena>, members: &mut Vec<&'arena Type<'arena>>) {
+    if let Type::Intersection(intersection) = ttype {
+        collect_intersection_members(intersection.left, members);
+        collect_intersection_members(intersection.right, members);
+    } else {
+        members.push(ttype);
+    }
+}
+
+fn intersect_unions(left: TUnion, right: TUnion, ttype: &Type<'_>) -> Result<TUnion, TypeError> {
+    let left_str = left.get_id();
+    let left_types = left.types.into_owned();
+    let right_types = right.types.into_owned();
+    let mut intersection_types = vec![];
+    for left_type in left_types {
+        for right_type in &right_types {
+            if let Some(string) = left_type.intersect_strings(right_type) {
+                intersection_types.push(string);
+                continue;
+            }
+
+            let (mut intersection, intersected_type) = if left_type.can_be_intersected() {
+                if !right_type.can_be_intersected()
+                    && let Some(deferred) = create_deferred_intersection(right_type.clone())
+                {
+                    (deferred, left_type.clone())
+                } else {
+                    (left_type.clone(), right_type.clone())
+                }
+            } else if let Some(deferred) = create_deferred_intersection(left_type.clone()) {
+                (deferred, right_type.clone())
+            } else if let Some(deferred) = create_deferred_intersection(right_type.clone()) {
+                (deferred, left_type.clone())
+            } else if right_type.can_be_intersected() {
+                (right_type.clone(), left_type.clone())
+            } else {
+                return Err(TypeError::InvalidType(
+                    ttype.to_string(),
+                    format!("Types `{}` and `{}` cannot be intersected", left_type.get_id(), right_type.get_id(),),
+                    ttype.span(),
+                ));
+            };
+
+            if !intersection.add_intersection_type(intersected_type) {
+                return Err(TypeError::InvalidType(
+                    ttype.to_string(),
+                    format!(
+                        "Type `{}` used in intersection cannot be intersected with another type ( `{}` )",
+                        right_type.get_id(),
+                        left_str,
+                    ),
+                    ttype.span(),
+                ));
+            }
+
+            intersection_types.push(intersection);
+        }
+    }
+
+    Ok(TUnion::from_vec(intersection_types))
 }
 
 fn create_deferred_intersection(atomic: TAtomic) -> Option<TAtomic> {
