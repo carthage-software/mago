@@ -51,10 +51,7 @@ function processItemsWithOr(array $items, Filter $filter): Generator
 {
     foreach ($items as $item) {
         if ($item !== '' || $filter->accept($status = new Status($item))) {
-            /**
-             * @mago-expect analysis:undefined-variable
-             * @mago-expect analysis:invalid-yield-value-type
-             */
+            /** @mago-expect analysis:possibly-undefined-variable */
             yield $status;
         }
     }

@@ -424,6 +424,7 @@ fn same_scope(left: &LoopScope, right: &LoopScope) -> bool {
         && same_types(&left.possibly_redefined_loop_variables, &right.possibly_redefined_loop_variables)
         && same_types(&left.possibly_redefined_loop_parent_variables, &right.possibly_redefined_loop_parent_variables)
         && same_types(&left.possibly_defined_loop_parent_variables, &right.possibly_defined_loop_parent_variables)
+        && same_types(&left.possibly_defined_loop_variables, &right.possibly_defined_loop_variables)
         && same_types(&left.by_reference_loop_mutations, &right.by_reference_loop_mutations)
         && left.assignment_targets == right.assignment_targets
         && left.tracks_assignment_targets == right.tracks_assignment_targets

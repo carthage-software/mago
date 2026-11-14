@@ -99,15 +99,19 @@ where
     assigned_variables
         .keys()
         .filter_map(|id| {
-            Some((
-                *id,
-                combine_union_types_rc(
-                    left_locals.get(id)?,
-                    right_context.locals.get(id)?,
-                    context.codebase,
-                    context.settings.combiner_options(),
-                ),
-            ))
+            let left_type = left_locals.get(id)?;
+            let mut combined = combine_union_types_rc(
+                left_type,
+                right_context.locals.get(id)?,
+                context.codebase,
+                context.settings.combiner_options(),
+            );
+
+            if left_type.possibly_undefined() {
+                Rc::make_mut(&mut combined).set_possibly_undefined(true, None);
+            }
+
+            Some((*id, combined))
         })
         .collect()
 }

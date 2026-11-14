@@ -153,6 +153,26 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
 
             loop_scope.final_actions.insert(ControlAction::Continue);
 
+            for (variable_id, variable_type) in &block_context.locals {
+                if loop_scope.parent_context_variables.contains_key(variable_id)
+                    || variable_id.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':'))
+                {
+                    continue;
+                }
+
+                let combined = match loop_scope.possibly_defined_loop_variables.get(variable_id) {
+                    Some(existing_type) => Rc::new(combine_union_types(
+                        existing_type,
+                        variable_type,
+                        context.codebase,
+                        CombinerOptions::default(),
+                    )),
+                    None => Rc::clone(variable_type),
+                };
+
+                loop_scope.possibly_defined_loop_variables.insert(*variable_id, combined);
+            }
+
             let mut removed_var_ids = WordSet::default();
             let redefined_vars =
                 block_context.get_redefined_locals(&loop_scope.parent_context_variables, false, &mut removed_var_ids);

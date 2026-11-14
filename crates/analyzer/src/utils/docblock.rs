@@ -355,6 +355,7 @@ pub fn insert_variable_from_docblock<'ctx, A>(
 
         let is_redundant = is_super
             && is_sub
+            && !previous_type.possibly_undefined()
             && !variable_type.is_mixed()
             && !previous_type.is_mixed()
             && !variable_type.is_generic_parameter()

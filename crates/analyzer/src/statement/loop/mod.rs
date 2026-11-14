@@ -694,6 +694,14 @@ where
         ) && convergence::supports_nodes(statements, pre_conditions, &post_expressions);
         let mut previous_input: Option<Box<convergence::Snapshot<'ctx>>> = None;
         let mut converged_passes = 0;
+        let condition_variables: WordSet = {
+            let mut variables = ShortCircuitedVariables::default();
+            for pre_condition in pre_conditions {
+                variables.walk_expression(pre_condition, &mut ());
+            }
+
+            variables.always.into_iter().chain(variables.sometimes).collect()
+        };
         while i <= assignment_depth {
             let previous_output = previous_input
                 .as_ref()
@@ -840,6 +848,31 @@ where
             }
 
             for variable_id in variables_to_remove {
+                let is_plain_variable = !variable_id.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':'));
+                if is_plain_variable
+                    && !condition_variables.contains(&variable_id)
+                    && !continue_context.references_in_scope.contains_key(&variable_id)
+                {
+                    let end_type = continue_context.locals.get(&variable_id).cloned();
+                    let continue_type = loop_scope.possibly_defined_loop_variables.get(&variable_id).cloned();
+                    let seeded_type = match (end_type, continue_type) {
+                        (Some(end_type), Some(continue_type)) => {
+                            Some(combine_union_types(&end_type, &continue_type, codebase, CombinerOptions::default()))
+                        }
+                        (Some(only_type), None) | (None, Some(only_type)) => Some((*only_type).clone()),
+                        (None, None) => None,
+                    };
+
+                    if let Some(mut seeded_type) = seeded_type {
+                        seeded_type.set_possibly_undefined(true, None);
+                        continue_context.locals.insert(variable_id, Rc::new(seeded_type));
+                        continue_context.possibly_undefined_variable_ids.insert(variable_id);
+                        continue_context.variables_possibly_in_scope.insert(variable_id);
+
+                        continue;
+                    }
+                }
+
                 continue_context.locals.remove(&variable_id);
             }
 
@@ -1292,6 +1325,21 @@ where
         }
     }
 
+    if always_enters_loop.get() && does_sometimes_continue {
+        for (variable_id, variable_type) in &loop_scope.possibly_defined_loop_variables {
+            if loop_parent_context.locals.contains_key(variable_id) || continue_context.locals.contains_key(variable_id)
+            {
+                continue;
+            }
+
+            let mut variable_type = (**variable_type).clone();
+            variable_type.set_possibly_undefined(true, None);
+            loop_parent_context.locals.insert(*variable_id, Rc::new(variable_type));
+            loop_parent_context.possibly_undefined_variable_ids.insert(*variable_id);
+            loop_parent_context.variables_possibly_in_scope.insert(*variable_id);
+        }
+    }
+
     if always_enters_loop.get() {
         for (variable_id, variable_type) in &continue_context.locals {
             // if there are break statements in the loop it's not certain
@@ -1605,6 +1653,23 @@ fn collect_condition_assignments<'ast, 'arena>(
     }
 }
 
+/// The variables a condition assigns whenever it is true: when an `&&` chain is true, each of its operands ran.
+fn assigned_when_true(condition: &Expression<'_>) -> WordSet {
+    if let Expression::Binary(binary) = unwrap_expression(condition)
+        && matches!(binary.operator, BinaryOperator::And(_) | BinaryOperator::LowAnd(_))
+    {
+        let mut assigned = assigned_when_true(binary.lhs);
+        assigned.extend(assigned_when_true(binary.rhs));
+
+        return assigned;
+    }
+
+    let mut variables = ShortCircuitedVariables::default();
+    variables.walk_expression(condition, &mut ());
+
+    variables.assigned
+}
+
 #[derive(Default)]
 struct ShortCircuitedVariables {
     depth: usize,
@@ -1790,6 +1855,16 @@ where
             first_application,
             false,
         );
+    }
+
+    for variable_id in assigned_when_true(pre_condition) {
+        if let Some(variable_type) = loop_context.locals.get_mut(&variable_id)
+            && variable_type.possibly_undefined()
+        {
+            Rc::make_mut(variable_type).set_possibly_undefined(false, Some(false));
+        }
+
+        loop_context.possibly_undefined_variable_ids.remove(&variable_id);
     }
 
     if is_do {

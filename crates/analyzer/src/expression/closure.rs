@@ -108,9 +108,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
                 // has_variable() has side effects, so use contains_key() directly.
                 if !is_by_reference || block_context.locals.contains_key(&word(variable_bytes)) {
                     let was_inside_general_use = block_context.flags.inside_general_use();
+                    let was_inside_variable_reference = block_context.flags.inside_variable_reference();
                     block_context.flags.set_inside_general_use(true);
+                    block_context.flags.set_inside_variable_reference(is_by_reference);
                     use_variable.variable.analyze(context, block_context, artifacts)?;
                     block_context.flags.set_inside_general_use(was_inside_general_use);
+                    block_context.flags.set_inside_variable_reference(was_inside_variable_reference);
                 }
 
                 let variable_span = use_variable.variable.span;
