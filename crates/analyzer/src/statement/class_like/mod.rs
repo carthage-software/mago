@@ -327,6 +327,15 @@ fn check_unused_template_parameters<'ctx, A>(
             }
         }
 
+        if class_like_metadata
+            .mixins
+            .iter()
+            .chain(class_like_metadata.magic_properties.values().filter_map(|property| property.type_metadata.as_ref()))
+            .any(|type_metadata| type_contains_template_param(&type_metadata.type_union, *template_name, class_name))
+        {
+            continue 'templates;
+        }
+
         for property_metadata in class_like_metadata.properties.values() {
             if let Some(type_metadata) = &property_metadata.type_metadata
                 && type_contains_template_param(&type_metadata.type_union, *template_name, class_name)
@@ -353,6 +362,28 @@ fn check_unused_template_parameters<'ctx, A>(
                 {
                     continue 'templates;
                 }
+            }
+
+            if function_like
+                .parameters
+                .iter()
+                .filter_map(|parameter| parameter.out_type.as_ref())
+                .chain(function_like.thrown_types.iter())
+                .any(|type_metadata| {
+                    type_contains_template_param(&type_metadata.type_union, *template_name, class_name)
+                })
+                || function_like
+                    .assertions
+                    .values()
+                    .chain(function_like.if_true_assertions.values())
+                    .chain(function_like.if_false_assertions.values())
+                    .flatten()
+                    .filter_map(|assertion| assertion.get_type())
+                    .any(|atomic| {
+                        type_contains_template_param(&TUnion::from_atomic(atomic.clone()), *template_name, class_name)
+                    })
+            {
+                continue 'templates;
             }
 
             // Check return type

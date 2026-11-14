@@ -1378,9 +1378,5 @@ mod tests {
                 return new ScalarType();
             }
         "},
-        issues = [
-            // TypeInterface: T is only used in @assert annotation, not in property/param/return
-            IssueCode::UnusedTemplateParameter,
-        ]
     }
 }

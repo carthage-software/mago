@@ -35,7 +35,6 @@ class GenericCovarianceFailure extends \RuntimeException {}
 
 /**
  * @template-covariant TFailure of \Throwable
- * @mago-expect analysis:unused-template-parameter
  */
 interface GenericCovarianceHandler
 {
