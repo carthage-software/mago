@@ -212,6 +212,11 @@ where
             continue;
         }
 
+        if let Some(class_name) = atomic.get_class_string_value() {
+            resolved_selectors.push(ResolvedSelector::LiteralString(class_name));
+            continue;
+        }
+
         let atomic_type_id = atomic.get_id();
 
         if atomic.is_any_string() {

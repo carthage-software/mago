@@ -3287,6 +3287,7 @@ test_case!(isset_property_on_some_union_members);
 test_case!(inherited_generic_mixin_binds_parent_templates);
 test_case!(static_call_through_generic_mixin);
 test_case!(match_get_class_narrows_subject);
+test_case!(class_string_literal_member_selector);
 
 #[test]
 #[cfg_attr(miri, ignore)]
