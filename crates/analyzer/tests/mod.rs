@@ -3321,6 +3321,7 @@ test_case!(do_while_condition_defines_variable);
 test_case!(bool_cast_condition_narrows_operand);
 test_case!(possibly_undefined_variable_reads_as_null_in_conditions);
 test_case!(string_length_comparisons_narrow);
+test_case!(isset_on_uninitialized_typed_property);
 
 #[test]
 #[cfg_attr(miri, ignore)]

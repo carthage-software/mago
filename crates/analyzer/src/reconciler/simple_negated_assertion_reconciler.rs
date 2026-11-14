@@ -1427,6 +1427,15 @@ where
 
 fn reconcile_not_isset(existing_var_type: &TUnion, key: Option<&[u8]>) -> TUnion {
     if existing_var_type.possibly_undefined() || existing_var_type.possibly_undefined_from_try() {
+        if let Some(key) = key
+            && memchr::memchr(b'[', key).is_none()
+            && memchr::memmem::find(key, b"->").is_some()
+            && !existing_var_type.can_be_null()
+            && !existing_var_type.is_mixed()
+        {
+            return existing_var_type.clone();
+        }
+
         return get_undefined_null();
     }
 
