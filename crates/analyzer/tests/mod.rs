@@ -3315,6 +3315,7 @@ test_case!(consensus_does_not_drop_needed_clauses);
 test_case!(nonnull_mixed_is_never_null);
 test_case!(existence_checks_of_literal_and_numeric_strings);
 test_case!(key_exists_narrowing_keeps_the_key_type);
+test_case!(is_float_removes_int);
 
 #[test]
 #[cfg_attr(miri, ignore)]

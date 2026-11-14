@@ -262,6 +262,10 @@ pub(super) fn apply_assertion_to_narrow_type(
             //   no overlap          -> drop the variant
             let mut retained: Vec<TAtomic> = Vec::new();
             for variant in original_type.types.as_ref().iter() {
+                if atomic.is_float() && variant.is_int() {
+                    continue;
+                }
+
                 let variant_is_subtype = atomic_comparator::is_contained_by(
                     codebase,
                     variant,

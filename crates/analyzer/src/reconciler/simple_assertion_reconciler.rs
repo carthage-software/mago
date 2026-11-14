@@ -1380,7 +1380,7 @@ where
                     context.codebase,
                     atomic,
                     &TAtomic::Scalar(TScalar::Float(*float)),
-                    false,
+                    true,
                     &mut ComparisonResult::new(),
                 ) {
                     acceptable_types.push(atomic.clone());
