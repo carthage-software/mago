@@ -242,6 +242,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             .map(|(&key, ty)| (key, Rc::clone(ty)))
             .collect();
 
+        let negated_condition_locals: Vec<(Word, Rc<TUnion>)> = if self.body.has_else_if_clauses() {
+            changed_variable_ids
+                .iter()
+                .filter_map(|key| temporary_else_context.locals.get(key).map(|ty| (*key, Rc::clone(ty))))
+                .collect()
+        } else {
+            Vec::new()
+        };
+
         analyze_if_statement_block(
             context,
             &mut if_scope,
@@ -252,6 +261,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             &pre_assignment_else_redefined_locals,
             self,
         )?;
+
+        let if_branch_exits = !if_scope.if_actions.is_empty() && !if_scope.if_actions.contains(ControlAction::None);
 
         let if_body_assigned_ids: WordSet = if_scope
             .assigned_variable_ids
@@ -383,6 +394,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
                         }
                     }
                 }
+            }
+        } else if if_branch_exits {
+            for (variable_id, variable_type) in negated_condition_locals {
+                block_context.locals.insert(variable_id, variable_type);
             }
         }
 

@@ -778,6 +778,7 @@ test_case!(integer_power_result_type);
 test_case!(bitwise_not_result_type);
 test_case!(narrowing_after_never_right_operand);
 test_case!(ternary_with_finishing_branch);
+test_case!(exiting_if_with_elseif_keeps_narrowing);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);
