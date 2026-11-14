@@ -1100,21 +1100,24 @@ where
                     did_remove_type = true;
                 }
 
-                acceptable_types.push(
-                    get_string_with_props(
-                        is_numeric || existing_string.is_numeric,
-                        is_truthy || existing_string.is_truthy,
-                        is_non_empty || existing_string.is_non_empty,
-                        is_callable || existing_string.is_callable,
-                        match (casing, existing_string.casing) {
-                            (a, b) if a == b => a,
-                            (TStringCasing::Unspecified, b) => b,
-                            (a, TStringCasing::Unspecified) => a,
-                            _ => TStringCasing::Unspecified,
-                        },
-                    )
-                    .get_single_owned(),
-                );
+                let mut narrowed = get_string_with_props(
+                    is_numeric || existing_string.is_numeric,
+                    is_truthy || existing_string.is_truthy,
+                    is_non_empty || existing_string.is_non_empty,
+                    is_callable || existing_string.is_callable,
+                    match (casing, existing_string.casing) {
+                        (TStringCasing::Unspecified, existing) => existing,
+                        (asserted, TStringCasing::Unspecified) => asserted,
+                        (_, existing) => existing,
+                    },
+                )
+                .get_single_owned();
+
+                if let TAtomic::Scalar(TScalar::String(narrowed_string)) = &mut narrowed {
+                    narrowed_string.literal = existing_string.literal;
+                }
+
+                acceptable_types.push(narrowed);
             }
             TAtomic::Scalar(TScalar::ClassLikeString(_)) if !is_numeric => {
                 acceptable_types.push(atomic.clone());

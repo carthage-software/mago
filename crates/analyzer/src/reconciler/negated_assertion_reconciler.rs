@@ -18,7 +18,6 @@ use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
-use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::combiner;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
@@ -450,13 +449,9 @@ where
                         did_remove_type = true;
 
                         if assertion_value.is_empty() {
-                            acceptable_types.push(TAtomic::Scalar(TScalar::String(TString::general_with_props(
-                                existing_string.is_numeric,
-                                existing_string.is_truthy,
-                                true,
-                                existing_string.is_callable,
-                                existing_string.casing,
-                            ))));
+                            let mut non_empty_string = *existing_string;
+                            non_empty_string.is_non_empty = true;
+                            acceptable_types.push(TAtomic::Scalar(TScalar::String(non_empty_string)));
                         } else {
                             acceptable_types.push(existing_atomic_type);
                         }
