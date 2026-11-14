@@ -147,8 +147,15 @@ pub fn inherit_methods_from_parent(
                 {
                     return;
                 }
+
+                let is_pseudo = |method_id: &MethodIdentifier| {
+                    codebase.get_method_by_id(method_id).is_some_and(|method| method.flags.is_magic_method())
+                };
+
                 if implementing_method_id.get_class_name() == class_like_name
-                    || !codebase.can_replace_inherited_method(*implementing_method_id, parent_metadata.name)
+                    || (is_pseudo(declaring_method_id) && !is_pseudo(implementing_method_id))
+                    || !(codebase.can_replace_inherited_method(*implementing_method_id, parent_metadata.name)
+                        || (is_pseudo(implementing_method_id) && !is_pseudo(declaring_method_id)))
                 {
                     return;
                 }

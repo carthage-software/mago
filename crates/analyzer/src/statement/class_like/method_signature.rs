@@ -204,7 +204,9 @@ pub fn validate_method_signature_compatibility(
         return issues;
     }
 
-    if is_visibility_narrowed(child_method_meta.visibility, parent_method_meta.visibility) {
+    if !parent_method.flags.is_magic_method()
+        && is_visibility_narrowed(child_method_meta.visibility, parent_method_meta.visibility)
+    {
         issues.push(SignatureCompatibilityIssue::VisibilityNarrowed {
             child_visibility: child_method_meta.visibility,
             parent_visibility: parent_method_meta.visibility,

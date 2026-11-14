@@ -4157,11 +4157,10 @@ where
 
         for (method_name, declaring_id) in &trait_metadata.declaring_method_ids {
             if class_like_metadata.excludes_trait_method(trait_metadata.name, *method_name, context.codebase)
-                || context
-                    .codebase
-                    .get_method_by_id(declaring_id)
-                    .and_then(|method| method.method_metadata.as_ref())
-                    .is_none_or(|method| method.is_abstract)
+                || context.codebase.get_method_by_id(declaring_id).is_none_or(|method| {
+                    method.flags.is_magic_method()
+                        || method.method_metadata.as_ref().is_none_or(|method| method.is_abstract)
+                })
             {
                 continue;
             }
