@@ -142,6 +142,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
 
                             let Some(ArrayKey::Integer(target_index)) = &array_key else {
                                 if array_key.is_none() {
+                                    let required_count =
+                                        known_elements.values().filter(|(optional, _)| !optional).count();
                                     atomics.push(TAtomic::Array(TArray::List(TList {
                                         known_elements: Some(
                                             // We don't know the key value, so we can't unset it.
@@ -159,8 +161,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                                         ),
                                         element_type,
                                         known_count,
-                                        // Mark the list as potentially undefined.
-                                        non_empty: true,
+                                        non_empty: non_empty && required_count >= 2,
                                     })));
                                 } else {
                                     // Keep everything as is, attempting to remove a string key from a list
@@ -270,6 +271,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                             };
 
                             let Some(array_key) = &array_key else {
+                                let required_count = known_items.values().filter(|(optional, _)| !optional).count();
                                 atomics.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
                                     known_items: Some(
                                         // We don't know the key value, so we can't unset it.
@@ -286,7 +288,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                                             .into(),
                                     ),
                                     parameters,
-                                    non_empty,
+                                    non_empty: non_empty && required_count >= 2,
                                     known_non_list,
                                 })));
 

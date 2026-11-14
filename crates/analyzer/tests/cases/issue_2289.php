@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 function readShape(): void
 {
+    // @mago-expect analysis:docblock-type-mismatch
     /**
      * @var array{
      *     k0: ?int,

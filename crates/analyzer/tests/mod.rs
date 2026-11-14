@@ -848,6 +848,7 @@ test_case!(array_keys_with_filter_may_be_empty);
 test_case!(array_callable_on_generic_object);
 test_case!(list_negative_key_write);
 test_case!(list_breaking_key_write);
+test_case!(non_empty_list_compared_with_empty_array);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);

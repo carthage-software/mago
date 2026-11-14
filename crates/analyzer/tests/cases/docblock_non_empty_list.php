@@ -9,5 +9,5 @@ function neListAN(array $a): int
 }
 
 echo neListAN([1, 2, 3]);
-/** @mago-expect analysis:possibly-invalid-argument */
+/** @mago-expect analysis:invalid-argument */
 echo neListAN([]);

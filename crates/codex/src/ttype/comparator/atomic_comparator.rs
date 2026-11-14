@@ -607,6 +607,13 @@ pub(crate) fn can_be_identical(
         };
     }
 
+    if let (TAtomic::Array(first_array), TAtomic::Array(second_array)) = (first_part, second_part)
+        && ((first_array.is_empty() && is_surely_non_empty(second_array))
+            || (second_array.is_empty() && is_surely_non_empty(first_array)))
+    {
+        return false;
+    }
+
     if (first_part.is_list() && second_part.is_non_empty_list())
         || (second_part.is_list() && first_part.is_non_empty_list())
     {
@@ -1033,6 +1040,15 @@ fn parameters_can_be_identical(
             )
         }
         _ => true,
+    }
+}
+
+fn is_surely_non_empty(array: &TArray) -> bool {
+    match array {
+        TArray::List(list) => list.non_empty,
+        TArray::Keyed(keyed) => {
+            keyed.known_items.as_ref().is_some_and(|items| items.values().any(|(optional, _)| !optional))
+        }
     }
 }
 
