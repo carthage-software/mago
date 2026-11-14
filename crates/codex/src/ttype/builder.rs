@@ -708,6 +708,7 @@ fn create_deferred_intersection(atomic: TAtomic) -> Option<TAtomic> {
         atomic,
         TAtomic::Variable(_)
             | TAtomic::Conditional(_)
+            | TAtomic::Alias(_)
             | TAtomic::Derived(
                 TDerived::IndexAccess(_)
                     | TDerived::ValueOf(_)

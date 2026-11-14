@@ -3254,6 +3254,7 @@ test_case!(spl_stub_parameter_names_match_php8);
 test_case!(covariant_template_in_nested_input_position);
 test_case!(array_literal_spread_keeps_counts_and_string_keys);
 test_case!(docblock_before_closure_assignment_documents_closure);
+test_case!(type_alias_in_intersection_expands);
 
 #[test]
 #[cfg_attr(miri, ignore)]
