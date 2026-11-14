@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use mago_word::Word;
 
 use crate::metadata::CodebaseMetadata;
@@ -130,10 +132,26 @@ pub(crate) fn is_contained_by(
             && !container_type_parameter.from_template_fallback()
         {
             let mut reverse_result = ComparisonResult::new();
+            let reverse_container =
+                if specialized_template_type.types.iter().any(
+                    |atomic| matches!(atomic, TAtomic::Object(TObject::Named(named_object)) if named_object.is_this),
+                ) {
+                    let mut reverse_container = specialized_template_type.clone();
+                    for atomic in reverse_container.types.to_mut() {
+                        if let TAtomic::Object(TObject::Named(named_object)) = atomic {
+                            named_object.is_this = false;
+                        }
+                    }
+
+                    Cow::Owned(reverse_container)
+                } else {
+                    Cow::Borrowed(&specialized_template_type)
+                };
+
             let reverse_ok = union_comparator::is_contained_by(
                 codebase,
                 container_type_parameter,
-                &specialized_template_type,
+                &reverse_container,
                 false,
                 container_type_parameter.ignore_falsable_issues(),
                 inside_assertion,
