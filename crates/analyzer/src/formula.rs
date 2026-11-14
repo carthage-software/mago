@@ -162,6 +162,22 @@ where
 {
     let expression = unwrap_expression(conditional);
 
+    if let Expression::UnaryPrefix(UnaryPrefix {
+        operator: UnaryPrefixOperator::BoolCast(..) | UnaryPrefixOperator::BooleanCast(..),
+        operand,
+    }) = expression
+    {
+        return get_base_formula(
+            conditional_object_id,
+            creating_object_id,
+            operand,
+            assertion_context,
+            artifacts,
+            algebra_thresholds,
+            formula_size_threshold,
+        );
+    }
+
     if let Expression::Binary(binary) = expression {
         let equality_operator = match binary.operator {
             BinaryOperator::NotIdentical(span) => Some(BinaryOperator::Identical(span)),
