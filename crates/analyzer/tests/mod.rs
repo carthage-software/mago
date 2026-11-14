@@ -3181,6 +3181,7 @@ test_case!(named_argument_named_like_variadic);
 test_case!(unknown_named_argument_fits_variadic_type);
 test_case!(truthy_mixed_keeps_truthiness_when_narrowed);
 test_case!(negated_type_checks_split_callable);
+test_case!(isset_strips_null_from_template_bound);
 
 #[test]
 #[cfg_attr(miri, ignore)]

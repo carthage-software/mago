@@ -1589,6 +1589,14 @@ where
                 acceptable_types.push(TAtomic::Mixed(mixed.with_is_non_null(true)));
                 did_remove_type = true;
             }
+        } else if let TAtomic::GenericParameter(generic_parameter) = &atomic
+            && generic_parameter.constraint.has_null()
+            && !generic_parameter.constraint.is_null()
+        {
+            did_remove_type = true;
+            let mut generic_parameter = generic_parameter.clone();
+            *Arc::make_mut(&mut generic_parameter.constraint) = generic_parameter.constraint.to_non_nullable();
+            acceptable_types.push(TAtomic::GenericParameter(generic_parameter));
         } else {
             acceptable_types.push(atomic);
         }
