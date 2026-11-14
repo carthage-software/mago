@@ -11,7 +11,6 @@ use mago_algebra::AssertionMap;
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::find_satisfying_assignments_iter;
-use mago_algebra::negate_formula;
 use mago_allocator::Arena;
 use mago_reporting::IssueCollection;
 
@@ -47,7 +46,9 @@ use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::AssignmentOperator;
+use mago_syntax::cst::Binary;
 use mago_syntax::cst::BinaryOperator;
+use mago_syntax::cst::Conditional;
 use mago_syntax::cst::DirectVariable;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Foreach;
@@ -57,6 +58,7 @@ use mago_syntax::cst::Statement;
 use mago_syntax::cst::UnaryPrefix;
 use mago_syntax::cst::UnaryPrefixOperator;
 use mago_syntax::cst::Variable;
+use mago_syntax::walker::MutWalker;
 use mago_word::Word;
 use mago_word::WordSet;
 use mago_word::word;
@@ -198,7 +200,7 @@ where
     let always_enters_loop = infinite_loop || loop_scope.truthy_pre_conditions;
 
     if loop_scope.condition_always_false {
-        for condition in conditions {
+        if let Some(condition) = conditions.last() {
             let type_id = artifacts
                 .get_expression_type(*condition)
                 .map(|t| t.get_id())
@@ -307,14 +309,29 @@ fn inherit_loop_block_context<'ctx, A>(
                     continue;
                 }
 
-                let always_defined = known_infinite_loop
+                let exit_type = inner_loop_block_context
+                    .locals
+                    .get(variable)
+                    .filter(|_| !known_infinite_loop && loop_scope.variables_defined_by_condition.contains(variable));
+                let always_defined = (known_infinite_loop || exit_type.is_some())
                     && loop_scope
                         .variables_defined_at_every_break
                         .as_ref()
                         .is_some_and(|defined_at_every_break| defined_at_every_break.contains(variable));
 
                 if always_defined {
-                    block_context.locals.insert(*variable, Rc::clone(variable_type));
+                    block_context.locals.insert(
+                        *variable,
+                        match exit_type {
+                            Some(exit_type) => combine_union_types_rc(
+                                exit_type,
+                                variable_type,
+                                context.codebase,
+                                CombinerOptions::default(),
+                            ),
+                            None => Rc::clone(variable_type),
+                        },
+                    );
                 } else {
                     let mut variable_type = (**variable_type).clone();
                     variable_type.set_possibly_undefined(true, None);
@@ -397,6 +414,8 @@ where
         let assertion_context = context.get_assertion_context_from_block(loop_context);
 
         let mut complex_conditions = vec![];
+        let (leading_conditions, pre_conditions) = pre_conditions.split_at(pre_conditions.len() - 1);
+        pre_condition_clauses.extend(leading_conditions.iter().map(|_| vec![]));
         for pre_condition in pre_conditions {
             let condition_span = pre_condition.span();
             let clauses = get_formula(
@@ -475,6 +494,7 @@ where
                 artifacts,
                 is_do,
                 !pre_conditions_applied,
+                condition_offset + 1 == pre_conditions.len(),
             )?;
         }
 
@@ -525,6 +545,7 @@ where
                         artifacts,
                         is_do,
                         !pre_conditions_applied,
+                        condition_offset + 1 == pre_conditions.len(),
                     )?;
                 }
 
@@ -572,6 +593,7 @@ where
                         artifacts,
                         is_do,
                         !pre_conditions_applied,
+                        condition_offset + 1 == pre_conditions.len(),
                     )?);
                 }
 
@@ -889,6 +911,7 @@ where
                         artifacts,
                         is_do,
                         !pre_conditions_applied,
+                        condition_offset + 1 == pre_conditions.len(),
                     );
 
                     if is_do {
@@ -975,6 +998,7 @@ where
                             artifacts,
                             is_do,
                             !pre_conditions_applied,
+                            condition_offset + 1 == pre_conditions.len(),
                         )?;
                     }
 
@@ -1143,36 +1167,38 @@ where
         }
     }
 
-    if !pre_conditions.is_empty() && !pre_condition_clauses.is_empty() && !does_sometimes_break {
-        // if the loop contains an assertion and there are no break statements, we can negate that assertion
-        // and apply it to the current context
-
+    if !pre_conditions.is_empty() && !pre_condition_clauses.is_empty() {
+        let only_condition_variables = does_sometimes_break.then_some(&loop_scope.variables_defined_by_condition);
         let pre_condition_clauses: Vec<Clause> = pre_condition_clauses.into_iter().flatten().collect();
-        let negated_pre_condition_clauses = if pre_conditions.len() == 1 {
-            negate_or_synthesize(
-                &pre_condition_clauses,
-                pre_conditions[0],
-                context.get_assertion_context_from_block(&continue_context),
-                artifacts,
-                &context.settings.algebra_thresholds(),
-                context.settings.formula_size_threshold,
-            )
-        } else {
-            negate_formula(&pre_condition_clauses, &context.settings.algebra_thresholds()).unwrap_or_default()
-        };
+        let tested_condition = pre_conditions[pre_conditions.len() - 1];
+        let negated_pre_condition_clauses = negate_or_synthesize(
+            &pre_condition_clauses,
+            tested_condition,
+            context.get_assertion_context_from_block(&continue_context),
+            artifacts,
+            &context.settings.algebra_thresholds(),
+            context.settings.formula_size_threshold,
+        );
 
-        if let [pre_condition] = pre_conditions {
-            let mut assignments = vec![];
+        let mut assignments = vec![];
+        for pre_condition in pre_conditions {
             collect_condition_assignments(pre_condition, &mut assignments);
-            for (variable, value) in assignments {
-                if let Some(value_type) = artifacts.get_rc_expression_type(value) {
-                    continue_context.locals.insert(word(variable.name), Rc::clone(value_type));
-                }
+        }
+
+        for (variable, value) in assignments {
+            let variable_id = word(variable.name);
+            if only_condition_variables.is_none_or(|variable_ids| variable_ids.contains(&variable_id))
+                && let Some(value_type) = artifacts.get_rc_expression_type(value)
+            {
+                continue_context.locals.insert(variable_id, Rc::clone(value_type));
             }
         }
 
-        let (negated_pre_condition_types, _) =
+        let (mut negated_pre_condition_types, _) =
             find_satisfying_assignments(negated_pre_condition_clauses.iter().as_slice(), None, &mut WordSet::default());
+        if let Some(variable_ids) = only_condition_variables {
+            negated_pre_condition_types.retain(|variable_id, _| variable_ids.contains(variable_id));
+        }
 
         if !negated_pre_condition_types.is_empty() {
             let mut changed_variable_ids = WordSet::default();
@@ -1192,6 +1218,10 @@ where
                 true,
                 false,
             );
+
+            if does_sometimes_break {
+                changed_variable_ids.clear();
+            }
 
             let mut parent_assertions = AssertionMap::default();
             for (variable_id, assertions) in &negated_pre_condition_types {
@@ -1550,6 +1580,44 @@ fn collect_condition_assignments<'ast, 'arena>(
     }
 }
 
+#[derive(Default)]
+struct ShortCircuitedVariables {
+    depth: usize,
+    always: WordSet,
+    sometimes: WordSet,
+}
+
+impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for ShortCircuitedVariables {
+    fn walk_in_direct_variable(&mut self, variable: &'ast DirectVariable<'arena>, _context: &mut ()) {
+        (if self.depth == 0 { &mut self.always } else { &mut self.sometimes }).insert(word(variable.name));
+    }
+
+    fn walk_binary(&mut self, binary: &'ast Binary<'arena>, context: &mut ()) {
+        let short_circuits = usize::from(matches!(
+            binary.operator,
+            BinaryOperator::And(_)
+                | BinaryOperator::Or(_)
+                | BinaryOperator::LowAnd(_)
+                | BinaryOperator::LowOr(_)
+                | BinaryOperator::NullCoalesce(_)
+        ));
+        self.walk_expression(binary.lhs, context);
+        self.depth += short_circuits;
+        self.walk_expression(binary.rhs, context);
+        self.depth -= short_circuits;
+    }
+
+    fn walk_conditional(&mut self, conditional: &'ast Conditional<'arena>, context: &mut ()) {
+        self.walk_expression(conditional.condition, context);
+        self.depth += 1;
+        if let Some(then) = conditional.then {
+            self.walk_expression(then, context);
+        }
+        self.walk_expression(conditional.r#else, context);
+        self.depth -= 1;
+    }
+}
+
 fn condition_needs_analyzed_types(expression: &Expression<'_>) -> bool {
     match expression {
         Expression::Call(_) => true,
@@ -1578,6 +1646,7 @@ fn apply_pre_condition_to_loop_context<'ctx, 'arena, A>(
     artifacts: &mut AnalysisArtifacts,
     is_do: bool,
     first_application: bool,
+    tested: bool,
 ) -> Result<WordSet, AnalysisError>
 where
     A: Arena,
@@ -1585,7 +1654,7 @@ where
     let pre_condition_span = pre_condition.span();
     let pre_referenced_variable_ids = std::mem::take(&mut loop_context.conditionally_referenced_variable_ids);
 
-    loop_context.flags.set_inside_conditional(true);
+    loop_context.flags.set_inside_conditional(tested);
     loop_context.flags.set_inside_loop_expressions(true);
 
     pre_condition.analyze(context, loop_context, artifacts)?;
@@ -1594,6 +1663,7 @@ where
     loop_context.flags.set_inside_conditional(false);
 
     if first_application
+        && tested
         && condition_needs_analyzed_types(pre_condition)
         && let Some(clauses) = get_formula(
             pre_condition_span,
@@ -1608,7 +1678,7 @@ where
         *pre_condition_clauses = clauses;
     }
 
-    if first_application {
+    if first_application && tested {
         let condition_type = artifacts.get_expression_type(pre_condition);
         let is_always_falsy = condition_type.is_some_and(|ct| ct.is_always_falsy());
         let is_always_truthy = condition_type.is_some_and(|ct| ct.is_always_truthy());
@@ -1637,6 +1707,8 @@ where
         BlockContext::get_new_or_updated_locals(loop_context, loop_parent_context);
 
     if first_application && let Some(loop_scope) = artifacts.get_loop_scope_mut() {
+        let mut short_circuited = ShortCircuitedVariables::default();
+        short_circuited.walk_expression(pre_condition, &mut ());
         loop_scope.variables_defined_by_condition.extend(
             loop_context
                 .locals
@@ -1644,9 +1716,15 @@ where
                 .filter(|variable_id| {
                     !loop_parent_context.locals.contains_key(*variable_id)
                         && !variable_id.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':'))
+                        && (!short_circuited.sometimes.contains(*variable_id)
+                            || short_circuited.always.contains(*variable_id))
                 })
                 .copied(),
         );
+    }
+
+    if !tested {
+        return Ok(always_assigned_before_loop_body_variables);
     }
 
     loop_context.clauses = saturate_shared_clauses(
