@@ -55,6 +55,7 @@ use crate::statement::analyze_statements;
 use crate::utils::conditional;
 use crate::utils::expression::is_derived_access_path;
 use crate::utils::misc::check_for_paradox;
+use crate::utils::misc::check_for_paradoxical_or_operands;
 use crate::utils::symbol_existence::extract_function_constant_existence;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
@@ -172,6 +173,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             &context.settings.algebra_thresholds(),
             true,
         );
+        check_for_paradoxical_or_operands(context, block_context, artifacts, self.condition);
 
         if_clauses = saturate_clauses(if_clauses.iter(), &context.settings.algebra_thresholds());
         let combined_clauses = if block_context.clauses.is_empty() {

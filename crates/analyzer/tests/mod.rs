@@ -3336,6 +3336,7 @@ test_case!(call_argument_inside_isset_is_a_plain_read);
 test_case!(implicit_float_to_int_operand);
 test_case!(array_column_object_index_column);
 test_case!(array_is_list_narrows_sealed_shapes);
+test_case!(dead_operand_of_or_is_paradoxical);
 
 #[test]
 #[cfg_attr(miri, ignore)]
