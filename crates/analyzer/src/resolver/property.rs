@@ -93,6 +93,8 @@ pub struct PropertyResolutionResult {
     /// When combined with `encountered_null` and nullsafe access, indicates
     /// the null in the result type came ONLY from nullsafe short-circuit.
     pub all_properties_non_nullable: bool,
+    /// Properties missing on some members of a union read inside `isset`, reported only when no member has them.
+    missing_isset_properties: Option<Vec<(Word, Word)>>,
 }
 
 /// Resolves all possible instance properties from an object expression and a member selector.
@@ -141,6 +143,10 @@ where
         } else {
             result.has_invalid_path = true;
         }
+    }
+
+    if block_context.flags.inside_isset() && object_type.types.len() > 1 {
+        result.missing_isset_properties = Some(vec![]);
     }
 
     let mut object_atomics = object_type.types.iter().collect::<Vec<_>>();
@@ -428,6 +434,21 @@ where
             }
 
             result.properties.push(resolved_property);
+        }
+    }
+
+    if let Some(missing_properties) = result.missing_isset_properties.take()
+        && result.properties.is_empty()
+    {
+        for (class_id, prop_name) in missing_properties {
+            report_non_existent_property(
+                context,
+                class_id,
+                prop_name,
+                property_selector.span(),
+                object_expression.span(),
+                false,
+            );
         }
     }
 
@@ -1014,7 +1035,7 @@ where
                 context.codebase.get_method_by_id(&method_id)
             };
 
-            let magic_type = if for_assignment {
+            let mut magic_type = if for_assignment {
                 magic_method(b"__set")
                     .and_then(|method| method.parameters.get(1))
                     .and_then(|parameter| parameter.type_metadata.as_ref())
@@ -1024,6 +1045,14 @@ where
             .map(|type_metadata| type_metadata.type_union.clone())
             .filter(|magic_type| !magic_type.has_template_types() && !magic_type.is_void())
             .unwrap_or_else(get_mixed);
+
+            if !for_assignment
+                && block_context.flags.inside_isset()
+                && !block_context.flags.inside_coalesce()
+                && magic_method(b"__isset").is_none()
+            {
+                magic_type = magic_type.as_nullable();
+            }
 
             return Some(ResolvedProperty {
                 lookup_class: None,
@@ -1073,7 +1102,13 @@ where
             result.has_possibly_defined_property = true;
         }
 
-        report_non_existent_property(context, class_id, prop_name, selector.span(), object_expr.span(), false);
+        match result.missing_isset_properties.as_mut() {
+            Some(missing_properties) => missing_properties.push((class_id, prop_name)),
+            None => {
+                report_non_existent_property(context, class_id, prop_name, selector.span(), object_expr.span(), false)
+            }
+        }
+
         return None;
     };
 

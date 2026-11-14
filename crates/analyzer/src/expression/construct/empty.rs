@@ -21,9 +21,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for EmptyConstruct<'arena> {
         A: Arena,
     {
         let was_inside_isset = block_context.flags.inside_isset();
+        let was_inside_coalesce = block_context.flags.inside_coalesce();
         block_context.flags.set_inside_isset(true);
+        block_context.flags.set_inside_coalesce(false);
         self.value.analyze(context, block_context, artifacts)?;
         block_context.flags.set_inside_isset(was_inside_isset);
+        block_context.flags.set_inside_coalesce(was_inside_coalesce);
 
         artifacts.set_expression_type(
             self,

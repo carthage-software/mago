@@ -54,12 +54,15 @@ where
     A: Arena,
 {
     let was_inside_isset = block_context.flags.inside_isset();
+    let was_inside_coalesce = block_context.flags.inside_coalesce();
     block_context.flags.set_inside_isset(matches!(
         binary.lhs,
         Expression::Variable(_) | Expression::Access(_) | Expression::ArrayAccess(_)
     ));
+    block_context.flags.set_inside_coalesce(true);
     binary.lhs.analyze(context, block_context, artifacts)?;
     block_context.flags.set_inside_isset(was_inside_isset);
+    block_context.flags.set_inside_coalesce(was_inside_coalesce);
 
     let lhs_type_option = artifacts.get_rc_expression_type(&binary.lhs);
 

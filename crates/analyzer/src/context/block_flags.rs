@@ -26,6 +26,8 @@ impl BlockContextFlags {
     /// its body.
     pub const INSIDE_CLASS_LIKE_ATTRIBUTE: u32 = 1 << 18;
     pub const INSIDE_REFERENCE: u32 = 1 << 19;
+    /// Set while analyzing the left side of `??`, which reads magic properties through `__get` without `__isset`.
+    pub const INSIDE_COALESCE: u32 = 1 << 20;
 
     #[inline]
     pub const fn new() -> Self {
@@ -155,6 +157,11 @@ impl BlockContextFlags {
     }
 
     #[inline(always)]
+    pub const fn inside_coalesce(&self) -> bool {
+        self.contains(Self::INSIDE_COALESCE)
+    }
+
+    #[inline(always)]
     pub fn set_inside_conditional(&mut self, value: bool) {
         self.set(Self::INSIDE_CONDITIONAL, value);
     }
@@ -252,5 +259,10 @@ impl BlockContextFlags {
     #[inline(always)]
     pub fn set_inside_reference(&mut self, value: bool) {
         self.set(Self::INSIDE_REFERENCE, value);
+    }
+
+    #[inline]
+    pub fn set_inside_coalesce(&mut self, value: bool) {
+        self.set(Self::INSIDE_COALESCE, value);
     }
 }

@@ -41,9 +41,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for IssetConstruct<'arena> {
             }
 
             let was_inside_isset = block_context.flags.inside_isset();
+            let was_inside_coalesce = block_context.flags.inside_coalesce();
             block_context.flags.set_inside_isset(true);
+            block_context.flags.set_inside_coalesce(false);
             value.analyze(context, block_context, artifacts)?;
             block_context.flags.set_inside_isset(was_inside_isset);
+            block_context.flags.set_inside_coalesce(was_inside_coalesce);
             if let Some(value_type) = artifacts.get_expression_type(value) {
                 if value_type.is_never() || value_type.is_null() {
                     any_definitely_unset = true;
