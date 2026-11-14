@@ -14,6 +14,7 @@ use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::cst::Binary;
 use mago_syntax::cst::Expression;
+use mago_syntax::cst::Node;
 use mago_syntax::cst::Variable;
 use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
@@ -132,9 +133,32 @@ where
     } else {
         let non_null_lhs_type = lhs_type.to_non_nullable();
         let has_returned = block_context.flags.has_returned();
+        let pre_rhs_locals = has_assignment(Node::Expression(binary.rhs)).then(|| block_context.locals.clone());
         block_context.flags.set_has_returned(false);
         binary.rhs.analyze(context, block_context, artifacts)?;
         block_context.flags.set_has_returned(block_context.flags.has_returned() && has_returned);
+
+        if let Some(pre_rhs_locals) = pre_rhs_locals {
+            for (variable_id, rhs_type) in &mut block_context.locals {
+                match pre_rhs_locals.get(variable_id) {
+                    Some(pre_rhs_type) if pre_rhs_type != rhs_type => {
+                        *rhs_type = Rc::new(combine_union_types(
+                            pre_rhs_type,
+                            rhs_type,
+                            context.codebase,
+                            context.settings.combiner_options(),
+                        ));
+                    }
+                    None if !variable_id.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':')) => {
+                        let mut possibly_undefined = (**rhs_type).clone();
+                        possibly_undefined.set_possibly_undefined(true, None);
+                        *rhs_type = Rc::new(possibly_undefined);
+                        block_context.possibly_undefined_variable_ids.insert(*variable_id);
+                    }
+                    _ => {}
+                }
+            }
+        }
 
         let rhs_type =
             artifacts.get_expression_type(&binary.rhs).map_or_else(|| Cow::Owned(get_mixed()), Cow::Borrowed);
@@ -200,6 +224,16 @@ where
     }
 
     Ok(())
+}
+
+fn has_assignment(node: Node<'_, '_>) -> bool {
+    if matches!(node, Node::Assignment(_)) {
+        return true;
+    }
+
+    let mut found = false;
+    node.visit_children(|child| found = found || has_assignment(child));
+    found
 }
 
 fn get_variable_name(expr: &Expression<'_>) -> Option<Word> {

@@ -3172,6 +3172,7 @@ test_case!(filter_var_flags_in_options_array);
 test_case!(instanceof_keeps_iterable_templates);
 test_case!(negated_instanceof_drops_sealed_subtypes);
 test_case!(final_non_traversable_class_is_never_iterable);
+test_case!(null_coalesce_rhs_assignment_is_conditional);
 
 #[test]
 #[cfg_attr(miri, ignore)]
