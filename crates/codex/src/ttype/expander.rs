@@ -901,8 +901,8 @@ fn resolve_static_type(
 
             named.name = static_obj.name;
             let effectively_final = is_effectively_final(&static_obj.name, codebase, options);
-            named.is_static = !effectively_final;
-            named.is_this = !effectively_final && is_this_type;
+            named.is_static = !effectively_final && (static_obj.is_static || crosses_mixin);
+            named.is_this = named.is_static && is_this_type;
         }
         StaticClassType::Name(static_class)
             if (!check_compatibility || codebase.is_instance_of(static_class.as_bytes(), named.name.as_bytes())) =>
@@ -1864,7 +1864,7 @@ mod tests {
 
         assert!(actual.types.iter().any(|t| {
             if let TAtomic::Object(TObject::Named(named)) = t {
-                named.name == ascii_lowercase_word(b"foo") && named.is_static && !named.is_this
+                named.name == ascii_lowercase_word(b"foo") && !named.is_static && !named.is_this
             } else {
                 false
             }
