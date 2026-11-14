@@ -3211,6 +3211,7 @@ test_case!(callable_docblock_named_optional_parameter);
 test_case!(constant_defined_in_branches);
 test_case!(assert_on_stored_condition_narrows);
 test_case!(duplicate_and_circular_inheritance);
+test_case!(object_shape_assertions_combine);
 
 #[test]
 #[cfg_attr(miri, ignore)]

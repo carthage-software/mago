@@ -19,6 +19,7 @@ use mago_codex::ttype::atomic::iterable::TIterable;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
+use mago_codex::ttype::atomic::object::with_properties::TObjectWithProperties;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
@@ -323,6 +324,52 @@ where
     None
 }
 
+fn intersect_object_shapes<A>(
+    context: &Context<'_, '_, A>,
+    first: &TObjectWithProperties,
+    second: &TObjectWithProperties,
+) -> Option<TAtomic>
+where
+    A: Arena,
+{
+    let mut known_properties = first.known_properties.clone();
+    for (name, (optional, property_type)) in &second.known_properties {
+        match known_properties.get_mut(name) {
+            Some((existing_optional, existing_type)) => {
+                let intersected = intersect_union_types(existing_type, property_type, context.codebase)?;
+                if intersected.is_never() {
+                    return None;
+                }
+
+                *existing_type = intersected;
+                *existing_optional = *existing_optional && *optional;
+            }
+            None if first.sealed => {
+                if !*optional {
+                    return None;
+                }
+            }
+            None => {
+                known_properties.insert(*name, (*optional, property_type.clone()));
+            }
+        }
+    }
+
+    if second.sealed
+        && first
+            .known_properties
+            .iter()
+            .any(|(name, (optional, _))| !*optional && !second.known_properties.contains_key(name))
+    {
+        return None;
+    }
+
+    Some(TAtomic::Object(TObject::WithProperties(TObjectWithProperties {
+        known_properties,
+        sealed: first.sealed || second.sealed,
+    })))
+}
+
 fn named_objects_can_intersect<A>(context: &Context<'_, '_, A>, first: &TNamedObject, second: &TNamedObject) -> bool
 where
     A: Arena,
@@ -459,6 +506,21 @@ where
     }
 
     match (first_type, second_type) {
+        (
+            TAtomic::Object(TObject::WithProperties(first_shape)),
+            TAtomic::Object(TObject::WithProperties(second_shape)),
+        ) => {
+            return intersect_object_shapes(context, first_shape, second_shape);
+        }
+        (TAtomic::Object(TObject::Named(named_object)), shape @ TAtomic::Object(TObject::WithProperties(_)))
+        | (shape @ TAtomic::Object(TObject::WithProperties(_)), TAtomic::Object(TObject::Named(named_object)))
+            if named_object.name.as_bytes().eq_ignore_ascii_case(b"stdClass") =>
+        {
+            let mut object = TAtomic::Object(TObject::Named(named_object.clone()));
+            object.add_intersection_type(shape.clone());
+
+            return Some(object);
+        }
         (TAtomic::Object(TObject::Enum(first_enum)), TAtomic::Object(TObject::Enum(second_enum))) => {
             if context.codebase.is_instance_of(first_enum.name.as_bytes(), second_enum.name.as_bytes())
                 && first_enum.case == second_enum.case

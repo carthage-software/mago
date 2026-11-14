@@ -17,6 +17,7 @@ use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::r#enum::TEnum;
 use crate::ttype::atomic::object::named::TNamedObject;
+use crate::ttype::atomic::object::with_properties::TObjectWithProperties;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
@@ -842,6 +843,37 @@ pub(crate) fn can_be_identical(
             }
             _ => true,
         };
+    }
+
+    match (first_part, second_part) {
+        (
+            TAtomic::Object(TObject::WithProperties(first_shape)),
+            TAtomic::Object(TObject::WithProperties(second_shape)),
+        ) => {
+            let conflicts = |left: &TObjectWithProperties, right: &TObjectWithProperties| {
+                left.known_properties.iter().any(|(name, (optional, left_type))| {
+                    match right.known_properties.get(name) {
+                        Some((_, right_type)) => !union_comparator::can_expression_types_be_identical(
+                            codebase,
+                            left_type,
+                            right_type,
+                            inside_assertion,
+                            allow_type_coercion,
+                        ),
+                        None => right.sealed && !optional,
+                    }
+                })
+            };
+
+            return !conflicts(first_shape, second_shape) && !conflicts(second_shape, first_shape);
+        }
+        (TAtomic::Object(TObject::Named(named)), TAtomic::Object(TObject::WithProperties(_)))
+        | (TAtomic::Object(TObject::WithProperties(_)), TAtomic::Object(TObject::Named(named)))
+            if named.name.as_bytes().eq_ignore_ascii_case(b"stdClass") =>
+        {
+            return true;
+        }
+        _ => {}
     }
 
     matches!(
