@@ -398,6 +398,16 @@ where
 
         let parameter_type = if let Some(mut pt) = parameter_type {
             filter_array_filter_callback_type(&invocation.target, &mut pt, &analyzed_argument_types);
+            if let Some(base_parameter_type) = &base_parameter_type_for_inference
+                && match argument_expression {
+                    Expression::Closure(closure) => closure.return_type_hint.is_some(),
+                    Expression::ArrowFunction(arrow_function) => arrow_function.return_type_hint.is_some(),
+                    _ => false,
+                }
+            {
+                drop_accumulator_parameter_hints(base_parameter_type, &mut pt);
+            }
+
             Some(pt)
         } else {
             None
@@ -2121,4 +2131,34 @@ fn filter_array_filter_callback_type(
             false
         }
     });
+}
+
+/// In `callable(I, V): I` the parameter typed like the return is an accumulator: its first value
+/// is not its type on later calls, so the closure keeps its own declared type for it.
+fn drop_accumulator_parameter_hints(base_parameter_type: &TUnion, parameter_type: &mut TUnion) {
+    for (base_atomic, atomic) in base_parameter_type.types.iter().zip(parameter_type.types.to_mut().iter_mut()) {
+        let (
+            TAtomic::Callable(TCallable::Signature(base_signature)),
+            TAtomic::Callable(TCallable::Signature(signature)),
+        ) = (base_atomic, atomic)
+        else {
+            continue;
+        };
+
+        let Some(base_return_type) = base_signature.get_return_type() else {
+            continue;
+        };
+
+        if !base_return_type.is_single() || !matches!(base_return_type.get_single(), TAtomic::GenericParameter(_)) {
+            continue;
+        }
+
+        for (index, base_parameter) in base_signature.get_parameters().iter().enumerate() {
+            if base_parameter.get_type_signature() == Some(base_return_type)
+                && let Some(parameter) = signature.get_parameters_mut().get_mut(index)
+            {
+                *parameter = parameter.clone().with_type_signature(None);
+            }
+        }
+    }
 }
