@@ -3209,6 +3209,7 @@ test_case!(loop_exit_keeps_never_entered_path);
 test_case!(ds_collection_is_iterator_aggregate);
 test_case!(callable_docblock_named_optional_parameter);
 test_case!(constant_defined_in_branches);
+test_case!(assert_on_stored_condition_narrows);
 
 #[test]
 #[cfg_attr(miri, ignore)]

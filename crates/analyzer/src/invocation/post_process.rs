@@ -425,6 +425,47 @@ fn apply_assertion_to_call_context<'ctx, 'arena, A>(
         true,
         false,
     );
+
+    if block_context.clauses.is_empty() {
+        return;
+    }
+
+    let assertion_clauses = type_assertions.iter().flat_map(|(variable, assertion_set)| {
+        assertion_set.iter().map(|assertions| {
+            let possibilities = AssertionMap::from_iter([(
+                *variable,
+                assertions.iter().map(|assertion| (assertion.to_hash(), assertion.clone())).collect(),
+            )]);
+
+            Rc::new(Clause::new(possibilities, invocation.span, invocation.span, None, None, None))
+        })
+    });
+
+    let clauses = mago_algebra::saturate_shared_clauses(
+        block_context.clauses.iter().cloned().chain(assertion_clauses),
+        &context.settings.algebra_thresholds(),
+    );
+
+    let (mut implied_assertions, mut active_implied_assertions) =
+        mago_algebra::find_satisfying_assignments_iter(clauses.iter().map(Rc::as_ref), None, &mut WordSet::default());
+
+    implied_assertions.retain(|variable, _| !type_assertions.contains_key(variable));
+    active_implied_assertions.retain(|variable, _| implied_assertions.contains_key(variable));
+    if implied_assertions.is_empty() {
+        return;
+    }
+
+    reconciler::reconcile_keyed_types(
+        context,
+        &implied_assertions,
+        active_implied_assertions,
+        block_context,
+        &mut changed_variable_ids,
+        &WordSet::default(),
+        &invocation.span,
+        false,
+        false,
+    );
 }
 
 fn update_by_reference_argument_types<'ctx, 'arena, A>(
