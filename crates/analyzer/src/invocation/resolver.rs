@@ -622,6 +622,7 @@ where
             );
 
         let are_disjoint = are_int_float_disjoint
+            || (subject.is_always_truthy() && target.is_always_falsy())
             || !union_comparator::can_expression_types_be_identical(context.codebase, &subject, &target, false, false);
 
         if are_disjoint {
@@ -630,6 +631,42 @@ where
 
         if subject_is_contained {
             return if negated { otherwise_type.types.into_owned() } else { then_type.types.into_owned() };
+        }
+
+        let parts: Vec<TAtomic> = subject
+            .types
+            .iter()
+            .flat_map(|atomic| match atomic {
+                TAtomic::Scalar(scalar) if scalar.is_general_bool() => {
+                    vec![TAtomic::Scalar(TScalar::r#true()), TAtomic::Scalar(TScalar::r#false())]
+                }
+                _ => vec![atomic.clone()],
+            })
+            .collect();
+
+        if parts.len() > 1
+            && let [TAtomic::GenericParameter(parameter)] = conditional.subject.types.as_ref()
+        {
+            let mut resolved = get_never();
+            for part in parts {
+                let mut part_result = template_result.clone();
+                part_result.lower_bounds.entry(parameter.parameter_name).or_default().insert(
+                    parameter.defining_entity,
+                    vec![TemplateBound::new(TUnion::from_atomic(part), 0, None)],
+                );
+
+                let part_type = TUnion::from_vec(resolve_conditional(
+                    context,
+                    invocation,
+                    &part_result,
+                    parameters,
+                    conditional.clone(),
+                ));
+
+                resolved = add_union_type(resolved, &part_type, context.codebase, CombinerOptions::default());
+            }
+
+            return resolved.types.into_owned();
         }
     }
 
