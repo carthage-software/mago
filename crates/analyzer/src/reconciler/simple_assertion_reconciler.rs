@@ -1856,18 +1856,18 @@ where
         if integer.is_unspecified() {
             redundant = false;
 
-            if is_less_than {
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::Integer(TInteger::To(if or_equal {
-                    value
+            let bound = match (is_less_than, or_equal) {
+                (_, true) => Some(value),
+                (true, false) => value.checked_sub(1),
+                (false, false) => value.checked_add(1),
+            };
+
+            if let Some(bound) = bound {
+                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::Integer(if is_less_than {
+                    TInteger::To(bound)
                 } else {
-                    value.saturating_sub(1)
-                }))));
-            } else {
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::Integer(TInteger::From(if or_equal {
-                    value
-                } else {
-                    value.saturating_add(1)
-                }))));
+                    TInteger::From(bound)
+                })));
             }
         } else {
             let new_integer = match (is_less_than, or_equal) {
