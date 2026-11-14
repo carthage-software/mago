@@ -16,6 +16,7 @@ use mago_syntax::cst::BinaryOperator;
 use mago_syntax::cst::ClassConstantAccess;
 use mago_syntax::cst::ClassLikeConstantSelector;
 use mago_syntax::cst::ClassLikeMemberSelector;
+use mago_syntax::cst::Conditional;
 use mago_syntax::cst::Construct;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Identifier;
@@ -38,10 +39,12 @@ use crate::metadata::constant::ConstantMetadata;
 use crate::scanner::Context;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
+use crate::ttype::atomic::array::key::ArrayKey;
 use crate::ttype::atomic::array::keyed::TKeyedArray;
 use crate::ttype::atomic::array::list::TList;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::derived::TDerived;
+use crate::ttype::atomic::derived::index_access::TIndexAccess;
 use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::atomic::reference::TGlobalReferenceSelector;
 use crate::ttype::atomic::reference::TReference;
@@ -60,6 +63,7 @@ use crate::ttype::get_false;
 use crate::ttype::get_float;
 use crate::ttype::get_int;
 use crate::ttype::get_int_or_float;
+use crate::ttype::get_int_range;
 use crate::ttype::get_literal_int;
 use crate::ttype::get_literal_string;
 use crate::ttype::get_mixed;
@@ -376,12 +380,14 @@ where
                         TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::Float(TFloat::literal(
                             -operand_value,
                         )))))
-                    } else if operand_type.is_numeric() {
-                        get_int_or_float()
                     } else {
-                        operand_type
+                        get_int_or_float()
                     })
                 }
+                UnaryPrefixOperator::BitwiseNot(_) => Some(match operand_type.get_single_literal_int_value() {
+                    Some(operand_value) => get_literal_int(!operand_value),
+                    None => get_int(),
+                }),
                 UnaryPrefixOperator::ArrayCast(_, _) => Some(get_mixed_keyed_array()),
                 UnaryPrefixOperator::BoolCast(_, _) => Some(get_bool()),
                 UnaryPrefixOperator::BooleanCast(_, _) => Some(get_bool()),
@@ -524,6 +530,92 @@ where
                 _ => Some(get_int_or_float()),
             }
         }
+        Expression::ArrayAccess(array_access) => {
+            let array_type = infer_with_constant_sources(
+                context,
+                scope,
+                array_access.array,
+                enclosing_class,
+                constants,
+                class_constants,
+            )?;
+            let index_type = infer_with_constant_sources(
+                context,
+                scope,
+                array_access.index,
+                enclosing_class,
+                constants,
+                class_constants,
+            )?;
+
+            if array_type.types.iter().any(|atomic| matches!(atomic, TAtomic::Reference(_))) {
+                return Some(wrap_atomic(TAtomic::Derived(TDerived::IndexAccess(TIndexAccess::new(
+                    array_type, index_type,
+                )))));
+            }
+
+            let key = if let Some(index) = index_type.get_single_literal_int_value() {
+                ArrayKey::Integer(index)
+            } else {
+                ArrayKey::String(word(index_type.get_single_literal_string_value()?))
+            };
+
+            let (optional, element_type) = match (array_type.is_single().then(|| array_type.get_single())?, key) {
+                (TAtomic::Array(TArray::List(list)), ArrayKey::Integer(index)) => {
+                    list.known_elements.as_ref()?.get(&usize::try_from(index).ok()?)?
+                }
+                (TAtomic::Array(TArray::Keyed(keyed)), key) => keyed.known_items.as_ref()?.get(&key)?,
+                _ => return None,
+            };
+
+            (!optional).then(|| element_type.clone())
+        }
+        Expression::Parenthesized(parenthesized) => infer_with_constant_sources(
+            context,
+            scope,
+            parenthesized.expression,
+            enclosing_class,
+            constants,
+            class_constants,
+        ),
+        Expression::Binary(Binary { operator: BinaryOperator::Spaceship(_), lhs, rhs }) => {
+            let lhs = infer_with_constant_sources(context, scope, lhs, enclosing_class, constants, class_constants)
+                .and_then(|lhs| lhs.get_single_literal_int_value());
+            let rhs = infer_with_constant_sources(context, scope, rhs, enclosing_class, constants, class_constants)
+                .and_then(|rhs| rhs.get_single_literal_int_value());
+
+            Some(match (lhs, rhs) {
+                (Some(lhs), Some(rhs)) => get_literal_int(lhs.cmp(&rhs) as i64),
+                _ => get_int_range(Some(-1), Some(1)),
+            })
+        }
+        Expression::Binary(Binary { operator: BinaryOperator::NullCoalesce(_), lhs, rhs }) if is_null_literal(lhs) => {
+            infer_with_constant_sources(context, scope, rhs, enclosing_class, constants, class_constants)
+        }
+        Expression::Binary(Binary { operator, .. }) if operator.is_comparison() || operator.is_logical() => {
+            Some(get_bool())
+        }
+        Expression::Conditional(Conditional { condition, then, r#else, .. }) => {
+            let then_type = infer_with_constant_sources(
+                context,
+                scope,
+                then.unwrap_or(condition),
+                enclosing_class,
+                constants,
+                class_constants,
+            )?;
+            let else_type =
+                infer_with_constant_sources(context, scope, r#else, enclosing_class, constants, class_constants)?;
+
+            let mut types = then_type.types.into_owned();
+            for atomic in else_type.types.iter() {
+                if !types.contains(atomic) {
+                    types.push(atomic.clone());
+                }
+            }
+
+            Some(TUnion::from_vec(types))
+        }
         Expression::Construct(construct) => match construct {
             Construct::Isset(_) => Some(get_bool()),
             Construct::Empty(_) => Some(get_bool()),
@@ -586,6 +678,15 @@ where
             let ClassLikeMemberSelector::Identifier(property_name) = &property_access.property else {
                 return None;
             };
+
+            if property_name.value == b"name"
+                && let Expression::Access(Access::ClassConstant(ClassConstantAccess {
+                    constant: ClassLikeConstantSelector::Identifier(case_name),
+                    ..
+                })) = property_access.object
+            {
+                return Some(get_literal_string(word(case_name.value)));
+            }
 
             if !property_name.value.eq_ignore_ascii_case(b"value") {
                 return None;
