@@ -312,6 +312,26 @@ pub fn check_property(
         }
     }
 
+    if class_like_is_readonly
+        && last_readonly.is_none()
+        && let Some(static_span) = last_static
+    {
+        context.report(
+            Issue::error(format!("Readonly property `{class_like_name}::{first_variable_name}` cannot be static."))
+                .with_annotation(
+                    Annotation::primary(static_span)
+                        .with_message("`static` modifier cannot be used on readonly properties."),
+                )
+                .with_annotation(
+                    Annotation::secondary(first_variable.span())
+                        .with_message(format!("Property `{first_variable_name}` declared here.")),
+                )
+                .with_annotation(Annotation::secondary(class_like_span).with_message(format!(
+                    "{class_like_kind} `{class_like_fqcn}` is readonly, making all properties implicitly readonly."
+                ))),
+        );
+    }
+
     if let (Some(abstract_span), Some(private_span)) = (last_abstract, last_private) {
         context.report(
             Issue::error(format!(
@@ -460,6 +480,19 @@ pub fn check_property(
                 Annotation::secondary(class_like_span)
                     .with_message(format!("{class_like_kind} `{class_like_fqcn}` defined here.")),
             ),
+        );
+    } else if class_like_is_readonly {
+        context.report(
+            Issue::error(format!(
+                "Readonly property `{class_like_name}::{first_variable_name}` must have a type hint."
+            ))
+            .with_annotation(
+                Annotation::primary(first_variable.span())
+                    .with_message(format!("Property `{first_variable_name}` declared here.")),
+            )
+            .with_annotation(Annotation::secondary(class_like_span).with_message(format!(
+                "{class_like_kind} `{class_like_fqcn}` is readonly, making all properties implicitly readonly."
+            ))),
         );
     }
 

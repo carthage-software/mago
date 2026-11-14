@@ -330,7 +330,7 @@ pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Conte
                     class_fqcn_bytes,
                     false,
                     class.modifiers.contains_abstract(),
-                    last_readonly.is_some(),
+                    last_readonly.is_some() && context.version.is_supported(Feature::ReadonlyClasses),
                     context,
                 );
             }
@@ -1204,7 +1204,7 @@ pub fn check_anonymous_class<'ast, 'arena>(
                     ANONYMOUS_CLASS_NAME,
                     false,
                     false,
-                    last_readonly.is_some(),
+                    last_readonly.is_some() && context.version.is_supported(Feature::ReadonlyAnonymousClasses),
                     context,
                 );
             }
