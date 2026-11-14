@@ -3206,6 +3206,7 @@ test_case!(chained_condition_assignment_narrows);
 test_case!(nearest_mixin_method_wins);
 test_case!(static_call_through_nested_mixins);
 test_case!(loop_exit_keeps_never_entered_path);
+test_case!(ds_collection_is_iterator_aggregate);
 
 #[test]
 #[cfg_attr(miri, ignore)]

@@ -4,6 +4,7 @@ namespace Ds;
 
 use ArrayAccess;
 use Countable;
+use IteratorAggregate;
 use JsonSerializable;
 use OutOfBoundsException;
 use OutOfRangeException;
@@ -14,10 +15,15 @@ use UnderflowException;
  * @template-covariant TKey
  * @template-covariant TValue
  *
- * @extends Traversable<TKey, TValue>
+ * @extends IteratorAggregate<TKey, TValue>
  */
-interface Collection extends Traversable, Countable, JsonSerializable
+interface Collection extends IteratorAggregate, Countable, JsonSerializable
 {
+    /**
+     * @return Traversable<TKey, TValue>
+     */
+    public function getIterator(): Traversable;
+
     /**
      * @return Collection<TKey, TValue>
      *
