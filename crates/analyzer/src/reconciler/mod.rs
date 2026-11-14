@@ -1456,6 +1456,16 @@ where
                                 block_context.scope.get_class_like_name(),
                             )?;
                         }
+                    } else if let TAtomic::Object(TObject::WithProperties(shape)) = existing_key_type_part
+                        && let Some((optional, property_type)) = shape.known_properties.get(&word(property_name))
+                    {
+                        class_property_type = if *optional {
+                            let mut property_type = property_type.clone();
+                            property_type.set_possibly_undefined(true, None);
+                            property_type
+                        } else {
+                            property_type.clone()
+                        };
                     } else {
                         class_property_type = get_mixed();
                     }
