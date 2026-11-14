@@ -1114,6 +1114,9 @@ namespace {
             bool $registerNodeNS = true,
         ): mixed {}
 
+        /**
+         * @return DOMNodeList<DOMNode>|false
+         */
         public function query(string $expression, ?DOMNode $contextNode = null, bool $registerNodeNS = true): mixed {}
 
         public function registerNamespace(string $prefix, string $namespace): bool {}

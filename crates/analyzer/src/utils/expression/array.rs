@@ -1427,9 +1427,8 @@ where
         )
         .unwrap_or_else(get_mixed);
 
-        let value = for_assignment
-            .then(|| get_array_access_assignment_value_type(context, metadata, named_object))
-            .flatten()
+        let value = get_array_access_method_value_type(context, metadata, named_object, for_assignment)
+            .filter(|value| for_assignment || !value.is_mixed())
             .unwrap_or_else(|| {
                 get_specialized_template_type(
                     context.codebase,
@@ -1566,20 +1565,30 @@ where
     resulting_value_type
 }
 
-fn get_array_access_assignment_value_type<A>(
+/// The value type `offsetSet()` takes (for a write) or `offsetGet()` returns (for a read).
+fn get_array_access_method_value_type<A>(
     context: &Context<'_, '_, A>,
     class_metadata: &ClassLikeMetadata,
     named_object: &TNamedObject,
+    for_assignment: bool,
 ) -> Option<TUnion>
 where
     A: Arena,
 {
+    let method_name = word(if for_assignment { b"offsetSet".as_slice() } else { b"offsetGet" });
     let method_id =
-        context.codebase.get_declaring_method_identifier(&MethodIdentifier::new(named_object.name, word(b"offsetSet")));
+        context.codebase.get_declaring_method_identifier(&MethodIdentifier::new(named_object.name, method_name));
     let method = context.codebase.get_method_by_id(&method_id)?;
-    let parameter = method.parameters.get(1)?;
-    let mut value_type =
-        parameter.get_type_metadata().map(|metadata| metadata.type_union.clone()).unwrap_or_else(get_mixed);
+    let mut value_type = if for_assignment {
+        method
+            .parameters
+            .get(1)?
+            .get_type_metadata()
+            .map(|metadata| metadata.type_union.clone())
+            .unwrap_or_else(get_mixed)
+    } else {
+        method.return_type_metadata.as_ref()?.type_union.clone()
+    };
 
     if value_type.has_template_types() {
         let mut template_result = TemplateResult::default();

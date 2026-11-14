@@ -3256,6 +3256,7 @@ test_case!(array_literal_spread_keeps_counts_and_string_keys);
 test_case!(docblock_before_closure_assignment_documents_closure);
 test_case!(type_alias_in_intersection_expands);
 test_case!(nullsafe_null_does_not_leave_its_chain);
+test_case!(array_access_read_uses_offset_get);
 
 #[test]
 #[cfg_attr(miri, ignore)]
