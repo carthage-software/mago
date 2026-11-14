@@ -14,6 +14,7 @@ use crate::identifier::method::MethodIdentifier;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::function_like::FunctionLikeMetadata;
+use crate::ttype::GenericParent;
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
@@ -46,6 +47,8 @@ use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::combiner;
+use crate::ttype::template::TemplateResult;
+use crate::ttype::template::inferred_type_replacer;
 use crate::ttype::union::TUnion;
 
 thread_local! {
@@ -1041,17 +1044,30 @@ fn expand_or_fill_type_parameters(
 
         if supplied_count < template_count {
             let mut params = named.type_parameters.take().unwrap_or_default().into_vec();
-            params.extend(class_metadata.template_types.values().skip(supplied_count).map(|template| {
-                if let Some(default) = &template.default {
-                    let mut default = default.clone();
-                    default.set_from_template_default(true);
-                    default
-                } else {
-                    let mut constraint = template.constraint.clone();
-                    constraint.set_from_unspecified_template(true);
-                    constraint
+            for template in class_metadata.template_types.values().skip(supplied_count) {
+                let mut filled = template.default.as_ref().unwrap_or(&template.constraint).clone();
+                if filled.has_template_types() {
+                    let mut earlier_arguments = TemplateResult::default();
+                    for (parameter_name, argument) in class_metadata.template_types.keys().zip(&params) {
+                        earlier_arguments.add_lower_bound(
+                            *parameter_name,
+                            GenericParent::ClassLike(class_metadata.name),
+                            argument.clone(),
+                        );
+                    }
+
+                    filled = inferred_type_replacer::replace(&filled, &earlier_arguments, codebase);
                 }
-            }));
+
+                if template.default.is_some() {
+                    filled.set_from_template_default(true);
+                } else {
+                    filled.set_from_unspecified_template(true);
+                }
+
+                params.push(filled);
+            }
+
             named.type_parameters = Some(params.into_boxed_slice());
         }
     }

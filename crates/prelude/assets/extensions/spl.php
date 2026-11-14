@@ -60,7 +60,7 @@ class EmptyIterator implements Iterator
 /**
  * @template-covariant K
  * @template-covariant V
- * @template-covariant TIterator as Iterator<K, V>
+ * @template-covariant TIterator as Iterator<K, V> = Iterator<K, V>
  *
  * @template-implements OuterIterator<K, V>
  *
@@ -92,7 +92,7 @@ class CallbackFilterIterator extends FilterIterator implements OuterIterator
 /**
  * @template K
  * @template V
- * @template TIterator as RecursiveIterator<K, V>
+ * @template TIterator as RecursiveIterator<K, V> = RecursiveIterator<K, V>
  *
  * @template-implements RecursiveIterator<K, V>
  * @template-extends CallbackFilterIterator<K, V, TIterator>
@@ -230,7 +230,7 @@ interface OuterIterator extends Iterator
 /**
  * @template K
  * @template-covariant V
- * @template I of Traversable<K, V>
+ * @template I of Traversable<K, V> = Traversable<K, V>
  *
  * @implements OuterIterator<K, V>
  *
@@ -274,7 +274,7 @@ class IteratorIterator implements OuterIterator
 /**
  * @template-covariant K
  * @template-covariant V
- * @template-covariant TIterator as Traversable<K, V>
+ * @template-covariant TIterator as Traversable<K, V> = Traversable<K, V>
  *
  * @template-extends IteratorIterator<K, V, TIterator>
  */
@@ -299,7 +299,7 @@ abstract class FilterIterator extends IteratorIterator
 /**
  * @template K
  * @template V
- * @template TIterator as RecursiveIterator<K, V>
+ * @template TIterator as RecursiveIterator<K, V> = RecursiveIterator<K, V>
  *
  * @template-extends FilterIterator<K, V, TIterator>
  * @template-implements RecursiveIterator<K, V>
@@ -312,7 +312,7 @@ abstract class RecursiveFilterIterator extends FilterIterator implements Recursi
     public function __construct(RecursiveIterator $iterator) {}
 
     /**
-     * @return TIterator
+     * @return static
      */
     public function getChildren() {}
 
@@ -337,7 +337,7 @@ abstract class RecursiveFilterIterator extends FilterIterator implements Recursi
 /**
  * @template K
  * @template V
- * @template TIterator as RecursiveIterator<K, V>
+ * @template TIterator as RecursiveIterator<K, V> = RecursiveIterator<K, V>
  *
  * @template-extends RecursiveFilterIterator<K, V, TIterator>
  */
@@ -400,7 +400,7 @@ interface SeekableIterator extends Iterator
 /**
  * @template-covariant K
  * @template-covariant V
- * @template-covariant TIterator as Iterator<K, V>
+ * @template-covariant TIterator as Iterator<K, V> = Iterator<K, V>
  *
  * @template-implements OuterIterator<K, V>
  * @template-extends IteratorIterator<K, V, TIterator>
@@ -428,7 +428,7 @@ class LimitIterator extends IteratorIterator implements OuterIterator
 /**
  * @template-covariant K
  * @template-covariant V
- * @template-covariant TIterator as Iterator<K, V>
+ * @template-covariant TIterator as Iterator<K, V> = Iterator<K, V>
  *
  * @template-implements OuterIterator<K, V>
  * @template-implements ArrayAccess<K, V>
@@ -497,7 +497,7 @@ class CachingIterator extends IteratorIterator implements OuterIterator, ArrayAc
 /**
  * @template K
  * @template V
- * @template TIterator as Iterator<K, V>
+ * @template TIterator as Iterator<K, V> = Iterator<K, V>
  *
  * @template-implements RecursiveIterator<K, V>
  * @template-extends CachingIterator<K, V, TIterator>
@@ -518,7 +518,7 @@ class RecursiveCachingIterator extends CachingIterator implements RecursiveItera
 /**
  * @template-covariant K
  * @template-covariant V
- * @template-covariant TIterator as Iterator<K, V>
+ * @template-covariant TIterator as Iterator<K, V> = Iterator<K, V>
  *
  * @template-extends IteratorIterator<K, V, TIterator>
  */
@@ -545,7 +545,7 @@ class NoRewindIterator extends IteratorIterator
 /**
  * @template K
  * @template V
- * @template TIterator as Iterator<K, V>
+ * @template TIterator as Iterator<K, V> = Iterator<K, V>
  *
  * @template-extends IteratorIterator<K, V, TIterator>
  */
@@ -585,7 +585,7 @@ class AppendIterator extends IteratorIterator
 /**
  * @template-covariant K
  * @template-covariant V
- * @template-covariant TIterator as Iterator<K, V>
+ * @template-covariant TIterator as Iterator<K, V> = Iterator<K, V>
  *
  * @template-extends IteratorIterator<K, V, TIterator>
  */
@@ -612,7 +612,7 @@ class InfiniteIterator extends IteratorIterator
 /**
  * @template K
  * @template V
- * @template TIterator as Iterator<K, V>
+ * @template TIterator as Iterator<K, V> = Iterator<K, V>
  *
  * @template-extends FilterIterator<K, V, TIterator>
  */
@@ -657,7 +657,7 @@ class RegexIterator extends FilterIterator
 /**
  * @template K
  * @template V
- * @template TIterator as RecursiveIterator<K, V>
+ * @template TIterator as RecursiveIterator<K, V> = RecursiveIterator<K, V>
  *
  * @template-implements RecursiveIterator<K, V>
  * @template-extends RegexIterator<K, V, TIterator>

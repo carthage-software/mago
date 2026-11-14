@@ -42,12 +42,14 @@ pub fn extend_template_parameters(
                     break;
                 };
 
+                let default = resolve_with_earlier_arguments(default, parent_name, &parent_path, codebase);
                 metadata.add_template_extended_parameter(parent_name, *parameter_name, default.clone());
-                parent_path.insert(*parameter_name, default.clone());
+                parent_path.insert(*parameter_name, default);
             }
         } else {
             for (parameter_name, template) in &parent_metadata.template_types {
-                let value = template.default.clone().unwrap_or_else(|| template.constraint.clone());
+                let value = template.default.as_ref().unwrap_or(&template.constraint);
+                let value = resolve_with_earlier_arguments(value, parent_name, &parent_path, codebase);
                 metadata.add_template_extended_parameter(parent_name, *parameter_name, value.clone());
                 parent_path.insert(*parameter_name, value);
             }
@@ -103,6 +105,26 @@ fn inherit_template_extended_paths(metadata: &mut ClassLikeMetadata, parent_meta
             metadata.record_template_extended_path(*ancestor, parameterization.clone());
         }
     }
+}
+
+/// Resolves a parent template's default or constraint against the arguments
+/// already given for the parent's earlier templates.
+fn resolve_with_earlier_arguments(
+    value: &TUnion,
+    parent_name: Word,
+    earlier_arguments: &IndexMap<Word, TUnion, RandomState>,
+    codebase: &CodebaseMetadata,
+) -> TUnion {
+    if !value.has_template_types() {
+        return value.clone();
+    }
+
+    let mut template_result = TemplateResult::default();
+    for (parameter_name, argument) in earlier_arguments {
+        template_result.add_lower_bound(*parameter_name, GenericParent::ClassLike(parent_name), argument.clone());
+    }
+
+    inferred_type_replacer::replace(value, &template_result, codebase)
 }
 
 /// Resolves the generic parameters of `extended_type`, at any depth, to the
