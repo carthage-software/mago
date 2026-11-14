@@ -68,6 +68,8 @@ use crate::scanner::function_like::scan_closure;
 use crate::scanner::function_like::scan_function;
 use crate::scanner::function_like::scan_method;
 use crate::scanner::property::scan_promoted_property;
+use crate::ttype::combine_union_types;
+use crate::ttype::combiner::CombinerOptions;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::template::GenericTemplate;
 
@@ -554,7 +556,19 @@ where
             constant_metadata.flags |= MetadataFlags::POLYFILL;
         }
 
-        self.codebase.constants.entry(constant_metadata.name).or_insert(constant_metadata);
+        let name = constant_metadata.name;
+        let Some(existing) = self.codebase.constants.get(&name) else {
+            self.codebase.constants.insert(name, constant_metadata);
+
+            return;
+        };
+
+        if let (Some(existing_type), Some(new_type)) = (&existing.inferred_type, &constant_metadata.inferred_type) {
+            let combined = combine_union_types(existing_type, new_type, &self.codebase, CombinerOptions::default());
+            if let Some(existing) = self.codebase.constants.get_mut(&name) {
+                existing.inferred_type = Some(combined);
+            }
+        }
     }
 
     #[inline]
