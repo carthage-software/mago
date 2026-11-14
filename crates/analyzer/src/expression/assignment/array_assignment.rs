@@ -357,7 +357,7 @@ where
 
                 match array {
                     TArray::List(list) => match array_key {
-                        ArrayKey::Integer(key_value) => {
+                        ArrayKey::Integer(key_value) if key_value >= 0 => {
                             *has_matching_item = true;
 
                             if let Some(known_elements) = list.known_elements.as_mut().map(Arc::make_mut) {
@@ -383,7 +383,7 @@ where
 
                             list.non_empty = true;
                         }
-                        ArrayKey::String(ustr) => {
+                        ArrayKey::String(_) | ArrayKey::Integer(_) => {
                             *has_matching_item = true;
 
                             let parameters = if list.element_type.is_never() {
@@ -400,9 +400,9 @@ where
                             }
 
                             if definite {
-                                known_items.insert(ArrayKey::String(ustr), (false, current_type.clone()));
+                                known_items.insert(array_key, (false, current_type.clone()));
                             } else {
-                                known_items.insert(ArrayKey::String(ustr), (true, possible_type()));
+                                known_items.insert(array_key, (true, possible_type()));
                             }
 
                             *array = TArray::Keyed(TKeyedArray {
