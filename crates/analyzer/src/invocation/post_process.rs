@@ -1330,6 +1330,7 @@ where
                         has_non_redundant_assertion = true;
                     }
 
+                    let previous_clause_count = block_context.clauses.len();
                     for clause in &new_clauses {
                         block_context.clauses.push(Rc::new(clause.clone()));
                     }
@@ -1340,7 +1341,23 @@ where
                     );
 
                     let (truths, _) = find_satisfying_assignments(&clauses, None, &mut WordSet::default());
+                    let mut previous_truths = None;
                     for (variable, assertions) in truths {
+                        if !new_clauses.iter().any(|clause| clause.possibilities.contains_key(&variable)) {
+                            let previous_truths = previous_truths.get_or_insert_with(|| {
+                                let previous_clauses = saturate_clauses(
+                                    block_context.clauses[..previous_clause_count].iter().map(Rc::as_ref),
+                                    &context.settings.algebra_thresholds(),
+                                );
+
+                                find_satisfying_assignments(&previous_clauses, None, &mut WordSet::default()).0
+                            });
+
+                            if previous_truths.get(&variable) == Some(&assertions) {
+                                continue;
+                            }
+                        }
+
                         type_assertions.entry(variable).or_default().extend(assertions);
                     }
                 }
