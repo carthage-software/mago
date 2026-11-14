@@ -3237,6 +3237,7 @@ test_case!(nested_inherited_template_argument_resolves);
 test_case!(template_default_uses_earlier_arguments);
 test_case!(intersection_uses_narrowest_method_return);
 test_case!(intersection_member_property_hooks_are_checked);
+test_case!(array_access_object_write_does_not_prove_isset);
 
 #[test]
 #[cfg_attr(miri, ignore)]

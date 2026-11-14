@@ -838,7 +838,9 @@ where
     let first_array_target = &array_target_expressions.remove(0);
 
     if let Some(root_var_id) = &root_var_id
-        && artifacts.get_expression_type(first_array_target.get_array()).is_some()
+        && artifacts
+            .get_expression_type(first_array_target.get_array())
+            .is_some_and(|array_type| !array_type.has_object_type())
     {
         let combined = format!("{}{}", root_var_id, var_id_additions.join(""));
         let extended_var_id = mago_word::word(&combined);
