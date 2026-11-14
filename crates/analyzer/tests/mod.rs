@@ -793,6 +793,7 @@ test_case!(comparison_past_int_range);
 test_case!(private_members_on_subclass_instances);
 test_case!(protected_member_redeclared_in_sibling);
 test_case!(catches_joined_after_exiting_try);
+test_case!(late_bound_class_constant_overridden);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);

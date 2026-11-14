@@ -10,6 +10,8 @@ use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
+use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
@@ -301,6 +303,24 @@ fn is_valid_trait_constant_access(origin: &ResolutionOrigin, inside_class_like_a
     )
 }
 
+const MAX_DESCENDANTS_FOR_LATE_BOUND_CONSTANTS: usize = 64;
+
+/// The docblock type when there is one, else the inferred value, else the declared type.
+fn class_constant_type(constant_metadata: &ClassLikeConstantMetadata) -> TUnion {
+    if let Some(type_metadata) = &constant_metadata.type_metadata
+        && type_metadata.from_docblock
+    {
+        return type_metadata.type_union.clone();
+    }
+
+    constant_metadata
+        .inferred_type
+        .clone()
+        .map(wrap_atomic)
+        .or_else(|| constant_metadata.type_metadata.clone().map(|type_metadata| type_metadata.type_union))
+        .unwrap_or_else(get_mixed)
+}
+
 /// Finds a constant or enum case by name within a class.
 fn find_constant_in_class<'ctx, A>(
     context: &mut Context<'ctx, '_, A>,
@@ -360,18 +380,37 @@ where
         // Prefer the docblock type (@var) when it exists, as it reflects the user's
         // intended type. When type_metadata was merely copied from the type declaration
         // (they are equal), fall back to the more specific inferred type.
-        let mut const_type = if let Some(type_metadata) = &constant_metadata.type_metadata
-            && type_metadata.from_docblock
-        {
-            type_metadata.type_union.clone()
-        } else {
-            constant_metadata
-                .inferred_type
-                .clone()
-                .map(wrap_atomic)
-                .or_else(|| constant_metadata.type_metadata.clone().map(|s| s.type_union))
-                .unwrap_or_else(get_mixed)
-        };
+        let mut const_type = class_constant_type(constant_metadata);
+
+        let late_bound = matches!(
+            resolution_origin,
+            ResolutionOrigin::Static { can_extend: true }
+                | ResolutionOrigin::Object { .. }
+                | ResolutionOrigin::AnyClassString
+                | ResolutionOrigin::SpecificClassLikeString(_)
+        ) && !metadata.flags.is_final()
+            && !constant_metadata.flags.is_final();
+
+        if late_bound && let Some(descendants) = context.codebase.all_class_like_descendants.get(&metadata.name) {
+            if descendants.len() > MAX_DESCENDANTS_FOR_LATE_BOUND_CONSTANTS {
+                const_type.widen_literals();
+            } else {
+                for descendant in descendants {
+                    if let Some(descendant_constant) = context
+                        .codebase
+                        .get_class_like_by_name(*descendant)
+                        .and_then(|descendant_metadata| descendant_metadata.constants.get(&const_name))
+                    {
+                        const_type = combine_union_types(
+                            &const_type,
+                            &class_constant_type(descendant_constant),
+                            context.codebase,
+                            CombinerOptions::default(),
+                        );
+                    }
+                }
+            }
+        }
 
         expander::expand_union(
             context.codebase,
