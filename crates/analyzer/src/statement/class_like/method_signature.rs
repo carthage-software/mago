@@ -305,7 +305,7 @@ pub fn validate_method_signature_compatibility(
             continue;
         };
 
-        if parent_param.name != child_param.name {
+        if parent_param.name != child_param.name && !parent_method.flags.forbids_named_arguments() {
             issues.push(SignatureCompatibilityIssue::ParameterNameMismatch {
                 parameter_index: index,
                 child_name: child_param.name.0,

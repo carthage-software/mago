@@ -3239,6 +3239,7 @@ test_case!(intersection_uses_narrowest_method_return);
 test_case!(intersection_member_property_hooks_are_checked);
 test_case!(array_access_object_write_does_not_prove_isset);
 test_case!(intersection_member_keeps_its_type_arguments);
+test_case!(no_named_arguments_parent_allows_renamed_parameter);
 
 #[test]
 #[cfg_attr(miri, ignore)]
