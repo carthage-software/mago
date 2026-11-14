@@ -11,6 +11,7 @@ class test
         $a = self::NUMS[$s] ?? ['value' => 0];
         $b = self::NUMS[$s]['value'] ?? 0;
 
+        // @mago-expect analysis:redundant-null-coalesce
         x($a['value'] ?? 0);
         x($b);
     }

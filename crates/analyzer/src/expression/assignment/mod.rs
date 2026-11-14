@@ -785,6 +785,10 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(
         artifacts.set_rc_expression_type(&variable_span, Rc::clone(&assigned_type));
     }
 
+    if assigned_type.possibly_undefined() || assigned_type.possibly_undefined_from_try() {
+        Rc::make_mut(&mut assigned_type).set_possibly_undefined(false, Some(false));
+    }
+
     block_context.locals.insert(variable_id, assigned_type);
     block_context.variables_possibly_in_scope.insert(variable_id);
 

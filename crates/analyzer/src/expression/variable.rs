@@ -261,9 +261,10 @@ where
         }
     };
 
+    let is_read = !block_context.flags.inside_isset() && !block_context.flags.inside_variable_reference();
     if variable_type.possibly_undefined()
         && block_context.possibly_undefined_variable_ids.contains(&variable_atom)
-        && !block_context.flags.inside_isset()
+        && is_read
         && !block_context.flags.inside_unset()
     {
         context.collector.report_with_code(
@@ -278,7 +279,7 @@ where
             .with_note("Accessing an undefined variable will result in an `E_WARNING` (PHP 8+) or `E_NOTICE` (PHP 7) and it will be treated as `null`.")
             .with_help(format!("Initialize `{variable_name}` before conditional paths, or use `isset()` to check its existence.")),
         );
-    } else if variable_type.possibly_undefined_from_try() && !block_context.flags.inside_isset() {
+    } else if variable_type.possibly_undefined_from_try() && is_read {
         context.collector.report_with_code(
             IssueCode::PossiblyUndefinedVariable,
             Issue::warning(format!(
@@ -438,8 +439,8 @@ mod tests {
                     echo 'Y: ' . $y . "\n";
                 }
 
-                echo (string) $key;
-                echo (string) $value;
+                echo $key;
+                echo $value;
                 echo (string) $y;
             }
         "#},

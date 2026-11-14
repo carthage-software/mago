@@ -258,11 +258,10 @@ fn inherit_loop_block_context<'ctx, A>(
                 }
             }
 
-            for (variable, _) in inner_loop_block_context.locals {
-                block_context.variables_possibly_in_scope.insert(variable);
-            }
+            block_context.variables_possibly_in_scope.extend(inner_loop_block_context.locals.keys().copied());
         } else {
-            for (variable, variable_type) in inner_loop_block_context.locals {
+            for (variable, variable_type) in &inner_loop_block_context.locals {
+                let (variable, variable_type) = (*variable, Rc::clone(variable_type));
                 if !has_break_or_continue {
                     block_context.locals.insert(variable, variable_type);
                     continue;
@@ -306,6 +305,21 @@ fn inherit_loop_block_context<'ctx, A>(
                 }
 
                 block_context.variables_possibly_in_scope.insert(*variable);
+            }
+        }
+
+        if !always_enters_loop {
+            for (variable, variable_type) in inner_loop_block_context.locals {
+                if block_context.locals.contains_key(&variable)
+                    || variable.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':'))
+                {
+                    continue;
+                }
+
+                let mut variable_type = Rc::unwrap_or_clone(variable_type);
+                variable_type.set_possibly_undefined(true, None);
+                block_context.locals.insert(variable, Rc::new(variable_type));
+                block_context.possibly_undefined_variable_ids.insert(variable);
             }
         }
     } else {
