@@ -217,6 +217,24 @@ pub fn reconcile_keyed_types<'ctx, A>(
             .map(Rc::new)
         });
 
+        let undefined_reads_as_null = !has_isset
+            && !has_inverted_isset
+            && !has_empty
+            && block_context.possibly_undefined_variable_ids.contains(key)
+            && before_adjustment
+                .as_ref()
+                .is_some_and(|existing| existing.possibly_undefined() && !existing.possibly_undefined_from_try());
+
+        let before_adjustment = if undefined_reads_as_null {
+            before_adjustment.map(|existing| {
+                let mut existing = Rc::unwrap_or_clone(existing).as_nullable();
+                existing.set_possibly_undefined(false, None);
+                Rc::new(existing)
+            })
+        } else {
+            before_adjustment
+        };
+
         let mut result_type = before_adjustment.as_deref().map(Cow::Borrowed);
         for (i, new_type_part_parts) in new_type_parts.iter().enumerate() {
             let mut orred_type: Option<TUnion> = None;
@@ -294,7 +312,10 @@ pub fn reconcile_keyed_types<'ctx, A>(
             }
         }
 
-        let result_type = result_type.map(Cow::into_owned).unwrap_or_else(get_never);
+        let mut result_type = result_type.map(Cow::into_owned).unwrap_or_else(get_never);
+        if undefined_reads_as_null {
+            result_type.set_possibly_undefined(result_type.has_null() || result_type.has_nullable_mixed(), None);
+        }
 
         if !did_type_exist && result_type.is_never() {
             // Even when the type doesn't exist and result is never, we still need to

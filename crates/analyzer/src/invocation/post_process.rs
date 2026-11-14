@@ -1057,11 +1057,15 @@ where
                 let mut new_variable_possibilities: AssertionSet = vec![];
                 let mut resolved_or_clause: Disjunction<Assertion> = Vec::new();
 
-                let asserted_type = block_context.locals.get(&assertion_variable).map(Rc::as_ref).or_else(|| {
-                    non_nullsafe_assertion_variable
-                        .and(assertion_expression)
+                let asserted_type = match block_context.locals.get(&assertion_variable) {
+                    Some(local) if local.possibly_undefined() => assertion_expression
                         .and_then(|expression| artifacts.get_expression_type(expression))
-                });
+                        .or(Some(local)),
+                    Some(local) => Some(local.as_ref()),
+                    None => non_nullsafe_assertion_variable
+                        .and(assertion_expression)
+                        .and_then(|expression| artifacts.get_expression_type(expression)),
+                };
                 let mut any_possible = false;
                 let mut has_resolved_types = false;
                 let mut all_negated = true;

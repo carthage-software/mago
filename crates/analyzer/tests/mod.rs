@@ -3319,6 +3319,7 @@ test_case!(is_float_removes_int);
 test_case!(loop_condition_reassigns_variable_from_before_the_loop);
 test_case!(do_while_condition_defines_variable);
 test_case!(bool_cast_condition_narrows_operand);
+test_case!(possibly_undefined_variable_reads_as_null_in_conditions);
 
 #[test]
 #[cfg_attr(miri, ignore)]
