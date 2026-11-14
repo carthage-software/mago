@@ -710,43 +710,73 @@ where
                 .is_some_and(|parameter| parameter.is_variadic())
                 && !invocation.target.get_function_like_metadata().is_some_and(|metadata| metadata.flags.is_built_in());
 
-            if !has_variadic_parameter {
-                has_named_argument_anomaly = true;
-                let target_name_str = invocation.target.guess_name(context);
-
-                context.collector.report_with_code(
-                    IssueCode::InvalidNamedArgument,
-                    Issue::error(format!(
-                        "Invalid named argument `${argument_name}` for {target_kind_str} `{target_name_str}`"
-                    ))
-                    .with_annotation(
-                        Annotation::primary(named_argument.name.span())
-                            .with_message(format!("Unknown argument name `${argument_name}`")),
-                    )
-                    .with_annotation(
-                        Annotation::secondary(invocation.target.span())
-                            .with_message(format!("Call to {target_kind_str} is here")),
-                    )
-                    .with_help({
-                        if !invocation.target.allows_named_arguments() {
-                            format!("The {target_kind_str} `{target_name_str}` does not support named arguments.")
-                        } else if invocation.target.parameter_count() == 0 {
-                            format!("The {target_kind_str} `{target_name_str}` has no parameters.")
-                        } else {
-                            let available_params: Vec<String> = invocation
-                                .target
-                                .iter_parameters()
-                                .filter_map(|parameter| parameter.get_name())
-                                .map(|n| {
-                                    let bytes = trim_start_byte(n.0.as_bytes(), b'$');
-                                    BytesDisplay(bytes).to_string()
-                                })
-                                .collect();
-                            format!("Available parameters are: `{}`.", available_params.join("`, `"))
-                        }
-                    }),
+            if has_variadic_parameter {
+                let variadic_parameter = invocation.target.get_parameter(invocation.target.parameter_count() - 1);
+                let base_parameter_type = get_parameter_type(
+                    context,
+                    variadic_parameter,
+                    base_class_metadata,
+                    calling_class_like_metadata,
+                    calling_instance_type,
+                    method_class_type,
                 );
+
+                let final_parameter_type = resolve_parameter_type_for_invocation(
+                    context,
+                    invocation,
+                    template_result,
+                    parameter_types,
+                    base_class_metadata,
+                    base_parameter_type,
+                );
+
+                verify_argument_type(
+                    context,
+                    &argument_value_type,
+                    &final_parameter_type,
+                    *argument_offset,
+                    argument_expression,
+                    &invocation.target,
+                );
+
+                continue;
             }
+
+            has_named_argument_anomaly = true;
+            let target_name_str = invocation.target.guess_name(context);
+
+            context.collector.report_with_code(
+                IssueCode::InvalidNamedArgument,
+                Issue::error(format!(
+                    "Invalid named argument `${argument_name}` for {target_kind_str} `{target_name_str}`"
+                ))
+                .with_annotation(
+                    Annotation::primary(named_argument.name.span())
+                        .with_message(format!("Unknown argument name `${argument_name}`")),
+                )
+                .with_annotation(
+                    Annotation::secondary(invocation.target.span())
+                        .with_message(format!("Call to {target_kind_str} is here")),
+                )
+                .with_help({
+                    if !invocation.target.allows_named_arguments() {
+                        format!("The {target_kind_str} `{target_name_str}` does not support named arguments.")
+                    } else if invocation.target.parameter_count() == 0 {
+                        format!("The {target_kind_str} `{target_name_str}` has no parameters.")
+                    } else {
+                        let available_params: Vec<String> = invocation
+                            .target
+                            .iter_parameters()
+                            .filter_map(|parameter| parameter.get_name())
+                            .map(|n| {
+                                let bytes = trim_start_byte(n.0.as_bytes(), b'$');
+                                BytesDisplay(bytes).to_string()
+                            })
+                            .collect();
+                        format!("Available parameters are: `{}`.", available_params.join("`, `"))
+                    }
+                }),
+            );
 
             break;
         } else if *argument_offset >= invocation.target.parameter_count() {
