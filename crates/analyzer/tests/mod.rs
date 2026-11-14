@@ -3329,6 +3329,7 @@ test_case!(match_class_constant_on_literal_name_of_final_class);
 test_case!(captured_possibly_undefined_variables);
 test_case!(foreach_by_reference_updates_the_array);
 test_case!(loop_entry_with_numeric_string_or_float_bound);
+test_case!(always_entered_loop_keeps_possibly_undefined);
 
 #[test]
 #[cfg_attr(miri, ignore)]

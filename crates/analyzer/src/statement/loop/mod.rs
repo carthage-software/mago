@@ -1332,6 +1332,10 @@ where
                 }
             } else {
                 loop_parent_context.locals.insert(*variable_id, Rc::clone(variable_type));
+
+                if continue_context.possibly_undefined_variable_ids.contains(variable_id) {
+                    loop_parent_context.possibly_undefined_variable_ids.insert(*variable_id);
+                }
             }
         }
     }
