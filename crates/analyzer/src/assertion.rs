@@ -899,6 +899,11 @@ where
         return assertions;
     }
 
+    if let Some(assertions) = scrape_string_length_equality_assertions(left, right, artifacts, assertion_context, false)
+    {
+        return assertions;
+    }
+
     match resolve_count_comparison(left, right, artifacts, assertion_context) {
         (None, Some(number_on_right)) => {
             let mut if_types = WordMap::default();
@@ -1022,6 +1027,11 @@ where
     }
 
     if let Some(assertions) = scrape_class_constant_equality_assertions(left, right, artifacts, assertion_context, true)
+    {
+        return assertions;
+    }
+
+    if let Some(assertions) = scrape_string_length_equality_assertions(left, right, artifacts, assertion_context, true)
     {
         return assertions;
     }
@@ -1778,28 +1788,30 @@ where
 
     let mut if_types: WordMap<AssertionSet> = WordMap::default();
 
-    if let Some(right_value) = right_integer.as_ref().and_then(TInteger::get_literal_value)
-        && let Some(argument_id) = get_strlen_argument_expression_id(assertion_context, left)
-    {
+    if let Some(right_value) = right_integer.as_ref().and_then(TInteger::get_literal_value) {
         let bound = if matches!(operator, BinaryOperator::LessThanOrEqual(_)) {
             right_value.saturating_add(1)
         } else {
             right_value
         };
+        let assertion = Assertion::StringLengthLessThan(bound);
 
-        if_types.insert(argument_id, vec![vec![Assertion::StringLengthLessThan(bound)]]);
+        if let Some(argument_id) = get_strlen_argument_expression_id(assertion_context, left, &assertion) {
+            if_types.insert(argument_id, vec![vec![assertion]]);
+        }
     }
 
-    if let Some(left_value) = left_integer.as_ref().and_then(TInteger::get_literal_value)
-        && let Some(argument_id) = get_strlen_argument_expression_id(assertion_context, right)
-    {
+    if let Some(left_value) = left_integer.as_ref().and_then(TInteger::get_literal_value) {
         let bound = if matches!(operator, BinaryOperator::LessThanOrEqual(_)) {
             left_value
         } else {
             left_value.saturating_add(1)
         };
+        let assertion = Assertion::StringLengthGreaterThanOrEqual(bound);
 
-        if_types.insert(argument_id, vec![vec![Assertion::StringLengthGreaterThanOrEqual(bound)]]);
+        if let Some(argument_id) = get_strlen_argument_expression_id(assertion_context, right, &assertion) {
+            if_types.insert(argument_id, vec![vec![assertion]]);
+        }
     }
 
     let left_id = assertion_context.get_expression_id(left);
@@ -1991,28 +2003,30 @@ where
 
     let mut if_types: WordMap<AssertionSet> = WordMap::default();
 
-    if let Some(right_value) = right_integer.as_ref().and_then(TInteger::get_literal_value)
-        && let Some(argument_id) = get_strlen_argument_expression_id(assertion_context, left)
-    {
+    if let Some(right_value) = right_integer.as_ref().and_then(TInteger::get_literal_value) {
         let bound = if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
             right_value
         } else {
             right_value.saturating_add(1)
         };
+        let assertion = Assertion::StringLengthGreaterThanOrEqual(bound);
 
-        if_types.insert(argument_id, vec![vec![Assertion::StringLengthGreaterThanOrEqual(bound)]]);
+        if let Some(argument_id) = get_strlen_argument_expression_id(assertion_context, left, &assertion) {
+            if_types.insert(argument_id, vec![vec![assertion]]);
+        }
     }
 
-    if let Some(left_value) = left_integer.as_ref().and_then(TInteger::get_literal_value)
-        && let Some(argument_id) = get_strlen_argument_expression_id(assertion_context, right)
-    {
+    if let Some(left_value) = left_integer.as_ref().and_then(TInteger::get_literal_value) {
         let bound = if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
             left_value.saturating_add(1)
         } else {
             left_value
         };
+        let assertion = Assertion::StringLengthLessThan(bound);
 
-        if_types.insert(argument_id, vec![vec![Assertion::StringLengthLessThan(bound)]]);
+        if let Some(argument_id) = get_strlen_argument_expression_id(assertion_context, right, &assertion) {
+            if_types.insert(argument_id, vec![vec![assertion]]);
+        }
     }
 
     let left_id = assertion_context.get_expression_id(left);
@@ -2393,15 +2407,56 @@ fn is_count_normal(mode: &Expression) -> bool {
 fn get_strlen_argument_expression_id<A>(
     assertion_context: AssertionContext<'_, '_, A>,
     expression: &Expression,
+    assertion: &Assertion,
 ) -> Option<Word>
 where
     A: Arena,
 {
-    if !is_function_call_to(expression, assertion_context, b"strlen") {
+    let counts_bytes = is_function_call_to(expression, assertion_context, b"strlen");
+    let counts_characters = !counts_bytes
+        && is_function_call_to(expression, assertion_context, b"mb_strlen")
+        && matches!(assertion, Assertion::StringLengthLessThan(1) | Assertion::StringLengthGreaterThanOrEqual(1));
+
+    if !counts_bytes && !counts_characters {
         return None;
     }
 
     get_first_argument_expression_id(assertion_context, expression)
+}
+
+fn scrape_string_length_equality_assertions<A>(
+    left: &Expression,
+    right: &Expression,
+    artifacts: &AnalysisArtifacts,
+    assertion_context: AssertionContext<'_, '_, A>,
+    negated: bool,
+) -> Option<Vec<WordMap<AssertionSet>>>
+where
+    A: Arena,
+{
+    let literal = |expression: &Expression| {
+        artifacts
+            .get_expression_type(expression)
+            .and_then(|expression_type| expression_type.get_single_literal_int_value())
+    };
+
+    let (call, length) = match (literal(left), literal(right)) {
+        (None, Some(length)) => (left, length),
+        (Some(length), None) => (right, length),
+        _ => return None,
+    };
+
+    let assertion = match (length, negated) {
+        (0, false) => Assertion::StringLengthLessThan(1),
+        (0, true) => Assertion::StringLengthGreaterThanOrEqual(1),
+        _ => return None,
+    };
+
+    let argument_id = get_strlen_argument_expression_id(assertion_context, call, &assertion)?;
+    let mut if_types = WordMap::default();
+    if_types.insert(argument_id, vec![vec![assertion]]);
+
+    Some(vec![if_types])
 }
 
 fn is_function_call_to<A>(
