@@ -3169,6 +3169,7 @@ test_case!(loop_condition_assignment_after_loop);
 test_case!(endless_loop_exits_only_through_break);
 test_case!(conditional_type_branch_bounds_template);
 test_case!(filter_var_flags_in_options_array);
+test_case!(instanceof_keeps_iterable_templates);
 
 #[test]
 #[cfg_attr(miri, ignore)]

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -982,6 +983,30 @@ where
                 .clone()
                 .with_type_parameters(Some(vec![iterable.get_key_type().clone(), iterable.get_value_type().clone()])),
         )));
+    }
+
+    if named_object.get_type_parameters().is_none() && sub_atomic.is_traversable(context.codebase) {
+        let iterable = match super_atomic {
+            TAtomic::Iterable(iterable) => Some(Cow::Borrowed(iterable)),
+            TAtomic::Object(TObject::Named(super_named_object))
+                if matches!(
+                    super_named_object.name.to_ascii_lowercase().as_bytes(),
+                    b"traversable" | b"iterator" | b"iteratoraggregate"
+                ) =>
+            {
+                match super_named_object.get_type_parameters() {
+                    Some([key, value]) => {
+                        Some(Cow::Owned(TIterable::new(Arc::new(key.clone()), Arc::new(value.clone()))))
+                    }
+                    _ => None,
+                }
+            }
+            _ => None,
+        };
+
+        if let Some(iterable) = iterable {
+            return intersect_traversable_with_iterable(context.codebase, named_object, &iterable);
+        }
     }
 
     if let TAtomic::Object(TObject::Named(super_named_object)) = super_atomic
