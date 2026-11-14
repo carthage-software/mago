@@ -904,6 +904,34 @@ pub(crate) fn add_access_base_clauses<A>(
         creating_object_id,
         assertion_context,
     );
+
+    let Some(expression_id) = assertion_context.get_expression_id(expression) else {
+        return;
+    };
+
+    let Some(non_nullsafe_id) = get_non_nullsafe_expression_id(expression_id) else {
+        return;
+    };
+
+    for clause in formula.iter_mut() {
+        if !clause.possibilities.contains_key(&expression_id) {
+            continue;
+        }
+
+        let mut possibilities = clause.possibilities.clone();
+        if let Some(assertions) = possibilities.shift_remove(&expression_id) {
+            possibilities.entry(non_nullsafe_id).or_default().extend(assertions);
+        }
+
+        *clause = Clause::new(
+            possibilities,
+            clause.condition_span,
+            clause.span,
+            Some(clause.wedge),
+            Some(clause.reconcilable),
+            Some(clause.generated),
+        );
+    }
 }
 
 fn add_null_equality_base_clauses<A>(
