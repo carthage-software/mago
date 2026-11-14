@@ -4565,7 +4565,7 @@ function array_walk_recursive(object|array &$array, callable $callback, mixed $a
  *
  * @return int<0, max>
  */
-function extract(array &$array, int $flags = EXTR_OVERWRITE, string $prefix = ''): int {}
+function extract(array $array, int $flags = EXTR_OVERWRITE, string $prefix = ''): int {}
 
 /**
  * @param string|array<string> $var_name
