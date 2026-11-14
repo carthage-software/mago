@@ -658,6 +658,10 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(
         }
     }
 
+    if assigned_type.has_nullsafe_null() {
+        Rc::make_mut(&mut assigned_type).set_nullsafe_null(false);
+    }
+
     if block_context.references_possibly_from_confusing_scope.contains(&variable_id) {
         context.collector.report_with_code(
             IssueCode::ReferenceReusedFromConfusingScope,
