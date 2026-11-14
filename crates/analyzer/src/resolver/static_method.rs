@@ -45,6 +45,7 @@ use crate::utils::names::display_method_name;
 use crate::visibility::check_method_visibility_by_id;
 use crate::visibility::is_method_visible_by_id;
 use crate::visibility::private_member_scope;
+use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
 
 /// Resolves all possible static method targets from a class expression and a member selector.
 ///
@@ -156,7 +157,17 @@ where
                 return (false, None);
             };
 
-            if !from_instance && !is_relative && defining_class_metadata.kind.is_interface() && !has_magic_static_call {
+            let from_enum_string = matches!(
+                &classname.origin,
+                ResolutionOrigin::SpecificClassLikeString(class_string) if matches!(class_string.kind(), Some(TClassLikeStringKind::Enum))
+            );
+
+            if !from_instance
+                && !is_relative
+                && !from_enum_string
+                && defining_class_metadata.kind.is_interface()
+                && !has_magic_static_call
+            {
                 report_static_call_on_interface(
                     context,
                     defining_class_metadata.original_name,

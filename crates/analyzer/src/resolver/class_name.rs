@@ -11,6 +11,7 @@ use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
+use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -486,6 +487,12 @@ pub fn get_class_name_from_atomic(codebase: &CodebaseMetadata, atomic: &TAtomic)
             },
             TAtomic::Scalar(TScalar::ClassLikeString(class_string)) => {
                 match class_string {
+                    TClassLikeString::Any { kind: TClassLikeStringKind::Enum } => {
+                        let unit_enum = TAtomic::Object(TObject::Named(TNamedObject::new(word("UnitEnum"))));
+                        let class_string = TClassLikeString::of_type(TClassLikeStringKind::Enum, unit_enum.clone());
+
+                        get_class_name_from_atomic_impl(codebase, &unit_enum, Some(&class_string))?
+                    }
                     TClassLikeString::Any { .. } => {
                         ResolvedClassname::new(None, ResolutionOrigin::AnyClassString, false)
                     }

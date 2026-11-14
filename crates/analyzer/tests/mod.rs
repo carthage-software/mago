@@ -3182,6 +3182,7 @@ test_case!(unknown_named_argument_fits_variadic_type);
 test_case!(truthy_mixed_keeps_truthiness_when_narrowed);
 test_case!(negated_type_checks_split_callable);
 test_case!(isset_strips_null_from_template_bound);
+test_case!(static_call_on_bare_enum_string);
 
 #[test]
 #[cfg_attr(miri, ignore)]
