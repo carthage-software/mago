@@ -44,6 +44,7 @@ use crate::context::block::ReferenceConstraintSource;
 use crate::error::AnalysisError;
 use crate::expression::assignment::PropertyWriteKind;
 use crate::expression::assignment::property_assignment;
+use crate::expression::assignment::static_property_assignment;
 use crate::utils::expression::array::ArrayTarget;
 use crate::utils::expression::array::get_array_target_type_given_index;
 use crate::utils::expression::get_block_expression_id;
@@ -84,6 +85,7 @@ where
         artifacts.get_rc_expression_type(root_array_expression).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
     let root_is_array_access_object =
         root_array_type.types.iter().all(|atomic| atomic.extends_or_implements(context.codebase, b"ArrayAccess"));
+    let root_is_array = root_array_type.types.iter().all(TAtomic::is_array);
 
     let mut current_type = Rc::clone(&root_array_type);
 
@@ -138,6 +140,28 @@ where
                 PropertyWriteKind::Mutation
             },
         )?;
+    } else if let Expression::Access(Access::StaticProperty(property_access)) = &root_array_expression
+        && root_is_array
+    {
+        let (result, issues) = context.record(|context| {
+            static_property_assignment::analyze(
+                context,
+                block_context,
+                artifacts,
+                property_access,
+                &root_array_type,
+                root_var_id,
+            )
+        });
+
+        result?;
+        context.collector.extend(issues.into_iter().filter(|issue| {
+            issue.code.as_deref().is_some_and(|code| {
+                code == IssueCode::InvalidPropertyAssignmentValue.as_str()
+                    || code == IssueCode::PropertyTypeCoercion.as_str()
+                    || code == IssueCode::MixedPropertyTypeCoercion.as_str()
+            })
+        }));
     }
 
     let root_array_type = Rc::new(root_array_type);
@@ -481,6 +505,10 @@ where
             types.push(TAtomic::Scalar(TScalar::String(TString::known_literal(empty_word()))));
 
             Rc::new(TUnion::from_vec(types))
+        } else if key_type.types.iter().any(TAtomic::is_array) {
+            let types: Vec<TAtomic> = key_type.types.iter().filter(|t| !t.is_array()).cloned().collect();
+
+            Rc::new(if types.is_empty() { get_arraykey() } else { TUnion::from_vec(types) })
         } else {
             Rc::clone(key_type)
         };

@@ -3290,6 +3290,7 @@ test_case!(match_get_class_narrows_subject);
 test_case!(class_string_literal_member_selector);
 test_case!(do_while_or_condition_narrows_right_side);
 test_case!(by_reference_items_of_one_array_in_one_call);
+test_case!(static_property_array_item_write_is_checked);
 
 #[test]
 #[cfg_attr(miri, ignore)]
