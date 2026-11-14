@@ -824,7 +824,7 @@ fn infer_templates_from_input_and_container_types<A>(
                                     continue;
                                 }
 
-                                let appearance_depth = usize::from(!top_level);
+                                let appearance_depth = usize::from(!top_level || generic_container_parts_len > 1);
                                 insert_bound_type(
                                     template_result,
                                     generic_parameter.parameter_name,
