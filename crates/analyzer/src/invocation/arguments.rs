@@ -415,9 +415,23 @@ pub fn verify_argument_type<'arena, A>(
                     false
                 } else if let Some(callable) = cast_atomic_to_callable(atomic, context.codebase, None) {
                     match callable.as_ref() {
-                        TCallable::Alias(id) => {
-                            get_signature_of_function_like_identifier(id, context.codebase).is_some()
-                        }
+                        TCallable::Alias(id) => get_signature_of_function_like_identifier(id, context.codebase)
+                            .is_some_and(|signature| {
+                                let required = signature
+                                    .get_parameters()
+                                    .iter()
+                                    .filter(|parameter| !parameter.has_default() && !parameter.is_variadic())
+                                    .count();
+
+                                parameter_type.types.iter().all(|container| match container {
+                                    TAtomic::Callable(TCallable::Signature(container_signature)) => {
+                                        let parameters = container_signature.get_parameters();
+                                        parameters.last().is_some_and(|parameter| parameter.is_variadic())
+                                            || required <= parameters.len()
+                                    }
+                                    _ => true,
+                                })
+                            }),
                         TCallable::Signature(_) => false,
                     }
                 } else {
