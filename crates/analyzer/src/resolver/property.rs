@@ -983,13 +983,17 @@ where
         if let TObject::Named(named_object) = object
             && let Some(resolved) = find_property_in_intersection_types(
                 context,
+                block_context,
                 named_object,
                 prop_name,
                 for_assignment,
-                (check_deprecation && !block_context.is_enclosing_scope_deprecated()).then(|| selector.span()),
+                access_span,
+                selector.span(),
+                check_deprecation && !block_context.is_enclosing_scope_deprecated(),
+                result,
             )
         {
-            return Some(resolved);
+            return resolved;
         }
 
         if has_magic_method {
@@ -1938,13 +1942,17 @@ fn find_property_in_single_mixin(
 
 /// Searches for a property in intersection types of a named object.
 /// For example, if the type is `Foo&Baz`, this will look for the property on `Baz`.
-fn find_property_in_intersection_types<A>(
-    context: &mut Context<'_, '_, A>,
+fn find_property_in_intersection_types<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
+    block_context: &BlockContext<'ctx>,
     named_object: &TNamedObject,
     prop_name: Word,
     for_assignment: bool,
-    deprecation_span: Option<Span>,
-) -> Option<ResolvedProperty>
+    access_span: Span,
+    selector_span: Span,
+    check_deprecation: bool,
+    result: &mut PropertyResolutionResult,
+) -> Option<Option<ResolvedProperty>>
 where
     A: Arena,
 {
@@ -1965,17 +1973,46 @@ where
                     continue;
                 };
 
-                if let Some(span) = deprecation_span {
-                    report_deprecated_property(context, resolution.declaring_class, resolution.property, span);
+                if check_deprecation {
+                    report_deprecated_property(context, resolution.declaring_class, resolution.property, selector_span);
                 }
 
-                return Some(get_resolved_declared_property(context.codebase, &resolution, prop_name, for_assignment));
+                let is_visible = if for_assignment {
+                    check_resolved_property_write_visibility(
+                        context,
+                        block_context,
+                        &resolution,
+                        access_span,
+                        Some(selector_span),
+                    )
+                } else {
+                    check_resolved_property_read_visibility(
+                        context,
+                        block_context,
+                        &resolution,
+                        access_span,
+                        Some(selector_span),
+                    )
+                };
+
+                if !is_visible {
+                    result.has_error_path = true;
+
+                    return Some(None);
+                }
+
+                return Some(Some(get_resolved_declared_property(
+                    context.codebase,
+                    &resolution,
+                    prop_name,
+                    for_assignment,
+                )));
             }
             TAtomic::Object(TObject::WithProperties(shaped)) => {
                 let key = mago_word::word(trim_start_byte(prop_name.as_bytes(), b'$'));
 
                 if let Some((_optional, property_type)) = shaped.known_properties.get(&key) {
-                    return Some(ResolvedProperty {
+                    return Some(Some(ResolvedProperty {
                         lookup_class: None,
                         property_span: None,
                         property_name: prop_name,
@@ -1983,7 +2020,7 @@ where
                         property_type: property_type.clone(),
                         is_magic: false,
                         read_type: None,
-                    });
+                    }));
                 }
             }
             _ => {}
