@@ -122,6 +122,27 @@ fn get_method_throw_contract(
     (throw_type, display_type, false)
 }
 
+/// A trait is not a type: `self` in a trait method stands for the class that uses the trait.
+fn replace_used_trait_with_class(codebase: &CodebaseMetadata, type_union: &mut TUnion, class_name: Word) {
+    let names_used_trait = |atomic: &TAtomic| {
+        matches!(atomic, TAtomic::Object(TObject::Named(named_object))
+            if codebase.get_class_like(named_object.name.as_bytes()).is_some_and(|metadata| metadata.kind.is_trait())
+                && codebase.class_uses_trait(class_name.as_bytes(), named_object.name.as_bytes()))
+    };
+
+    if !type_union.types.iter().any(names_used_trait) {
+        return;
+    }
+
+    for atomic in type_union.types.to_mut() {
+        if names_used_trait(atomic)
+            && let TAtomic::Object(TObject::Named(named_object)) = atomic
+        {
+            named_object.name = class_name;
+        }
+    }
+}
+
 /// Validates that a child method signature is compatible with a parent method signature.
 ///
 /// This function checks the Liskov Substitution Principle (LSP) rules:
@@ -253,6 +274,7 @@ pub fn validate_method_signature_compatibility(
         if expanded_parent_param_type.is_expandable() {
             expand_union(codebase, &mut expanded_parent_param_type, &expansion_options);
         }
+        replace_used_trait_with_class(codebase, &mut expanded_child_param_type, child_class_name);
         if expanded_child_param_type.is_expandable() {
             expand_union(codebase, &mut expanded_child_param_type, &expansion_options);
         }
@@ -331,6 +353,7 @@ pub fn validate_method_signature_compatibility(
         if expanded_parent_return_type.is_expandable() {
             expand_union(codebase, &mut expanded_parent_return_type, &expansion_options);
         }
+        replace_used_trait_with_class(codebase, &mut expanded_child_return_type, child_class_name);
         if expanded_child_return_type.is_expandable() {
             expand_union(codebase, &mut expanded_child_return_type, &expansion_options);
         }
@@ -372,6 +395,7 @@ pub fn validate_method_signature_compatibility(
         if expanded_parent_return_type.is_expandable() {
             expand_union(codebase, &mut expanded_parent_return_type, &expansion_options);
         }
+        replace_used_trait_with_class(codebase, &mut expanded_child_return_type, child_class_name);
         if expanded_child_return_type.is_expandable() {
             expand_union(codebase, &mut expanded_child_return_type, &expansion_options);
         }
