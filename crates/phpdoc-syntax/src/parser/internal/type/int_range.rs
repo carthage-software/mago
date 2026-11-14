@@ -19,6 +19,10 @@ where
         let min = self.parse_int_or_keyword()?;
         let comma = self.stream.eat_span(TokenKind::Comma)?;
         let max = self.parse_int_or_keyword()?;
+        if self.stream.is_at(TokenKind::Comma) {
+            self.stream.consume_span()?;
+        }
+
         let greater_than = self.stream.eat_span(TokenKind::RightAngleBracket)?;
 
         Ok(Type::IntRange(IntRangeType { keyword, less_than, min, comma, max, greater_than }))

@@ -353,6 +353,7 @@ mod tests {
         let arena = LocalArena::new();
         assert!(matches!(parse(&arena, b"int<-5, 10>"), Type::IntRange(_)));
         assert!(matches!(parse(&arena, b"int<min, max>"), Type::IntRange(_)));
+        assert!(matches!(parse(&arena, b"int<0, 5,>"), Type::IntRange(_)));
     }
 
     #[test]
