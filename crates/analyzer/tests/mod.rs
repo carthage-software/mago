@@ -3159,6 +3159,7 @@ test_case!(intersection_with_object_shape_in_any_position);
 test_case!(list_index_range_outside_known_keys);
 test_case!(type_alias_scoped_to_its_class);
 test_case!(class_template_used_in_type_alias);
+test_case!(static_override_inherits_this_return);
 
 #[test]
 #[cfg_attr(miri, ignore)]

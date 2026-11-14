@@ -25,6 +25,7 @@ use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::keyed::TKeyedArray;
 use crate::ttype::atomic::callable::TCallable;
+use crate::ttype::atomic::object::TObject;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
 use crate::ttype::get_arraykey;
@@ -69,6 +70,10 @@ fn narrow_inherited_iterable_to_array(
     }
 
     Some(TUnion::from_vec(atomics))
+}
+
+fn is_static_return(union: &TUnion) -> bool {
+    union.types.iter().all(|atomic| matches!(atomic, TAtomic::Object(TObject::Named(named)) if named.is_static))
 }
 
 /// Determines whether to inherit a type from the parent based on variance rules.
@@ -183,16 +188,17 @@ fn should_inherit_docblock_type(
             &mut ComparisonResult::new(),
         );
 
-        let types_equal = child_contained_in_parent
-            && union_comparator::is_contained_by(
-                codebase,
-                parent_native,
-                child_native,
-                false,
-                false,
-                false,
-                &mut ComparisonResult::new(),
-            );
+        let types_equal = (is_static_return(child_native) && is_static_return(parent_native))
+            || child_contained_in_parent
+                && union_comparator::is_contained_by(
+                    codebase,
+                    parent_native,
+                    child_native,
+                    false,
+                    false,
+                    false,
+                    &mut ComparisonResult::new(),
+                );
 
         if types_equal {
             return true;
@@ -795,23 +801,25 @@ fn resolve_method_inheritance(
                 );
 
                 let child_matches_parent_native = parent_native_return_type.is_some_and(|parent_native_return| {
-                    union_comparator::is_contained_by(
-                        codebase,
-                        &child_native_return.type_union,
-                        &parent_native_return.type_union,
-                        false,
-                        false,
-                        false,
-                        &mut ComparisonResult::new(),
-                    ) && union_comparator::is_contained_by(
-                        codebase,
-                        &parent_native_return.type_union,
-                        &child_native_return.type_union,
-                        false,
-                        false,
-                        false,
-                        &mut ComparisonResult::new(),
-                    )
+                    (is_static_return(&child_native_return.type_union)
+                        && is_static_return(&parent_native_return.type_union))
+                        || union_comparator::is_contained_by(
+                            codebase,
+                            &child_native_return.type_union,
+                            &parent_native_return.type_union,
+                            false,
+                            false,
+                            false,
+                            &mut ComparisonResult::new(),
+                        ) && union_comparator::is_contained_by(
+                            codebase,
+                            &parent_native_return.type_union,
+                            &child_native_return.type_union,
+                            false,
+                            false,
+                            false,
+                            &mut ComparisonResult::new(),
+                        )
                 });
 
                 if child_is_more_specific && !child_matches_parent_native {
