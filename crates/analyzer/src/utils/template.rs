@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use foldhash::HashMap;
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
@@ -23,6 +25,7 @@ use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::definition_type_replacer;
 use mago_codex::ttype::template::definition_type_replacer::DefinitionReplacementOptions;
+use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 use mago_reporting::Annotation;
@@ -43,6 +46,29 @@ where
         match node {
             TypeRef::Union(union) => union.append_child_nodes(&mut nodes),
             TypeRef::Atomic(TAtomic::GenericParameter(_)) => {}
+            TypeRef::Atomic(TAtomic::Conditional(conditional))
+                if let [TAtomic::GenericParameter(parameter)] = conditional.subject.types.as_ref() =>
+            {
+                let (holds, fails) = if conditional.negated {
+                    (&conditional.otherwise, &conditional.then)
+                } else {
+                    (&conditional.then, &conditional.otherwise)
+                };
+
+                let mut bounds = TemplateResult::default();
+                bounds.add_lower_bound(
+                    parameter.parameter_name,
+                    parameter.defining_entity,
+                    wrap_atomic(TAtomic::GenericParameter(TGenericParameter {
+                        constraint: Arc::clone(&conditional.target),
+                        ..parameter.clone()
+                    })),
+                );
+
+                let holds = inferred_type_replacer::replace(holds, &bounds, context.codebase);
+                check_template_arguments(context, TypeRef::Union(&holds), span);
+                nodes.push(TypeRef::Union(fails));
+            }
             TypeRef::Atomic(atomic) => {
                 if let TAtomic::Object(TObject::Named(named)) = atomic {
                     check_named_template_arguments(context, named, span);
