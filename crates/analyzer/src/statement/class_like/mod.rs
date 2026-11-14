@@ -19,6 +19,7 @@ use mago_codex::reference::ReferenceOrigin;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::TypeRef;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
@@ -29,6 +30,7 @@ use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::expand_union;
+use mago_codex::ttype::get_array_parameters;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::template::GenericTemplate;
@@ -2058,62 +2060,120 @@ fn check_template_variance_positions<'ctx, A>(
             continue;
         }
 
-        for parameter in &method.parameters {
-            let Some(type_metadata) = &parameter.type_metadata else {
-                continue;
-            };
+        let positions = method
+            .parameters
+            .iter()
+            .filter_map(|parameter| Some((parameter.type_metadata.as_ref()?, parameter.span, true)))
+            .chain(method.return_type_metadata.as_ref().map(|return_type| (return_type, return_type.span, false)));
 
-            for atomic in type_metadata.type_union.types.as_ref() {
-                let TAtomic::GenericParameter(generic) = atomic else {
-                    continue;
+        for (type_metadata, span, is_input) in positions {
+            let mut misplaced = Vec::new();
+            collect_misplaced_templates(
+                context.codebase,
+                &type_metadata.type_union,
+                is_input,
+                &own_entity,
+                &covariant_templates,
+                &contravariant_templates,
+                &mut misplaced,
+            );
+
+            for template_name in misplaced {
+                let (variance, tag, position) = if covariant_templates.contains(&template_name) {
+                    ("Covariant", "@template-covariant", "an input")
+                } else {
+                    ("Contravariant", "@template-contravariant", "an output")
                 };
 
-                if generic.defining_entity != own_entity || !covariant_templates.contains(&generic.parameter_name) {
-                    continue;
-                }
-
-                let template_name = generic.parameter_name;
                 context.collector.report_with_code(
                     IssueCode::InvalidTemplateParameter,
                     Issue::error(format!(
-                        "Covariant template parameter `{template_name}` cannot appear in a parameter position."
+                        "{variance} template parameter `{template_name}` cannot appear in {position} position."
                     ))
-                    .with_annotation(Annotation::primary(parameter.span).with_message(format!(
-                        "`{template_name}` is declared covariant (`@template-covariant`) on `{class_name}`"
-                    )))
-                    .with_note("A method parameter is a contravariant position; a covariant template parameter may only appear in covariant positions, such as a return type.")
+                    .with_annotation(
+                        Annotation::primary(span)
+                            .with_message(format!("`{template_name}` is declared with `{tag}` on `{class_name}`")),
+                    )
+                    .with_note("A method parameter is an input position and a return type an output position; a callable parameter inside either one flips it.")
                     .with_help(format!(
-                        "Declare `{template_name}` as invariant (`@template`), or remove it from parameter positions."
+                        "Declare `{template_name}` as invariant (`@template`), or move it out of {position} position."
                     )),
                 );
             }
         }
+    }
+}
 
-        if let Some(return_type) = &method.return_type_metadata {
-            for atomic in return_type.type_union.types.as_ref() {
-                let TAtomic::GenericParameter(generic) = atomic else {
+/// Collects the templates of the class that sit in a position their variance
+/// forbids: covariant ones in an input position, contravariant ones in an output
+/// position. A callable's parameters flip the position; containers keep it when
+/// their own template is covariant, flip it when contravariant, and are skipped
+/// when invariant.
+fn collect_misplaced_templates(
+    codebase: &CodebaseMetadata,
+    union: &TUnion,
+    is_input: bool,
+    own_entity: &GenericParent,
+    covariant_templates: &[Word],
+    contravariant_templates: &[Word],
+    misplaced: &mut Vec<Word>,
+) {
+    use mago_codex::ttype::template::variance::Variance;
+
+    let recurse = |union: &TUnion, is_input: bool, misplaced: &mut Vec<Word>| {
+        collect_misplaced_templates(
+            codebase,
+            union,
+            is_input,
+            own_entity,
+            covariant_templates,
+            contravariant_templates,
+            misplaced,
+        );
+    };
+
+    for atomic in union.types.as_ref() {
+        match atomic {
+            TAtomic::GenericParameter(generic) if &generic.defining_entity == own_entity => {
+                let forbidden = if is_input { covariant_templates } else { contravariant_templates };
+                if forbidden.contains(&generic.parameter_name) && !misplaced.contains(&generic.parameter_name) {
+                    misplaced.push(generic.parameter_name);
+                }
+            }
+            TAtomic::Array(array) => {
+                let (key, value) = get_array_parameters(array, codebase);
+                recurse(&key, is_input, misplaced);
+                recurse(&value, is_input, misplaced);
+            }
+            TAtomic::Iterable(iterable) => {
+                recurse(&iterable.key_type, is_input, misplaced);
+                recurse(&iterable.value_type, is_input, misplaced);
+            }
+            TAtomic::Callable(TCallable::Signature(signature)) => {
+                for parameter in signature.get_parameters() {
+                    if let Some(parameter_type) = parameter.get_type_signature() {
+                        recurse(parameter_type, !is_input, misplaced);
+                    }
+                }
+
+                if let Some(return_type) = signature.get_return_type() {
+                    recurse(return_type, is_input, misplaced);
+                }
+            }
+            TAtomic::Object(TObject::Named(named)) => {
+                let Some(class_like) = codebase.get_class_like(named.name.as_bytes()) else {
                     continue;
                 };
 
-                if generic.defining_entity != own_entity || !contravariant_templates.contains(&generic.parameter_name) {
-                    continue;
+                for (index, argument) in named.get_type_parameters().unwrap_or_default().iter().enumerate() {
+                    match class_like.template_variance.get(index) {
+                        Some(Variance::Covariant) => recurse(argument, is_input, misplaced),
+                        Some(Variance::Contravariant) => recurse(argument, !is_input, misplaced),
+                        _ => {}
+                    }
                 }
-
-                let template_name = generic.parameter_name;
-                context.collector.report_with_code(
-                    IssueCode::InvalidTemplateParameter,
-                    Issue::error(format!(
-                        "Contravariant template parameter `{template_name}` cannot appear in a return position."
-                    ))
-                    .with_annotation(Annotation::primary(return_type.span).with_message(format!(
-                        "`{template_name}` is declared contravariant (`@template-contravariant`) on `{class_name}`"
-                    )))
-                    .with_note("A method return type is a covariant position; a contravariant template parameter may only appear in contravariant positions, such as a method parameter.")
-                    .with_help(format!(
-                        "Declare `{template_name}` as invariant (`@template`), or remove it from return positions."
-                    )),
-                );
             }
+            _ => {}
         }
     }
 }
