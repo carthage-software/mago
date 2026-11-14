@@ -23,17 +23,13 @@ where
     }
 
     pub(crate) fn parse_param_tag_value(&mut self) -> Result<TagValue<'arena>, ParseError> {
-        let starts_with_parameter_dependent_type = self.stream.is_at(TokenKind::Variable)
-            && matches!(
-                self.stream.peek_kind(1),
-                Some(
-                    TokenKind::Variable
-                        | TokenKind::ThisVariable
-                        | TokenKind::Pipe
-                        | TokenKind::Ampersand
-                        | TokenKind::LeftBracket
-                )
-            );
+        let starts_with_parameter_dependent_type = match self.stream.peek_kind(1) {
+            Some(TokenKind::Pipe | TokenKind::Ampersand | TokenKind::LeftBracket) => {
+                self.stream.is_at(TokenKind::Variable) || self.stream.is_at(TokenKind::ThisVariable)
+            }
+            Some(TokenKind::Variable | TokenKind::ThisVariable) => self.stream.is_at(TokenKind::Variable),
+            _ => false,
+        };
 
         if self.at_parameter_start() && !starts_with_parameter_dependent_type {
             let ampersand =
