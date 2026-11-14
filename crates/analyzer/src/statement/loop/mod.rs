@@ -1203,6 +1203,14 @@ where
             }
 
             for variable_id in changed_variable_ids {
+                if !always_enters_loop.get()
+                    && loop_parent_context.locals.contains_key(&variable_id)
+                    && let Some(assertions) = negated_pre_condition_types.get(&variable_id)
+                {
+                    parent_assertions.insert(variable_id, assertions.clone());
+                    continue;
+                }
+
                 if let Some(reconciled_type) = continue_context.locals.get(&variable_id) {
                     if loop_parent_context.locals.contains_key(&variable_id)
                         || (!reconciled_type.possibly_undefined()
