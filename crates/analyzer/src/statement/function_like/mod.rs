@@ -27,6 +27,7 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::reference::TReference;
+use mago_codex::ttype::atomic::reference::TReferenceMemberSelector;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::comparator::ComparisonResult;
@@ -1623,8 +1624,34 @@ where
     }
 
     type_metadata.type_union.any_child_node(|type_ref| {
+        if let TypeRef::Atomic(TAtomic::Reference(TReference::Member { class_like_name, member_selector })) = type_ref
+            && !matches!(class_like_name.to_ascii_lowercase().as_bytes(), b"self" | b"static" | b"parent" | b"$this")
+            && let Some(class_like) = context.codebase.get_class_like_by_name(*class_like_name)
+        {
+            let found = class_like.constants.keys().any(|name| member_selector.matches(*name))
+                || class_like.enum_cases.keys().any(|name| member_selector.matches(*name))
+                || matches!(member_selector, TReferenceMemberSelector::Identifier(name) if name.as_bytes().eq_ignore_ascii_case(b"class") || class_like.type_aliases.contains_key(name));
+
+            if !found {
+                context.collector.report_with_code(
+                    IssueCode::NonExistentClassConstant,
+                    Issue::error(format!("No constant of `{}` matches `{}`.", class_like.original_name, match member_selector {
+                        TReferenceMemberSelector::Wildcard => "*".to_string(),
+                        TReferenceMemberSelector::Identifier(name) => name.to_string(),
+                        TReferenceMemberSelector::StartsWith(prefix) => format!("{prefix}*"),
+                        TReferenceMemberSelector::EndsWith(suffix) => format!("*{suffix}"),
+                    }))
+                        .with_annotation(Annotation::primary(type_metadata.span).with_message("This type names a constant that does not exist")),
+                );
+            }
+
+            return false;
+        }
+
         let name = match type_ref {
             TypeRef::Atomic(TAtomic::Reference(TReference::Symbol { name, .. })) => name,
+            TypeRef::Atomic(TAtomic::Reference(TReference::Member { class_like_name: name, .. }))
+                if !matches!(name.to_ascii_lowercase().as_bytes(), b"self" | b"static" | b"parent" | b"$this") => name,
             TypeRef::Atomic(TAtomic::Object(TObject::Named(TNamedObject { name, .. }) | TObject::Enum(TEnum { name, .. })))
                 if !matches!(name.as_bytes(), b"self" | b"static" | b"parent" | b"$this")
                     && context.codebase.get_class_like_by_name(*name).is_none() => name,

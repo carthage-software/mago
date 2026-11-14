@@ -3154,6 +3154,7 @@ test_case!(issue_2676);
 test_case!(static_property_on_missing_class);
 test_case!(first_class_callable_static_return_binds_receiver);
 test_case!(key_of_constant_with_class_constant_keys);
+test_case!(docblock_type_names_missing_class_constant);
 
 #[test]
 #[cfg_attr(miri, ignore)]
