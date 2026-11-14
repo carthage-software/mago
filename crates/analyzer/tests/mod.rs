@@ -3300,6 +3300,7 @@ test_case!(array_map_several_arrays_uses_inferred_callback_return);
 test_case!(dynamic_properties_class_pseudo_property_fits_object_shape);
 test_case!(class_typed_constant_with_var_docblock);
 test_case!(unset_removes_object_shape_property);
+test_case!(static_property_write_forgets_other_spellings);
 
 #[test]
 #[cfg_attr(miri, ignore)]

@@ -160,6 +160,17 @@ where
 
     let resulting_type = Rc::new(resulting_type.unwrap_or_else(get_never));
 
+    if let Some(property_access_id) = property_access_id
+        && let Some(separator) = memchr::memmem::find(property_access_id.as_bytes(), b"::$")
+    {
+        let member = &property_access_id.as_bytes()[separator..];
+        block_context.locals.retain(|id, _| {
+            *id == property_access_id
+                || !memchr::memmem::find_iter(id.as_bytes(), member)
+                    .any(|start| id.as_bytes().get(start + member.len()).is_none_or(|next| matches!(next, b'-' | b'[')))
+        });
+    }
+
     if context.settings.memoize_properties
         && let Some(property_access_id) = property_access_id
     {
