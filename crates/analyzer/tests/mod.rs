@@ -3233,6 +3233,7 @@ test_case!(get_class_and_get_called_class_bind_templates);
 test_case!(array_merge_recursive_and_replace_keep_shapes);
 test_case!(property_write_after_isset_is_not_ambiguous);
 test_case!(possibly_missing_literal_key_union_on_sealed_shape);
+test_case!(nested_inherited_template_argument_resolves);
 
 #[test]
 #[cfg_attr(miri, ignore)]

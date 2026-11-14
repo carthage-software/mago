@@ -95,7 +95,7 @@ fn merge_interface_metadata(
         metadata.permitted_inheritors.get_or_insert_default().extend(inheritors.iter().copied());
     }
 
-    extend_template_parameters(metadata, parent_interface_metadata);
+    extend_template_parameters(metadata, parent_interface_metadata, codebase);
     inherit_methods_from_parent(metadata, parent_interface_metadata, codebase, seeds);
     inherit_properties_from_parent(metadata, parent_interface_metadata);
 }
@@ -131,7 +131,7 @@ pub fn merge_metadata_from_parent_class_like(
         metadata.permitted_inheritors.get_or_insert_default().extend(inheritors.iter().copied());
     }
 
-    extend_template_parameters(metadata, parent_metadata);
+    extend_template_parameters(metadata, parent_metadata, codebase);
 
     inherit_methods_from_parent(metadata, parent_metadata, codebase, seeds);
     inherit_properties_from_parent(metadata, parent_metadata);
@@ -209,7 +209,7 @@ pub fn merge_metadata_from_trait(
     metadata.mixins.extend(trait_metadata.mixins.iter().cloned());
     metadata.add_used_traits(trait_metadata.used_traits.iter().copied());
 
-    extend_template_parameters(metadata, trait_metadata);
+    extend_template_parameters(metadata, trait_metadata, codebase);
     remove_trait_requirement_template_parameters(metadata, trait_metadata, codebase);
 
     inherit_methods_from_parent(metadata, trait_metadata, codebase, seeds);
