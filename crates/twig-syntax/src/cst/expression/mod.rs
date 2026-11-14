@@ -40,6 +40,7 @@ pub enum Expression<'arena> {
     Number(Number<'arena>),
     String(StringLiteral<'arena>),
     InterpolatedString(InterpolatedString<'arena>),
+    StringConcatenation(StringConcatenation<'arena>),
     Bool(Bool),
     Null(Null),
     Array(Array<'arena>),
@@ -61,26 +62,77 @@ pub enum Expression<'arena> {
 impl HasSpan for Expression<'_> {
     fn span(&self) -> Span {
         match self {
-            Expression::Name(e) => e.span(),
-            Expression::Number(e) => e.span(),
-            Expression::String(e) => e.span(),
-            Expression::InterpolatedString(e) => e.span(),
-            Expression::Bool(e) => e.span(),
-            Expression::Null(e) => e.span(),
-            Expression::Array(e) => e.span(),
-            Expression::HashMap(e) => e.span(),
-            Expression::Unary(e) => e.span(),
-            Expression::Binary(e) => e.span(),
-            Expression::Conditional(e) => e.span(),
-            Expression::GetAttribute(e) => e.span(),
-            Expression::GetItem(e) => e.span(),
-            Expression::Slice(e) => e.span(),
-            Expression::Call(e) => e.span(),
-            Expression::MethodCall(e) => e.span(),
-            Expression::Filter(e) => e.span(),
-            Expression::Test(e) => e.span(),
-            Expression::Parenthesized(e) => e.span(),
-            Expression::ArrowFunction(e) => e.span(),
+            Expression::Name(e) => return e.span(),
+            Expression::Number(e) => return e.span(),
+            Expression::String(e) => return e.span(),
+            Expression::InterpolatedString(e) => return e.span(),
+            Expression::Bool(e) => return e.span(),
+            Expression::Null(e) => return e.span(),
+            Expression::Array(e) => return e.span(),
+            Expression::HashMap(e) => return e.span(),
+            Expression::Parenthesized(e) => return e.span(),
+            _ => {}
         }
+
+        let mut left = self;
+        let start = loop {
+            left = match left {
+                Expression::Unary(e) => break e.operator.span(),
+                Expression::Binary(e) => e.lhs,
+                Expression::StringConcatenation(e) => e.lhs,
+                Expression::Conditional(e) => e.condition,
+                Expression::GetAttribute(e) => e.object,
+                Expression::GetItem(e) => e.object,
+                Expression::Slice(e) => e.object,
+                Expression::Call(e) => e.callee,
+                Expression::MethodCall(e) => e.object,
+                Expression::Filter(e) => e.operand,
+                Expression::Test(e) => e.operand,
+                Expression::ArrowFunction(e) => {
+                    break e
+                        .left_parenthesis
+                        .or_else(|| e.parameters.nodes.first().map(|parameter| parameter.span))
+                        .unwrap_or(e.fat_arrow);
+                }
+                _ => break left.span(),
+            };
+        };
+
+        let mut right = self;
+        let end = loop {
+            right = match right {
+                Expression::Unary(e) => e.operand,
+                Expression::Binary(e) => e.rhs,
+                Expression::StringConcatenation(e) => e.rhs,
+                Expression::Conditional(e) => {
+                    if let Some(otherwise) = e.r#else {
+                        otherwise
+                    } else if let Some(colon) = e.colon {
+                        break colon;
+                    } else if let Some(then) = e.then {
+                        then
+                    } else {
+                        break e.question_mark;
+                    }
+                }
+                Expression::GetAttribute(e) => e.attribute,
+                Expression::GetItem(e) => break e.right_bracket,
+                Expression::Slice(e) => break e.right_bracket,
+                Expression::Call(e) => break e.argument_list.right_parenthesis,
+                Expression::MethodCall(e) => break e.argument_list.right_parenthesis,
+                Expression::Filter(e) => {
+                    break e.argument_list.as_ref().map_or(e.name.span, |arguments| arguments.right_parenthesis);
+                }
+                Expression::Test(e) => match &e.arguments {
+                    TestArguments::Bare(expression) => expression,
+                    TestArguments::Parenthesised(arguments) => break arguments.right_parenthesis,
+                    TestArguments::None => break e.second_word.map_or(e.name.span, |word| word.span),
+                },
+                Expression::ArrowFunction(e) => e.body,
+                _ => break right.span(),
+            };
+        };
+
+        start.join(end)
     }
 }

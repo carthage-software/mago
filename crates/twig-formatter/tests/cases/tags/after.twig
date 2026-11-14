@@ -1,0 +1,37 @@
+{% extends 'base.html.twig' %}
+{% use 'blocks.twig' with title as heading, body as content %}
+{% import 'forms.twig' as forms %}
+{% from 'forms.twig' import input as field, textarea %}
+{% set a, b = 1, 2 %}
+{% set capture %}
+{{ a }}
+{% endset %}
+{% block title 'Hello' %}
+{% block body %}
+{% include 'part.twig' ignore missing with {'x': 1} only %}
+{% embed 'layout.twig' with {'x': 1} only %}
+{% block inner %}{{ x }}{% endblock inner %}
+{% endembed %}
+{% endblock body %}
+{% macro input(name, value = '', ...rest) %}
+{{ name }}
+{% endmacro input %}
+{% with {'a': 1} only %}
+{{ a }}
+{% endwith %}
+{% apply upper|escape('html') %}
+hello
+{% endapply %}
+{% autoescape 'html' %}
+{{ value }}
+{% endautoescape %}
+{% sandbox %}
+{{ value }}
+{% endsandbox %}
+{% do call(1, 2) %}
+{% flush %}
+{% deprecated 'old' %}
+{% cache 'key' ttl(60) tags(['a', 'b']) %}
+{{ value }}
+{% endcache %}
+

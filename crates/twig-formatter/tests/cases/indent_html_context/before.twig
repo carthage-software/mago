@@ -1,0 +1,11 @@
+<section>
+  {%block content%}
+    <div   class="unchanged">
+        {%if enabled%}
+{{user.name}}
+  {%else%}
+{{'guest'}}
+ {%endif%}
+    </div>
+{%endblock%}
+</section>

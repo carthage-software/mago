@@ -1,0 +1,6 @@
+--TEST--
+Word operators need a boundary before a unary operator.
+--TEMPLATE--
+{{ value starts with-x }}
+--EXCEPTION--
+Twig\Error\SyntaxError: Unexpected token "name" of value "starts" ("end of print statement" expected) in "index.twig" at line 2 column 10.

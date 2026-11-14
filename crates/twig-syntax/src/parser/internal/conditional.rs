@@ -62,19 +62,15 @@ where
         }))
     }
 
-    /// Parse the Elvis conditional form `a ?: c`. The lexer fuses `?:`
-    /// into a single `QuestionColon` token; we split its span into the
-    /// question-mark half and the colon half so the CST still reports
-    /// both positions.
+    /// Parse `a ?: c` or `a ? : c`, keeping each punctuation span.
     pub(crate) fn parse_elvis(
         &mut self,
         condition: Expression<'arena>,
     ) -> Result<Expression<'arena>, ParseError<'arena>> {
         let qc_tok = self.stream.consume()?;
         let full = self.stream.span_of(&qc_tok);
-        let mid = Position::new(full.start.offset + 1);
-        let question_mark = self.stream.span(full.start, mid);
-        let colon = self.stream.span(mid, full.end);
+        let question_mark = self.stream.span(full.start, Position::new(full.start.offset + 1));
+        let colon = self.stream.span(Position::new(full.end.offset - 1), full.end);
         let else_expr = self.parse_expression()?;
         Ok(Expression::Conditional(Conditional {
             condition: self.alloc(condition),

@@ -53,7 +53,7 @@ where
         T: Terminator,
     {
         self.state.recursion_depth += 1;
-        if self.state.recursion_depth > crate::parser::MAX_RECURSION_DEPTH {
+        if self.state.recursion_depth > self.recursion_limit {
             self.state.recursion_depth -= 1;
             let position = self.stream.current_position();
             return Err(ParseError::RecursionLimitExceeded(Span::new(self.stream.file_id(), position, position)));

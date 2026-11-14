@@ -28,6 +28,7 @@ Mago 借鉴了 Prettier、`rustfmt` 和 Black 所使用的“解析后再打印�
 
 ## 接下来读什么
 
+- [Twig 格式化器](/tools/formatter/twig/)：独立的 `mago twig:fmt` 命令格式化 Twig，不重新格式化 HTML。
 - [使用](/tools/formatter/usage/):如何运行 `mago format`。
 - [格式化忽略](/tools/formatter/format-ignore/):用于跳过文件、区域或单条语句格式化的注解。
 - [配置参考](/tools/formatter/configuration-reference/):你可以设置的所有选项。

@@ -15,6 +15,7 @@ workspace = true
 [dependencies]
 mago-allocator = { workspace = true }
 mago-syntax = { workspace = true }
+mago-span = { workspace = true }
 mago-reporting = { workspace = true }
 mago-bytes = { workspace = true }
 mago-word = { workspace = true }
@@ -22,6 +23,7 @@ mago-database = { workspace = true }
 mago-linter = { workspace = true }
 mago-names = { workspace = true }
 mago-formatter = { workspace = true }
+mago-twig-formatter = { workspace = true }
 mago-php-version = { workspace = true }
 mago-semantics = { workspace = true }
 mago-codex = { workspace = true }

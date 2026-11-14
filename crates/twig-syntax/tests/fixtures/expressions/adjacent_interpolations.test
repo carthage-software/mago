@@ -1,0 +1,18 @@
+--TEST--
+Interpolations can join adjacent string tokens.
+--TEMPLATE--
+{{ 'a' "#{b}"|upper }}
+{{ 'a' "#{b}" }}
+{{ "#{a}" 'b' }}
+{{ "a#{b}" 'c' "#{a}" }}
+{{ "#{a}" "#{b}" "#{c}" }}
+{{ ['a' "#{b}", "#{a}" 'b']|join(',') }}
+--DATA--
+return ['a' => 'A', 'b' => 'B', 'c' => 'C'];
+--EXPECT--
+AB
+aB
+Ab
+aBcA
+ABC
+aB,Ab

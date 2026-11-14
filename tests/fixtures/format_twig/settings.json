@@ -1,0 +1,4 @@
+{
+  "source": { "paths": ["src"] },
+  "twig": { "formatter": { "tab-width": 2, "print-width": 80 } }
+}

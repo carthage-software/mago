@@ -437,7 +437,8 @@ fn tag_guard_test_compound_divisible_by() {
     let tpl = parse_ok(&arena, "{% guard test divisible by %}yes{% endguard %}");
     let Statement::Guard(g) = &tpl.statements.nodes[0] else { panic!() };
     assert_eq!(g.kind, GuardKind::Test);
-    assert_eq!(g.name.value, b"divisible by".as_slice());
+    assert_eq!(g.name.value, b"divisible".as_slice());
+    assert_eq!(g.second_word.unwrap().value, b"by".as_slice());
 }
 
 #[test]

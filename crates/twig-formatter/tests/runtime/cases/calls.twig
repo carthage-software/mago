@@ -1,0 +1,8 @@
+{{ [record('a'), ...list, record('b')]|join(',') }}
+{{ f(n:record('n',2), value:record('value','a')) }}
+{{ {'first':record('first'), 'second':record('second')}|json_encode }}
+{{ g(in:1,not=2) }}
+{{ {is: 'x-btn', and: 1, or: 2}|json_encode }}
+{{not}} / {{not+1}} / {{not|default(0)}}
+{{ a is s is?:b }} / {{ a is s not?:b }}
+{{ list|map(not=>'x')|join(',') }}

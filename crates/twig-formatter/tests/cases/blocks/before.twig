@@ -1,0 +1,17 @@
+<main>
+    {%if user%}
+{%for item in items%}
+<li>{{item.name}}</li>
+{%if item.active%}
+{{item.label}}
+{%elseif item.pending%}
+{{'pending'}}
+{%else%}
+{{'none'}}
+{%endif%}
+{%else%}
+empty
+{%endfor%}
+{%endif%}
+</main>
+

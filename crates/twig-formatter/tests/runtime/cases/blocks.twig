@@ -1,0 +1,12 @@
+{%set a=[1,2,3]%}{%for x in a%}{{x*2}}-{{loop.index}};{%endfor%}
+{%set a,b=1,2%}{{ a+b }}
+{%set captured%}
+  {{x}}
+{%endset%}[{{captured}}]
+{%if flag%}X{%elseif y%}Y{%else%}Z{%endif%}
+{%for value in list%}{{value}}{%else%}empty{%endfor%}
+X{%apply trim%}
+  {{x}} 
+{%endapply%}Y
+{%with {inner: x} only%}{{inner}}{%endwith%}
+{%autoescape 'html'%}{{'<x>'}}{%endautoescape%}

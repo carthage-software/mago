@@ -1,0 +1,6 @@
+target/
+artifacts/
+coverage/
+Cargo.lock
+corpus/*/*
+!corpus/*/.gitkeep

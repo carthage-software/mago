@@ -107,6 +107,7 @@ use crate::config::guard::GuardConfiguration;
 use crate::config::linter::LinterConfiguration;
 use crate::config::parser::ParserConfiguration;
 use crate::config::source::SourceConfiguration;
+use crate::config::twig::TwigConfiguration;
 use crate::consts::*;
 use crate::error::Error;
 use crate::version_check::VersionDriftFailLevel;
@@ -118,6 +119,8 @@ pub mod guard;
 pub mod linter;
 pub mod parser;
 pub mod source;
+pub mod twig;
+pub mod twig_formatter;
 
 /// Default value for threads configuration field.
 fn default_threads() -> usize {
@@ -319,6 +322,10 @@ pub struct Configuration {
     /// if not specified in the config file.
     #[serde(default)]
     pub formatter: FormatterConfiguration,
+
+    /// Settings for the standalone Twig commands.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub twig: Option<TwigConfiguration>,
 
     /// Type analyzer service configuration.
     ///
@@ -631,6 +638,7 @@ impl Configuration {
             linter: LinterConfiguration::default(),
             parser: ParserConfiguration::default(),
             formatter: FormatterConfiguration::default(),
+            twig: None,
             analyzer: AnalyzerConfiguration::default(),
             guard: GuardConfiguration::default(),
             editor_url: None,
@@ -647,7 +655,7 @@ impl Configuration {
     /// so that only applicable rules are shown in the output.
     #[must_use]
     pub fn to_filtered_value(&self) -> Value {
-        serde_json::json!({
+        let mut value = serde_json::json!({
             "version": self.version,
             "threads": self.threads,
             "stack-size": self.stack_size,
@@ -662,7 +670,13 @@ impl Configuration {
             "formatter": self.formatter.to_value(),
             "analyzer": self.analyzer,
             "guard": self.guard,
-        })
+        });
+
+        if let Some(twig) = &self.twig {
+            value["twig"] = serde_json::json!(twig);
+        }
+
+        value
     }
 
     /// Normalizes and validates configuration values.

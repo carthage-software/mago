@@ -1,6 +1,6 @@
 //! File listing command implementation.
 //!
-//! This module implements the `mago list-files` command, which displays all PHP files
+//! This module implements the `mago list-files` command, which displays source files
 //! that would be processed by Mago based on the current configuration. This is a
 //! diagnostic tool useful for verifying path configurations and exclusion patterns.
 //!
@@ -68,7 +68,7 @@ pub struct ListFilesCommand {
     /// If given, the exclude rules for that command are taken into
     /// consideration. Otherwise, only the `sources` configuration is used.
     ///
-    /// Available commands: linter, formatter, analyzer.
+    /// Available commands: linter, formatter, analyzer, guard.
     #[arg(long, value_enum)]
     command: Option<Command>,
 
@@ -84,7 +84,7 @@ impl ListFilesCommand {
     /// Executes the file listing command.
     ///
     /// This method scans the workspace according to the configuration and prints
-    /// all discovered PHP files to stdout. The output format depends on the
+    /// all found source files to stdout. The output format depends on the
     /// `--zero-terminate` flag.
     ///
     /// # Process

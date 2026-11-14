@@ -1,0 +1,22 @@
+{%block starts with%}
+{%block ends with%}
+{%block has some%}
+{%guard test starts with%}{{ value }}{% endguard %}
+{{value is starts with}}
+{{value is ends with}}
+{{value is has some}}
+{{value is has every}}
+{{value is not}}
+{{b-and}}
+{{b-or}}
+{{b-xor}}
+{{obj.b-and}}
+{{ value|default('ok') }}
+{%include starts with''|default({value:1})only%}
+{%include ends with''|default({value:2})only%}
+{%include ''~starts with''|default({value:3})only%}
+{% include weekends with ''|default({value: 5}) only %}
+{%embed starts with''|default({value:4})%}{% block content %}{{ value }}{% endblock %}{% endembed %}
+{{value is foo has some}}
+{{value is foo starts with}}
+{{value is foo ends with}}

@@ -27,7 +27,6 @@ use mago_database::file::FileId;
 use mago_database::file::HasFileId;
 use mago_span::Position;
 use mago_syntax_core::input::Input;
-use mago_syntax_core::part_of_identifier;
 
 use crate::error::SyntaxError;
 use crate::lexer::internal::consts::BYTE_CLASS;
@@ -42,6 +41,7 @@ use crate::lexer::internal::stack::Bracket;
 use crate::lexer::internal::stack::BracketStack;
 use crate::lexer::internal::stack::ModeStack;
 use crate::lexer::internal::utils::closer_kind;
+use crate::lexer::internal::utils::follows_word_operator;
 use crate::lexer::internal::utils::is_whitespace_byte;
 use crate::lexer::internal::utils::is_word_byte;
 use crate::lexer::internal::utils::matching_closer;
@@ -61,7 +61,6 @@ pub struct TwigLexer<'input> {
     mode_stack: ModeStack,
     brackets: BracketStack,
     eof_emitted: bool,
-    last_significant: Option<u8>,
 }
 
 #[allow(clippy::undocumented_unsafe_blocks)]
@@ -76,7 +75,6 @@ impl<'input> TwigLexer<'input> {
             mode_stack: ModeStack::new(),
             brackets: BracketStack::new(),
             eof_emitted: false,
-            last_significant: None,
         }
     }
 
@@ -134,18 +132,7 @@ impl<'input> TwigLexer<'input> {
             LexerMode::Verbatim(kind, stage) => self.lex_verbatim(kind, stage),
         };
 
-        match result {
-            Ok(tok) => {
-                if !tok.kind.is_trivia()
-                    && !tok.value.is_empty()
-                    && let Some(b) = tok.value.last()
-                {
-                    self.last_significant = Some(*b);
-                }
-                Some(Ok(tok))
-            }
-            Err(err) => Some(Err(err)),
-        }
+        Some(result)
     }
 
     #[inline]
@@ -551,7 +538,7 @@ impl<'input> TwigLexer<'input> {
             }
             ByteClass::Hash => {
                 let bytes = self.input.read_remaining();
-                let end = start + memchr(b'\n', bytes).unwrap_or(bytes.len());
+                let end = start + memchr::memchr2(b'\r', b'\n', bytes).unwrap_or(bytes.len());
                 let slice = self.slice_bytes(start, end);
                 self.jump_forward_to(end);
                 Ok(TwigToken::new(TwigTokenKind::InlineComment, slice, self.position_at(start)))
@@ -607,8 +594,14 @@ impl<'input> TwigLexer<'input> {
             }
             if p < total && at(p).is_ascii_digit() {
                 end = p + 1;
-                while end < total && at(end).is_ascii_digit() {
-                    end += 1;
+                while end < total {
+                    if at(end).is_ascii_digit() {
+                        end += 1;
+                    } else if at(end) == b'_' && end + 1 < total && at(end + 1).is_ascii_digit() {
+                        end += 2;
+                    } else {
+                        break;
+                    }
                 }
             }
         }
@@ -772,9 +765,12 @@ impl<'input> TwigLexer<'input> {
         while end < total && IDENT_PART[unsafe { *bytes.get_unchecked(end) } as usize] {
             end += 1;
         }
-        // Recognise `b-and` / `b-or` / `b-xor` as single operator tokens when
-        // `b` is followed by `-and` / `-or` / `-xor` on a word boundary.
-        if end == start + 1 && self.byte_at(start) == b'b' && self.byte_opt(end) == Some(b'-') {
+        let may_be_word_op = !(start > 0 && matches!(self.byte_at(start - 1), b'.' | b'|')
+            || start > 1
+                && is_whitespace_byte(self.byte_at(start - 1))
+                && matches!(self.byte_at(start - 2), b'.' | b'|'));
+
+        if may_be_word_op && end == start + 1 && self.byte_at(start) == b'b' && self.byte_opt(end) == Some(b'-') {
             for (suffix, kind) in [
                 (b"-and".as_slice(), TwigTokenKind::BAnd),
                 (b"-or".as_slice(), TwigTokenKind::BOr),
@@ -782,7 +778,7 @@ impl<'input> TwigLexer<'input> {
             ] {
                 if end + suffix.len() <= total && self.slice_bytes(end, end + suffix.len()) == suffix {
                     let after = end + suffix.len();
-                    if after >= total || !matches!(self.byte_at(after), part_of_identifier!()) {
+                    if self.byte_opt(after).is_some_and(follows_word_operator) {
                         let slice = self.slice_bytes(start, after);
                         self.jump_forward_to(after);
                         return Ok(TwigToken::new(kind, slice, self.position_at(start)));
@@ -793,10 +789,6 @@ impl<'input> TwigLexer<'input> {
 
         let name = self.slice_bytes(start, end);
 
-        // Context: if the previous significant byte was `.` or `|`, the word
-        // is NOT a word operator regardless of its spelling.
-        let may_be_word_op = !matches!(self.last_significant, Some(b'.') | Some(b'|'));
-
         if may_be_word_op
             && let Some(conts) = continuation_words_for(name)
             && let Some((new_end, collapsed, kind)) = self.try_extend_word_multi(start, end, conts)
@@ -805,7 +797,10 @@ impl<'input> TwigLexer<'input> {
             return Ok(TwigToken::new(kind, collapsed, self.position_at(start)));
         }
 
-        if may_be_word_op && let Some(kind) = single_word_operator_kind(name) {
+        if may_be_word_op
+            && self.byte_opt(end).is_some_and(follows_word_operator)
+            && let Some(kind) = single_word_operator_kind(name)
+        {
             self.jump_forward_to(end);
             return Ok(TwigToken::new(kind, name, self.position_at(start)));
         }
@@ -856,7 +851,7 @@ impl<'input> TwigLexer<'input> {
         }
 
         let after_word = i + word.len();
-        if after_word < total && matches!(self.byte_at(after_word), part_of_identifier!()) {
+        if !self.byte_opt(after_word).is_some_and(follows_word_operator) {
             return None;
         }
 
@@ -874,6 +869,17 @@ impl<'input> TwigLexer<'input> {
         }
         if let Some((kind, len)) = two_byte_operator(b0, b1) {
             return self.emit_fixed(start, len, kind);
+        }
+
+        if b0 == b'?' && b1.is_some_and(is_whitespace_byte) {
+            let mut end = start + 1;
+            while self.byte_opt(end).is_some_and(is_whitespace_byte) {
+                end += 1;
+            }
+
+            if self.byte_opt(end) == Some(b':') {
+                return self.emit_fixed(start, end + 1 - start, TwigTokenKind::QuestionColon);
+            }
         }
 
         if let Some(kind) = opener_kind(b0) {

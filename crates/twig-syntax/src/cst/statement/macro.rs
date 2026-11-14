@@ -11,6 +11,7 @@ use crate::cst::statement::Statement;
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct MacroArgument<'arena> {
+    pub ellipsis: Option<Span>,
     pub name: Identifier<'arena>,
     pub equal: Option<Span>,
     pub default: Option<Expression<'arena>>,
@@ -19,7 +20,7 @@ pub struct MacroArgument<'arena> {
 impl HasSpan for MacroArgument<'_> {
     fn span(&self) -> Span {
         let end = self.default.as_ref().map(HasSpan::span).unwrap_or(self.name.span);
-        self.name.span.join(end)
+        self.ellipsis.unwrap_or(self.name.span).join(end)
     }
 }
 

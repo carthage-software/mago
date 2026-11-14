@@ -17,14 +17,7 @@ where
         operand: Expression<'arena>,
         is_keyword: crate::cst::Keyword<'arena>,
     ) -> Result<Expression<'arena>, ParseError<'arena>> {
-        let mut not_keyword = None;
-        if let Some(token) = self.stream.lookahead(0)?
-            && matches!(token.kind, TwigTokenKind::Not | TwigTokenKind::Name)
-            && token.value == b"not"
-        {
-            let not_tok = self.stream.consume()?;
-            not_keyword = Some(self.keyword_from(&not_tok));
-        }
+        let not_keyword = self.stream.try_consume(TwigTokenKind::Not)?.map(|token| self.keyword_from(&token));
 
         let name = self.expect_flexible_identifier(b"expected test name")?;
 

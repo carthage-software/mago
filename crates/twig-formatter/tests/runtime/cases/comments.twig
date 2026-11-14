@@ -1,0 +1,17 @@
+left{# comment #}right
+{{ f( # input
+ value='a  b', n=-2) }}
+{{ [ 1, # first
+ 2,3 ][1] }}
+{{ (a ? # truthy
+ b : c) }}
+{{ (a ?? # default
+ b)|upper }}
+{{ obj[ a ? # choose
+ 'a' : 'b' ] }}
+{{ list[ # slice
+ 1:2 ]|join(',') }}
+{{ - # negative
+ 2 }}
+{% if ( # check
+ a) %}true{%endif%}

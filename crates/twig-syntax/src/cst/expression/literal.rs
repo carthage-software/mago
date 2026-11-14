@@ -48,6 +48,13 @@ pub struct InterpolatedString<'arena> {
     pub close_quote: Span,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+pub struct StringConcatenation<'arena> {
+    pub lhs: &'arena Expression<'arena>,
+    pub rhs: &'arena Expression<'arena>,
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Bool {
@@ -97,6 +104,12 @@ impl HasSpan for StringPart<'_> {
 impl HasSpan for InterpolatedString<'_> {
     fn span(&self) -> Span {
         self.open_quote.join(self.close_quote)
+    }
+}
+
+impl HasSpan for StringConcatenation<'_> {
+    fn span(&self) -> Span {
+        self.lhs.span().join(self.rhs.span())
     }
 }
 

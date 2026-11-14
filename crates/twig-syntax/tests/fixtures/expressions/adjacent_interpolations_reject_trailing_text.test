@@ -1,0 +1,6 @@
+--TEST--
+Adjacent literals cannot follow an interpolated string that ends with text.
+--TEMPLATE--
+{{ "#{a}x" 'b' }}
+--EXCEPTION--
+Twig\Error\SyntaxError: Unexpected token "string" of value "b" ("end of print statement" expected) in "index.twig" at line 2 column 12.

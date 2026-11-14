@@ -17,6 +17,8 @@ use-tabs = true
 
 ## Presets
 
+PHP settings and presets do not apply to Twig. Use [`[twig.formatter]`](/tools/formatter/twig/#configuration) to configure or disable Twig formatting.
+
 A preset is a complete bundle of formatter options tuned for a specific coding standard.
 
 ```toml

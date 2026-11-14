@@ -50,6 +50,11 @@ test:
 test-sdk:
     vendor/bin/phpunit --configuration composer/phpunit.xml
 
+# Check formatted templates with the Twig runtime.
+test-twig-runtime:
+    cargo build --bin mago --locked
+    php crates/twig-formatter/tests/runtime.php
+
 # Fuzz the PHP lexer. Seeds are drawn from the syntax/analyzer/formatter PHP fixtures.
 fuzz-php-lexer:
     cd crates/syntax/fuzz && cargo +nightly fuzz run lexer \
@@ -74,6 +79,10 @@ fuzz-twig-lexer:
 fuzz-twig-parser:
     cd crates/twig-syntax/fuzz && cargo +nightly fuzz run parser corpus/parser seeds/parser
 
+# Fuzz Twig formatting and idempotence.
+fuzz-twig-formatter:
+    cd crates/twig-formatter/fuzz && cargo +nightly fuzz run formatter corpus/formatter ../tests/cases
+
 # Publishes all crates to crates.io in the correct order.
 publish $CARGO_RESOLVER_INCOMPATIBLE_PUBLISH_AGE="allow":
     # Note: the order of publishing is important, as some crates depend on others.
@@ -95,7 +104,9 @@ publish $CARGO_RESOLVER_INCOMPATIBLE_PUBLISH_AGE="allow":
     cargo publish -p mago-hir
     cargo publish -p mago-collector
     cargo publish -p mago-composer
+    cargo publish -p mago-formatter-core
     cargo publish -p mago-formatter
+    cargo publish -p mago-twig-formatter
     cargo publish -p mago-names
     cargo publish -p mago-semantics
     cargo publish -p mago-fingerprint

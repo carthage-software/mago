@@ -6,7 +6,7 @@ nav_section = "Tools"
 +++
 # Tools
 
-Mago is one binary that bundles four tools. They share configuration, parser, and runtime, so you can use any combination without paying for tools you do not run.
+Mago ships several tools in one binary. Each command chooses its parser and rules. Tools share file settings and reports.
 
 ## [Formatter](/tools/formatter/overview/)
 
@@ -23,3 +23,7 @@ A static analysis engine that catches type errors and logic bugs before runtime.
 ## [Architectural guard](/tools/guard/overview/)
 
 Enforces dependency rules and structural conventions. Useful when you want to forbid certain `use` paths, codify layer boundaries, or assert that code in one part of the project never imports code from another.
+
+## [Twig formatter](/tools/formatter/twig/)
+
+`mago twig:fmt` formats Twig syntax with its own `[twig.formatter]` settings. It keeps template text unchanged and does not rewrite HTML. The PHP formatter and `mago fix` do not run it.

@@ -18,6 +18,7 @@ use mago_twig_syntax::cst::Expression;
 use mago_twig_syntax::cst::Statement;
 use mago_twig_syntax::cst::UnaryOperator;
 
+use crate::common::parse;
 use crate::common::parse_and_roundtrip;
 use crate::common::parse_ok;
 use crate::common::parses;
@@ -72,6 +73,11 @@ fn literal_number_with_underscores() {
 }
 
 #[test]
+fn literal_exponent_with_underscores() {
+    parse_and_roundtrip(include_str!("fixtures/expressions/exponent_underscores.twig"));
+}
+
+#[test]
 fn literal_single_quoted_string() {
     parses(r#"{{ 'hello' }}"#);
 }
@@ -101,13 +107,41 @@ fn literal_name() {
 }
 
 #[test]
-fn adjacent_strings_are_concatenated() {
+fn adjacent_strings_are_rejected() {
     let arena = LocalArena::new();
-    let e = print_expr(&arena, r#"{{ 'a' 'b' }}"#);
-    match e {
-        Expression::Binary(b) => assert!(matches!(b.operator, BinaryOperator::StringConcat(_))),
-        _ => panic!("expected implicit concat, got {e:?}"),
-    }
+    assert!(parse(&arena, r#"{{ 'a' 'b' }}"#).has_errors());
+}
+
+#[test]
+fn adjacent_interpolations_are_joined() {
+    let source = include_str!("fixtures/expressions/adjacent_interpolations.twig");
+    parse_and_roundtrip(source);
+    let arena = LocalArena::new();
+    assert!(
+        matches!(print_expr(&arena, source), Expression::Filter(filter)
+            if matches!(filter.operand, Expression::StringConcatenation(_))),
+        "The filter must apply to the full string concatenation"
+    );
+}
+
+#[test]
+fn compound_operator_boundaries() {
+    parse_and_roundtrip(include_str!("fixtures/expressions/compound_operator_boundaries.twig"));
+}
+
+#[test]
+fn spaced_elvis_has_separate_punctuation_spans() {
+    let source = include_str!("fixtures/expressions/spaced_elvis.twig");
+    parse_and_roundtrip(source);
+    let arena = LocalArena::new();
+    let Expression::Conditional(conditional) = print_expr(&arena, source) else {
+        panic!("Expected a conditional expression");
+    };
+
+    let question = conditional.question_mark;
+    let colon = conditional.colon.unwrap();
+    assert_eq!(&source.as_bytes()[question.start.offset as usize..question.end.offset as usize], b"?");
+    assert_eq!(&source.as_bytes()[colon.start.offset as usize..colon.end.offset as usize], b":");
 }
 
 #[test]

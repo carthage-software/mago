@@ -1,0 +1,9 @@
+{%types {name:'string',count?:'int'}%}
+{%types name : 'string', count?: 'int',%}
+{%types {name:'string', # keep
+count?:'int'}%}
+{%guard test same as%}
+{{value is same as(3)}}
+{%else%}
+{{'fallback'}}
+{%endguard%}

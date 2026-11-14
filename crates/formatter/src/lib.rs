@@ -15,6 +15,7 @@ use std::borrow::Cow;
 use mago_allocator::Arena;
 
 use mago_database::file::File;
+use mago_formatter_core::printer::Printer;
 use mago_php_version::PHPVersion;
 use mago_syntax::cst::Program;
 use mago_syntax::cst::TriviaSequenceExt;
@@ -25,10 +26,9 @@ use mago_syntax::settings::ParserSettings;
 use crate::document::Document;
 use crate::internal::FormatterState;
 use crate::internal::format::Format;
-use crate::internal::printer::Printer;
 use crate::settings::FormatSettings;
 
-pub mod document;
+pub use mago_formatter_core::document;
 pub mod presets;
 mod range;
 pub mod settings;
@@ -158,7 +158,7 @@ where
     ///
     /// A formatted string representation of the document.
     pub fn print(&self, document: Document<'arena, A>, capacity_hint: Option<usize>) -> &'arena [u8] {
-        Printer::new(self.arena, document, capacity_hint.unwrap_or(0), self.settings).build()
+        Printer::new(self.arena, self.settings.into()).build(document, capacity_hint.unwrap_or(0))
     }
 }
 

@@ -59,6 +59,8 @@ use crate::service::format::FormatService;
 use crate::service::guard::GuardService;
 use crate::service::incremental_analysis::IncrementalAnalysisService;
 use crate::service::lint::LintService;
+use crate::service::twig_format::TwigFormatService;
+use mago_twig_formatter::settings::FormatSettings as TwigFormatSettings;
 
 pub use config::OrchestratorConfiguration;
 pub use error::OrchestratorError;
@@ -167,9 +169,16 @@ impl<'cfg> Orchestrator<'cfg> {
         self.context_paths.extend(old_paths);
     }
 
+    /// Adds a source extension for the current command.
+    pub fn add_source_extension(&mut self, extension: &'cfg str) {
+        if !self.config.extensions.contains(&extension) {
+            self.config.extensions.push(extension);
+        }
+    }
+
     /// Loads the database by scanning the file system according to the configuration.
     ///
-    /// This method scans the workspace directory and builds a database of all PHP files
+    /// This method scans the workspace directory and builds a database of source files
     /// according to the configured paths, includes, excludes, and extensions. The database
     /// provides fast access to file contents and metadata for all tools.
     ///
@@ -417,6 +426,11 @@ impl<'cfg> Orchestrator<'cfg> {
         )
     }
 
+    #[must_use]
+    pub fn get_twig_format_service(&self, database: ReadDatabase, settings: TwigFormatSettings) -> TwigFormatService {
+        TwigFormatService::new(database, settings, self.config.use_progress_bars)
+    }
+
     /// Formats a single file according to the configured style settings.
     ///
     /// This is a convenience method for formatting an individual file without requiring
@@ -430,8 +444,8 @@ impl<'cfg> Orchestrator<'cfg> {
     /// # Returns
     ///
     /// - `Ok(FileFormatStatus::Unchanged)` if the file is already properly formatted
-    /// - `Ok(FileFormatStatus::Changed(String))` if the file was formatted, containing the new content
-    /// - `Ok(FileFormatStatus::FailedToParse(ParseError))` if the file couldn't be parsed
+    /// - `Ok(FileFormatStatus::Changed(Vec<u8>))` if the file was formatted, containing the new content
+    /// - `Ok(FileFormatStatus::FailedToParse(FormatParseError))` if the file couldn't be parsed
     /// - `Err(OrchestratorError)` if formatting failed for other reasons
     ///
     /// # Performance
@@ -464,8 +478,8 @@ impl<'cfg> Orchestrator<'cfg> {
     /// # Returns
     ///
     /// - `Ok(FileFormatStatus::Unchanged)` if the file is already properly formatted
-    /// - `Ok(FileFormatStatus::Changed(String))` if the file was formatted, containing the new content
-    /// - `Ok(FileFormatStatus::FailedToParse(ParseError))` if the file couldn't be parsed
+    /// - `Ok(FileFormatStatus::Changed(Vec<u8>))` if the file was formatted, containing the new content
+    /// - `Ok(FileFormatStatus::FailedToParse(FormatParseError))` if the file couldn't be parsed
     /// - `Err(OrchestratorError)` if formatting failed for other reasons
     ///
     /// # Performance

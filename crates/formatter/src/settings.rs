@@ -1,7 +1,11 @@
 use std::ops::Deref;
 
-use crate::presets::FormatterPreset;
 use schemars::JsonSchema;
+
+pub use mago_formatter_core::settings::EndOfLine;
+use mago_formatter_core::settings::PrinterSettings;
+
+use crate::presets::FormatterPreset;
 
 /// Macro to generate both `FormatSettings` and `RawFormatSettings` from a single definition.
 ///
@@ -1317,22 +1321,6 @@ impl Default for SortUses {
     }
 }
 
-/// Specifies the style of line endings.
-#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, JsonSchema)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case"))]
-pub enum EndOfLine {
-    #[default]
-    #[cfg_attr(feature = "serde", serde(alias = "Auto"))]
-    Auto,
-    #[cfg_attr(feature = "serde", serde(alias = "Lf"))]
-    Lf,
-    #[cfg_attr(feature = "serde", serde(alias = "Crlf"))]
-    Crlf,
-    #[cfg_attr(feature = "serde", serde(alias = "Cr"))]
-    Cr,
-}
-
 /// Specifies brace placement style for various constructs.
 ///
 /// - `SameLine`: Opening brace on the same line as the declaration
@@ -1394,14 +1382,13 @@ impl MethodChainBreakingStyle {
     }
 }
 
-impl EndOfLine {
-    #[inline]
-    #[must_use]
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            Self::Crlf => "\r\n",
-            Self::Cr => "\r",
-            Self::Lf | Self::Auto => "\n",
+impl From<FormatSettings> for PrinterSettings {
+    fn from(settings: FormatSettings) -> Self {
+        Self {
+            print_width: settings.print_width,
+            tab_width: settings.tab_width,
+            use_tabs: settings.use_tabs,
+            end_of_line: settings.end_of_line,
         }
     }
 }

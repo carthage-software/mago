@@ -28,7 +28,6 @@ pub mod comment;
 pub mod format;
 pub mod macros;
 pub mod parens;
-pub mod printer;
 pub mod utils;
 
 #[derive(Debug, Clone, Copy, Default)]

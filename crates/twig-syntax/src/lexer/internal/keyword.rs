@@ -13,8 +13,6 @@ pub const MULTI_WORD_OPENERS: &[MultiWordOpener] = &[
     (b"starts", &[(b"with", TwigTokenKind::StartsWith)]),
     (b"ends", &[(b"with", TwigTokenKind::EndsWith)]),
     (b"has", &[(b"some", TwigTokenKind::HasSome), (b"every", TwigTokenKind::HasEvery)]),
-    (b"same", &[(b"as", TwigTokenKind::SameAs)]),
-    (b"divisible", &[(b"by", TwigTokenKind::DivisibleBy)]),
 ];
 
 #[inline]

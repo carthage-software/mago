@@ -1,5 +1,6 @@
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec;
+pub use mago_formatter_core::utils::string_width;
 use mago_syntax::cst::Argument;
 use mago_syntax::cst::ArgumentList;
 use mago_syntax::cst::ClassConstantAccess;
@@ -11,7 +12,6 @@ use mago_syntax::cst::FunctionCall;
 use mago_syntax::cst::Identifier;
 use mago_syntax::cst::StaticMethodCall;
 use mago_syntax::cst::Variable;
-use unicode_width::UnicodeWidthStr;
 
 use mago_syntax::cst::Access;
 use mago_syntax::cst::ArrayElement;
@@ -427,24 +427,4 @@ fn get_composite_string_width(composite_string: &CompositeString<'_>) -> Option<
     }
 
     Some(width)
-}
-
-#[inline]
-pub fn string_width(s: &[u8]) -> usize {
-    if s.iter().all(|&byte| (b' '..=b'~').contains(&byte)) {
-        return s.len();
-    }
-    let line = memchr::memrchr2(b'\r', b'\n', s).map_or(s, |offset| &s[offset + 1..]);
-    if line.iter().all(|&byte| (b' '..=b'~').contains(&byte)) {
-        return line.len();
-    }
-    let line_str = String::from_utf8_lossy(line);
-
-    if line_str.contains("الله") {
-        // The word "الله" is a special case, as it is usually rendered as a single glyph
-        // while being 4 characters wide. This is a hack to handle this case.
-        line_str.replace("الله", "_").width()
-    } else {
-        line_str.width()
-    }
 }

@@ -1,0 +1,3 @@
+{% cache key() tags(tags()) ttl(ttl()) %}{{ value }}{% endcache %}
+{% cache key() ttl(ttl()) tags(tags()) %}{{ value }}{% endcache %}
+{%cache key() ttl(first()) ttl(second())%}{{ value }}{% endcache %}

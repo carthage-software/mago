@@ -10,7 +10,6 @@ use crate::cst::Expression;
 use crate::cst::Name;
 use crate::cst::Null;
 use crate::cst::Number;
-use crate::cst::StringLiteral;
 use crate::cst::Unary;
 use crate::cst::UnaryOperator;
 use crate::error::ParseError;
@@ -36,7 +35,7 @@ where
         min_precedence: u32,
     ) -> Result<Expression<'arena>, ParseError<'arena>> {
         self.state.recursion_depth += 1;
-        if self.state.recursion_depth > crate::parser::MAX_RECURSION_DEPTH {
+        if self.state.recursion_depth > self.recursion_limit {
             self.state.recursion_depth -= 1;
             let position = self.stream.current_position();
             return Err(ParseError::RecursionLimitExceeded(Span::new(self.stream.file_id(), position, position)));
@@ -127,6 +126,13 @@ where
                 let arrow_tok = self.stream.consume()?;
                 let fat_arrow = self.stream.span_of(&arrow_tok);
                 let parameters = self.arrow_parameters_from(&left);
+                if parameters.is_empty() {
+                    return Err(ParseError::UnexpectedToken(
+                        b"arrow function parameters must be simple names",
+                        left.span(),
+                    ));
+                }
+
                 let body = self.parse_expression()?;
                 left = Expression::ArrowFunction(crate::cst::ArrowFunction {
                     left_parenthesis: None,
@@ -181,14 +187,8 @@ where
                     token.value.contains(&b'.') || token.value.contains(&b'e') || token.value.contains(&b'E');
                 Ok(Expression::Number(Number { raw: token.value, is_float, span: self.stream.span_of(&token) }))
             }
-            TwigTokenKind::StringSingleQuoted | TwigTokenKind::StringDoubleQuoted => {
-                self.stream.consume()?;
-                let first = Expression::String(StringLiteral { raw: token.value, span: self.stream.span_of(&token) });
-                self.maybe_extend_string(first)
-            }
-            TwigTokenKind::DoubleQuoteStart => {
-                let expression = self.parse_interpolated_string()?;
-                self.maybe_extend_string(expression)
+            TwigTokenKind::StringSingleQuoted | TwigTokenKind::StringDoubleQuoted | TwigTokenKind::DoubleQuoteStart => {
+                self.parse_string_expression()
             }
             TwigTokenKind::Name => {
                 self.stream.consume()?;
@@ -215,37 +215,6 @@ where
                 self.stream.span_of(&token),
             )),
         }
-    }
-
-    /// Implicit string concatenation: `'a' 'b'` and `'a' "b"` become a
-    /// `StringConcat` binary operation.
-    fn maybe_extend_string(&mut self, first: Expression<'arena>) -> Result<Expression<'arena>, ParseError<'arena>> {
-        let mut left = first;
-        while let Some(token) = self.stream.lookahead(0)? {
-            match token.kind {
-                TwigTokenKind::StringSingleQuoted | TwigTokenKind::StringDoubleQuoted => {
-                    self.stream.consume()?;
-                    let rhs = Expression::String(StringLiteral { raw: token.value, span: self.stream.span_of(&token) });
-                    let concat_span = self.stream.span_of(&token);
-                    left = Expression::Binary(Binary {
-                        operator: BinaryOperator::StringConcat(concat_span),
-                        lhs: self.alloc(left),
-                        rhs: self.alloc(rhs),
-                    });
-                }
-                TwigTokenKind::DoubleQuoteStart => {
-                    let rhs = self.parse_interpolated_string()?;
-                    let concat_span = rhs.span();
-                    left = Expression::Binary(Binary {
-                        operator: BinaryOperator::StringConcat(concat_span),
-                        lhs: self.alloc(left),
-                        rhs: self.alloc(rhs),
-                    });
-                }
-                _ => break,
-            }
-        }
-        Ok(left)
     }
 }
 

@@ -81,6 +81,11 @@ jobs:
         if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
         run: cargo test -p mago-codex --features property-tests --locked
 
+      - name: Test Twig rendering
+        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
+        timeout-minutes: 5
+        run: just test-twig-runtime
+
       - name: cargo build
         if: matrix.rust == 'stable'
         run: cargo build --release --locked

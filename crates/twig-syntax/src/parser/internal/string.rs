@@ -2,6 +2,8 @@ use crate::cst::Expression;
 use crate::cst::InterpolatedLiteral;
 use crate::cst::InterpolatedString;
 use crate::cst::Interpolation;
+use crate::cst::StringConcatenation;
+use crate::cst::StringLiteral;
 use crate::cst::StringPart;
 use crate::error::ParseError;
 use crate::parser::Parser;
@@ -12,6 +14,42 @@ impl<'arena, A> Parser<'_, 'arena, A>
 where
     A: Arena,
 {
+    pub(crate) fn parse_string_expression(&mut self) -> Result<Expression<'arena>, ParseError<'arena>> {
+        let mut left = self.parse_string_atom()?;
+        let mut next_can_be_string = ends_with_interpolation(&left);
+        while let Some(token) = self.stream.lookahead(0)? {
+            match token.kind {
+                TwigTokenKind::StringSingleQuoted | TwigTokenKind::StringDoubleQuoted if next_can_be_string => {}
+                TwigTokenKind::DoubleQuoteStart => {}
+                _ => break,
+            }
+
+            let right = self.parse_string_atom()?;
+            if !next_can_be_string
+                && !matches!(&right, Expression::InterpolatedString(string)
+                    if matches!(string.parts.first(), Some(StringPart::Interpolation(_))))
+            {
+                return Err(ParseError::UnexpectedToken(b"unexpected adjacent string", self.stream.span_of(&token)));
+            }
+
+            next_can_be_string = ends_with_interpolation(&right);
+            left =
+                Expression::StringConcatenation(StringConcatenation { lhs: self.alloc(left), rhs: self.alloc(right) });
+        }
+
+        Ok(left)
+    }
+
+    fn parse_string_atom(&mut self) -> Result<Expression<'arena>, ParseError<'arena>> {
+        let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
+        if token.kind == TwigTokenKind::DoubleQuoteStart {
+            return self.parse_interpolated_string();
+        }
+
+        self.stream.consume()?;
+        Ok(Expression::String(StringLiteral { raw: token.value, span: self.stream.span_of(&token) }))
+    }
+
     /// Parse an interpolated double-quoted string, producing a sequence of
     /// literal chunks and `#{ ... }` interpolations.
     pub(crate) fn parse_interpolated_string(&mut self) -> Result<Expression<'arena>, ParseError<'arena>> {
@@ -64,4 +102,9 @@ where
             }
         }
     }
+}
+
+fn ends_with_interpolation(expression: &Expression<'_>) -> bool {
+    matches!(expression, Expression::InterpolatedString(string)
+        if matches!(string.parts.last(), Some(StringPart::Interpolation(_))))
 }

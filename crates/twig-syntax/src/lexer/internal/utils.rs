@@ -19,6 +19,11 @@ pub(crate) fn is_whitespace_byte(b: u8) -> bool {
     matches!(b, b' ' | b'\t' | b'\r' | b'\n' | 0x0B | 0x0C)
 }
 
+#[inline]
+pub(crate) fn follows_word_operator(byte: u8) -> bool {
+    is_whitespace_byte(byte) || matches!(byte, b'(' | b')' | b'[' | b'{')
+}
+
 /// Whether `b` may continue an identifier (alphanumeric, `_`, or non-ASCII).
 #[inline]
 pub(crate) fn is_word_byte(b: u8) -> bool {

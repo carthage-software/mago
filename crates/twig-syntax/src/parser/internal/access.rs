@@ -9,6 +9,7 @@ use crate::cst::Identifier;
 use crate::cst::MethodCall;
 use crate::cst::Name;
 use crate::cst::Number;
+use crate::cst::Parenthesized;
 use crate::cst::Slice;
 use crate::error::ParseError;
 use crate::parser::Parser;
@@ -38,10 +39,17 @@ where
 
         let (attribute, method): (Expression<'arena>, Option<Identifier<'arena>>) = match token.kind {
             TwigTokenKind::LeftParen => {
-                self.stream.consume()?;
+                let left = self.stream.consume()?;
                 let inner = self.parse_expression()?;
-                self.stream.expect_kind(TwigTokenKind::RightParen, b"expected `)`")?;
-                (inner, None)
+                let right = self.stream.expect_kind(TwigTokenKind::RightParen, b"expected `)`")?;
+                (
+                    Expression::Parenthesized(Parenthesized {
+                        left_parenthesis: self.stream.span_of(&left),
+                        inner: self.alloc(inner),
+                        right_parenthesis: self.stream.span_of(&right),
+                    }),
+                    None,
+                )
             }
             TwigTokenKind::Name => {
                 self.stream.consume()?;

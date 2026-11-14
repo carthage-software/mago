@@ -1,0 +1,13 @@
+{% if show %}
+{{ value|default('guest') }}
+{% endif %}
+{{
+  [
+    'first-long-value',
+    'second-long-value',
+    'third-long-value',
+    'fourth-long-value',
+    'fifth-long-value',
+    'sixth-long-value'
+  ]|join(',')
+}}
