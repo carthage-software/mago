@@ -3266,6 +3266,7 @@ test_case!(array_literal_spread_keeps_optional_and_generic_items);
 test_case!(nullsafe_truthiness_narrows_plain_property);
 test_case!(instanceof_generic_descendant_takes_ancestor_arguments);
 test_case!(string_callable_with_too_many_required_parameters);
+test_case!(shape_intersected_with_array_is_open_shape);
 
 #[test]
 #[cfg_attr(miri, ignore)]

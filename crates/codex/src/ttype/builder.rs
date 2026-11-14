@@ -662,6 +662,11 @@ fn intersect_unions(left: TUnion, right: TUnion, ttype: &Type<'_>) -> Result<TUn
                 continue;
             }
 
+            if let Some(open_shape) = open_shape_from_intersection(&left_type, right_type) {
+                intersection_types.push(open_shape);
+                continue;
+            }
+
             let (mut intersection, intersected_type) = if left_type.can_be_intersected() {
                 if !right_type.can_be_intersected()
                     && let Some(deferred) = create_deferred_intersection(right_type.clone())
@@ -701,6 +706,29 @@ fn intersect_unions(left: TUnion, right: TUnion, ttype: &Type<'_>) -> Result<TUn
     }
 
     Ok(TUnion::from_vec(intersection_types))
+}
+
+/// `array{a: T}&array<K, V>` is the older spelling of the open shape `array{a: T, ...<K, V>}`.
+fn open_shape_from_intersection(left: &TAtomic, right: &TAtomic) -> Option<TAtomic> {
+    let (TAtomic::Array(TArray::Keyed(left)), TAtomic::Array(TArray::Keyed(right))) = (left, right) else {
+        return None;
+    };
+
+    let (shape, generic) = match (left.known_items.is_some(), right.known_items.is_some()) {
+        (true, false) => (left, right),
+        (false, true) => (right, left),
+        _ => return None,
+    };
+
+    if shape.parameters.is_some() {
+        return None;
+    }
+
+    let mut open_shape = shape.clone();
+    open_shape.parameters = Some(generic.parameters.clone()?);
+    open_shape.non_empty |= generic.non_empty;
+
+    Some(TAtomic::Array(TArray::Keyed(open_shape)))
 }
 
 fn create_deferred_intersection(atomic: TAtomic) -> Option<TAtomic> {
