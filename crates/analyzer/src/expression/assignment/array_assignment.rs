@@ -485,9 +485,39 @@ where
             Rc::clone(key_type)
         };
 
+        let breaks_list = key_type.types.iter().all(|key| match key {
+            TAtomic::Scalar(TScalar::String(_) | TScalar::ClassLikeString(_)) => true,
+            TAtomic::Scalar(TScalar::Integer(integer)) => integer.get_bounds().1.is_some_and(|max| max < 0),
+            _ => false,
+        });
+
         for original_type in root_type.types.as_ref() {
             match original_type {
                 TAtomic::Array(array_type) => match array_type {
+                    TArray::List(list) if breaks_list => {
+                        let known_items = list.known_elements.as_deref().map(|known_elements| {
+                            known_elements
+                                .iter()
+                                .map(|(index, entry)| (ArrayKey::Integer(*index as i64), entry.clone()))
+                                .collect::<BTreeMap<_, _>>()
+                                .into()
+                        });
+
+                        collection_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
+                            parameters: Some((
+                                Arc::new(add_union_type(
+                                    get_non_negative_int(),
+                                    &key_type,
+                                    context.codebase,
+                                    CombinerOptions::default(),
+                                )),
+                                Arc::new(value_type.clone()),
+                            )),
+                            known_items,
+                            non_empty: true,
+                            known_non_list: true,
+                        })));
+                    }
                     TArray::List(list) => {
                         collection_types.push(TAtomic::Array(TArray::List(TList {
                             element_type: Arc::new(value_type.clone()),
