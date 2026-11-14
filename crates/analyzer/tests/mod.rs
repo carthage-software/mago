@@ -3191,6 +3191,7 @@ test_case!(switch_true_case_ruled_out_by_earlier_case);
 test_case!(static_return_on_other_receiver_is_not_this_static);
 test_case!(constant_initialized_with_new);
 test_case!(unpack_template_bounded_by_iterable);
+test_case!(class_against_object_shape_property_types);
 
 #[test]
 #[cfg_attr(miri, ignore)]

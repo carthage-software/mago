@@ -381,17 +381,18 @@ pub fn is_contained_by(
                         .and_then(|declaring_metadata| declaring_metadata.properties.get(&property_name));
 
                     // Structural containment is an external view: a publicly readable real
-                    // property governs; otherwise a magic `@property*` tag documents the
-                    // `__get` interface and applies instead.  A non-public real property
-                    // without a tag is still accepted, as it always was here.
+                    // property governs; otherwise a magic `@property*` tag applies, when the
+                    // class has a `__get` to serve it.
                     let declared_property = match real_property {
                         Some(real) if real.read_visibility.is_public() => Some(real),
-                        real => class_like_metadata
-                            .magic_property_ids
-                            .get(&property_name)
-                            .and_then(|tag_class| codebase.get_class_like_by_name(*tag_class))
-                            .and_then(|tag_metadata| tag_metadata.magic_properties.get(&property_name))
-                            .or(real),
+                        _ if class_like_metadata.declaring_method_ids.contains_key(&word("__get")) => {
+                            class_like_metadata
+                                .magic_property_ids
+                                .get(&property_name)
+                                .and_then(|tag_class| codebase.get_class_like_by_name(*tag_class))
+                                .and_then(|tag_metadata| tag_metadata.magic_properties.get(&property_name))
+                        }
+                        _ => None,
                     };
 
                     let Some(declared_property) = declared_property else {
@@ -405,8 +406,8 @@ pub fn is_contained_by(
                         Some(property_type_metadata) => {
                             if !union_comparator::is_contained_by(
                                 codebase,
-                                container_property_type,
                                 &property_type_metadata.type_union,
+                                container_property_type,
                                 false,
                                 false,
                                 inside_assertion,
