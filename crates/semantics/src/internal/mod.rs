@@ -12,6 +12,7 @@ use mago_syntax::cst::Constant;
 use mago_syntax::cst::Declare;
 use mago_syntax::cst::Enum;
 use mago_syntax::cst::Expression;
+use mago_syntax::cst::For;
 use mago_syntax::cst::Function;
 use mago_syntax::cst::FunctionLikeParameterList;
 use mago_syntax::cst::FunctionLikeReturnTypeHint;
@@ -47,6 +48,21 @@ impl<'ast, 'arena> Walker<'ast, 'arena, Context<'_, 'ast, 'arena>> for CheckingW
     #[inline]
     fn walk_in_statement(&self, statement: &'ast Statement<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
         context.ancestors.push(statement.span());
+
+        if let Statement::Expression(expression_statement) = statement
+            && checker::expression::is_void_cast(expression_statement.expression)
+        {
+            context.statement_void_casts.push(expression_statement.expression.span());
+        }
+    }
+
+    #[inline]
+    fn walk_in_for(&self, r#for: &'ast For<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
+        for expression in r#for.initializations.iter().chain(r#for.conditions.iter()).chain(r#for.increments.iter()) {
+            if checker::expression::is_void_cast(expression) {
+                context.statement_void_casts.push(expression.span());
+            }
+        }
     }
 
     #[inline]
@@ -54,6 +70,7 @@ impl<'ast, 'arena> Walker<'ast, 'arena, Context<'_, 'ast, 'arena>> for CheckingW
         context.ancestors.push(expression.span());
 
         checker::expression::check_for_clone_with(expression, context);
+        checker::expression::check_void_cast_position(expression, context);
     }
 
     #[inline]

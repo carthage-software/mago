@@ -18,6 +18,7 @@ pub struct Context<'ctx, 'ast, 'arena> {
     pub source_file: &'ctx File,
     pub ancestors: Vec<Span>,
     pub hint_depth: usize,
+    pub statement_void_casts: Vec<Span>,
 
     issues: IssueCollection,
 }
@@ -37,6 +38,7 @@ impl<'ctx, 'ast, 'arena> Context<'ctx, 'ast, 'arena> {
             issues: IssueCollection::default(),
             ancestors: vec![],
             hint_depth: 0,
+            statement_void_casts: vec![],
         }
     }
 

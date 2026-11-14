@@ -8,6 +8,7 @@ use mago_syntax::cst::Call;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::FunctionCall;
 use mago_syntax::cst::Instantiation;
+use mago_syntax::cst::UnaryPrefix;
 use mago_syntax::cst::UnaryPrefixOperator;
 
 use crate::internal::context::Context;
@@ -110,6 +111,30 @@ pub fn check_for_clone_with(expr: &Expression, context: &mut Context<'_, '_, '_>
         ).with_help(
             "Upgrade to PHP 8.5 or above to use cloning with properties.",
         )
+    );
+}
+
+#[inline]
+pub fn is_void_cast(expression: &Expression<'_>) -> bool {
+    matches!(expression, Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::VoidCast(..), .. }))
+}
+
+#[inline]
+pub fn check_void_cast_position(expression: &Expression<'_>, context: &mut Context<'_, '_, '_>) {
+    let Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::VoidCast(span, _), .. }) = expression
+    else {
+        return;
+    };
+
+    if context.statement_void_casts.contains(&expression.span()) {
+        return;
+    }
+
+    context.report(
+        Issue::error("The `void` cast can only be used as a statement.")
+            .with_annotation(Annotation::primary(*span).with_message("Void cast used as a value here."))
+            .with_note("PHP compiles `(void)` only as a statement on its own or as an expression of a `for` loop.")
+            .with_help("Move the `(void)` cast to a statement of its own, or drop it."),
     );
 }
 
