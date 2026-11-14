@@ -5,6 +5,8 @@ class ZipArchive implements Countable
     /** @var non-empty-string */
     public const LIBZIP_VERSION = '1.7.3';
 
+    public const ER_TRUNCATED_ZIP = 35;
+
     public const CREATE = 1;
 
     public const EXCL = 2;

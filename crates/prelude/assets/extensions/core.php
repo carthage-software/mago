@@ -283,6 +283,8 @@ class DivisionByZeroError extends ArithmeticError {}
 #[Mago\AvailableSince(80000)]
 class UnhandledMatchError extends Error {}
 
+class ClosedGeneratorException extends Exception {}
+
 #[Mago\AvailableSince(80400)]
 class RequestParseBodyException extends Exception {}
 

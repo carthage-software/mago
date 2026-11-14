@@ -451,6 +451,9 @@ enum PropertyHookType: string
  */
 class ReflectionProperty implements Reflector
 {
+    #[Mago\AvailableSince(80400)]
+    public function getMangledName(): string {}
+
     public const IS_ABSTRACT = 64;
 
     public const IS_VIRTUAL = 512;
@@ -682,6 +685,21 @@ final class ReflectionReference
 #[Mago\AvailableSince(80500)]
 final class ReflectionConstant implements Reflector
 {
+    #[Mago\AvailableSince(80500)]
+    public function getFileName(): string|false {}
+
+    #[Mago\AvailableSince(80500)]
+    public function getExtension(): ?ReflectionExtension {}
+
+    #[Mago\AvailableSince(80500)]
+    public function getExtensionName(): string|false {}
+
+    /**
+     * @return list<ReflectionAttribute<object>>
+     */
+    #[Mago\AvailableSince(80500)]
+    public function getAttributes(?string $name = null, int $flags = 0): array {}
+
     /**
      * @readonly
      */

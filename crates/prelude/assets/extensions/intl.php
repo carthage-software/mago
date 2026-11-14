@@ -1316,6 +1316,12 @@ function locale_set_default(string $locale): bool {}
  */
 function locale_get_primary_language(string $locale): ?string {}
 
+#[Mago\AvailableSince(80500)]
+function locale_add_likely_subtags(string $locale): string|false {}
+
+#[Mago\AvailableSince(80500)]
+function locale_minimize_subtags(string $locale): string|false {}
+
 /**
  * @pure
  */
@@ -2429,6 +2435,8 @@ const IDNA_ERROR_DOMAIN_NAME_TOO_LONG = 4;
 const IDNA_ERROR_LEADING_HYPHEN = 8;
 
 const IDNA_ERROR_HYPHEN_3_4 = 32;
+
+const IDNA_ERROR_TRAILING_HYPHEN = 16;
 
 const IDNA_ERROR_LEADING_COMBINING_MARK = 64;
 

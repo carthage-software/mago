@@ -344,6 +344,12 @@ namespace {
     function pcntl_setcpuaffinity(?int $process_id = null, array $cpu_ids = []): bool {}
 
     function pcntl_getcpu(): int {}
+
+    #[Mago\AvailableSince(80500)]
+    function pcntl_getqos_class(): Pcntl\QosClass {}
+
+    #[Mago\AvailableSince(80500)]
+    function pcntl_setqos_class(Pcntl\QosClass $qos_class = Pcntl\QosClass::Default): void {}
 }
 
 namespace Pcntl {

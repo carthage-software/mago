@@ -61,6 +61,9 @@ const FILTER_FORCE_ARRAY = 67108864;
 
 const FILTER_NULL_ON_FAILURE = 134217728;
 
+#[Mago\AvailableSince(80500)]
+const FILTER_THROW_ON_FAILURE = 268435456;
+
 const FILTER_VALIDATE_INT = 257;
 
 #[Mago\AvailableSince(80000)]

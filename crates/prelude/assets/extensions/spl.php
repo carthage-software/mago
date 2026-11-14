@@ -618,6 +618,9 @@ class InfiniteIterator extends IteratorIterator
  */
 class RegexIterator extends FilterIterator
 {
+    public ?string $replacement = null;
+
+    const INVERT_MATCH = 2;
     const MATCH = 0;
     const GET_MATCH = 1;
     const ALL_MATCHES = 2;
@@ -794,6 +797,10 @@ class RecursiveTreeIterator extends RecursiveIteratorIterator implements OuterIt
  */
 class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Countable
 {
+    public function __serialize(): array {}
+
+    public function __unserialize(array $data): void {}
+
     const STD_PROP_LIST = 1;
     const ARRAY_AS_PROPS = 2;
 
@@ -950,6 +957,10 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
  */
 class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Countable
 {
+    public function __serialize(): array {}
+
+    public function __unserialize(array $data): void {}
+
     const STD_PROP_LIST = 1;
     const ARRAY_AS_PROPS = 2;
 
@@ -1313,6 +1324,7 @@ class DirectoryIterator extends SplFileInfo implements SeekableIterator
  */
 class FilesystemIterator extends DirectoryIterator implements Iterator
 {
+    const OTHER_MODE_MASK = 28672;
     const CURRENT_AS_PATHNAME = 32;
     const CURRENT_AS_FILEINFO = 0;
     const CURRENT_AS_SELF = 16;
@@ -1665,6 +1677,10 @@ class SplStack extends SplDoublyLinkedList
  */
 abstract class SplHeap implements Iterator, Countable
 {
+    public function __serialize(): array {}
+
+    public function __unserialize(array $data): void {}
+
     /**
      * @return V
      */
@@ -1807,6 +1823,10 @@ class SplMaxHeap extends SplHeap
  */
 class SplPriorityQueue implements Iterator, Countable
 {
+    public function __serialize(): array {}
+
+    public function __unserialize(array $data): void {}
+
     public const EXTR_BOTH = 3;
     public const EXTR_PRIORITY = 2;
     public const EXTR_DATA = 1;

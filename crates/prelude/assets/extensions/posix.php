@@ -189,6 +189,8 @@ const POSIX_RLIMIT_STACK = 3;
 
 const POSIX_RLIMIT_INFINITY = 9223372036854775807;
 
+const POSIX_SC_OPEN_MAX = 5;
+
 #[Mago\AvailableSince(80300)]
 const POSIX_SC_ARG_MAX = 0;
 

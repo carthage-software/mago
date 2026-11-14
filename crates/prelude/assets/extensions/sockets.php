@@ -346,6 +346,18 @@ const SOCKET_EMEDIUMTYPE = 124;
 
 const IPPROTO_IP = 0;
 
+const IPPROTO_ICMP = 1;
+
+const IPPROTO_ICMPV6 = 58;
+
+const IP_DONTFRAG = 28;
+
+const SHUT_RD = 0;
+
+const SHUT_WR = 1;
+
+const SHUT_RDWR = 2;
+
 const IPPROTO_IPV6 = 41;
 
 const SOL_TCP = 6;

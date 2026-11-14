@@ -563,6 +563,10 @@ const IMAGETYPE_COUNT = 20;
 
 const IMAGETYPE_AVIF = 19;
 
+const IMAGETYPE_HEIF = 20;
+
+const IMAGETYPE_SVG = 21;
+
 const DNS_A = 1;
 
 const DNS_CAA = 8192;

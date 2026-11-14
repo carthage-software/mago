@@ -3248,6 +3248,7 @@ test_case!(pseudo_method_does_not_implement_abstract_method);
 test_case!(bare_template_skips_input_matched_by_sibling);
 test_case!(callable_string_literal_must_name_a_callable);
 test_case!(loose_comparison_with_truthy_value_proves_nullsafe_root);
+test_case!(php85_symbols_exist);
 
 #[test]
 #[cfg_attr(miri, ignore)]

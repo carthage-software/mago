@@ -1494,6 +1494,19 @@ namespace Dom {
         /**
          * @readonly
          */
+        public HTMLCollection $children;
+
+        #[\Mago\AvailableSince(80500)]
+        public string $outerHTML;
+
+        public function getElementsByClassName(string $classNames): HTMLCollection {}
+
+        #[\Mago\AvailableSince(80500)]
+        public function insertAdjacentHTML(AdjacentPosition $where, string $string): void {}
+
+        /**
+         * @readonly
+         */
         public ?string $namespaceURI;
 
         /**
@@ -1778,6 +1791,11 @@ namespace Dom {
         /**
          * @readonly
          */
+        public HTMLCollection $children;
+
+        /**
+         * @readonly
+         */
         public ?Element $firstElementChild;
 
         /**
@@ -1838,6 +1856,13 @@ namespace Dom {
 
     abstract class Document extends Node implements ParentNode
     {
+        /**
+         * @readonly
+         */
+        public HTMLCollection $children;
+
+        public function getElementsByClassName(string $classNames): HTMLCollection {}
+
         /**
          * @readonly
          */

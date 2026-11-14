@@ -349,3 +349,9 @@ const T_PRIVATE_SET = 327;
 const T_PROTECTED_SET = 328;
 
 const T_PUBLIC_SET = 329;
+
+#[Mago\AvailableSince(80500)]
+const T_VOID_CAST = 388;
+
+#[Mago\AvailableSince(80500)]
+const T_PIPE = 408;

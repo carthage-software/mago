@@ -121,4 +121,7 @@ function opcache_get_configuration(): array|false {}
 
 function opcache_is_script_cached(string $filename): bool {}
 
+#[Mago\AvailableSince(80500)]
+function opcache_is_script_cached_in_file_cache(string $filename): bool {}
+
 function opcache_jit_blacklist(Closure $closure): void {}
