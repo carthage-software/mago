@@ -1191,6 +1191,10 @@ where
             if only_condition_variables.is_none_or(|variable_ids| variable_ids.contains(&variable_id))
                 && let Some(value_type) = artifacts.get_rc_expression_type(value)
             {
+                if let Some(inner_do_context) = inner_do_context.as_mut() {
+                    inner_do_context.locals.insert(variable_id, Rc::clone(value_type));
+                }
+
                 continue_context.locals.insert(variable_id, Rc::clone(value_type));
             }
         }

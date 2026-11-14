@@ -3317,6 +3317,7 @@ test_case!(existence_checks_of_literal_and_numeric_strings);
 test_case!(key_exists_narrowing_keeps_the_key_type);
 test_case!(is_float_removes_int);
 test_case!(loop_condition_reassigns_variable_from_before_the_loop);
+test_case!(do_while_condition_defines_variable);
 
 #[test]
 #[cfg_attr(miri, ignore)]
