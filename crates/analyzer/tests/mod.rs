@@ -3158,6 +3158,7 @@ test_case!(docblock_type_names_missing_class_constant);
 test_case!(intersection_with_object_shape_in_any_position);
 test_case!(list_index_range_outside_known_keys);
 test_case!(type_alias_scoped_to_its_class);
+test_case!(class_template_used_in_type_alias);
 
 #[test]
 #[cfg_attr(miri, ignore)]

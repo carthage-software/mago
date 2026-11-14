@@ -317,6 +317,12 @@ fn check_unused_template_parameters<'ctx, A>(
             }
         }
 
+        for type_alias in class_like_metadata.type_aliases.values() {
+            if type_contains_template_param(&type_alias.type_union, *template_name, class_name) {
+                continue 'templates;
+            }
+        }
+
         for property_metadata in class_like_metadata.properties.values() {
             if let Some(type_metadata) = &property_metadata.type_metadata
                 && type_contains_template_param(&type_metadata.type_union, *template_name, class_name)
