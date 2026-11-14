@@ -40,7 +40,7 @@ pub fn extract_function_constant_existence(
         Expression::Call(Call::Function(FunctionCall { function: Expression::Identifier(ident), argument_list }))
             if !negated =>
         {
-            let func_name = ident.value().to_ascii_lowercase();
+            let func_name = ident.value().trim_prefix(b"\\").to_ascii_lowercase();
             match func_name.as_slice() {
                 b"function_exists" => {
                     if let Some(name) = get_first_literal_string_arg(argument_list, artifacts, false) {
@@ -73,5 +73,6 @@ fn get_first_literal_string_arg(
         .map(mago_syntax::cst::Argument::value)
         .and_then(|expr| artifacts.get_expression_type(expr))
         .and_then(|ty| ty.get_single_literal_string_value())
+        .map(|s| s.trim_prefix(b"\\"))
         .map(|s| if constant { ascii_lowercase_constant_name_word(s) } else { ascii_lowercase_word(s) })
 }
