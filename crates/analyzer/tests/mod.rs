@@ -55,6 +55,7 @@ macro_rules! test_case {
 
 test_case!(accessing_undefined_class_constant);
 test_case!(array_to_int_cast);
+test_case!(issue_2441);
 test_case!(issue_2686);
 test_case!(issue_2686_mixed_parents);
 test_case!(issue_2616);
