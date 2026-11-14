@@ -3183,6 +3183,7 @@ test_case!(truthy_mixed_keeps_truthiness_when_narrowed);
 test_case!(negated_type_checks_split_callable);
 test_case!(isset_strips_null_from_template_bound);
 test_case!(static_call_on_bare_enum_string);
+test_case!(switch_assignments_count_in_try);
 
 #[test]
 #[cfg_attr(miri, ignore)]

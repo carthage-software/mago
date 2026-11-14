@@ -275,6 +275,8 @@ where
         if let Some(new_locals) = self.new_locals {
             possibly_redefined_vars.retain(|k, _| !new_locals.contains_key(k));
             if is_exhaustive {
+                let offset = switch.start_position().offset;
+                self.new_assigned_variable_ids.extend(new_locals.keys().map(|variable_id| (*variable_id, offset)));
                 self.block_context.locals.extend(new_locals);
             } else {
                 for (var_id, var_type) in new_locals {
@@ -288,6 +290,8 @@ where
 
         if let Some(redefined_vars) = self.redefined_variables {
             if is_exhaustive {
+                let offset = switch.start_position().offset;
+                self.new_assigned_variable_ids.extend(redefined_vars.keys().map(|variable_id| (*variable_id, offset)));
                 possibly_redefined_vars.retain(|k, _| !redefined_vars.contains_key(k));
                 self.block_context.locals.extend(redefined_vars.iter().map(|(k, v)| (*k, Rc::clone(v))));
             } else {
