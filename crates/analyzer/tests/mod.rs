@@ -3224,6 +3224,7 @@ test_case!(array_map_with_several_arrays_is_a_list);
 test_case!(if_branch_offset_write_forgets_narrowing);
 test_case!(closure_keeps_readonly_property_narrowing);
 test_case!(repeated_condition_is_paradoxical);
+test_case!(nullsafe_call_arguments_are_conditional);
 
 #[test]
 #[cfg_attr(miri, ignore)]

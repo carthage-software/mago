@@ -22,6 +22,7 @@ use mago_syntax::cst::Call;
 use mago_syntax::cst::ClassLikeMemberSelector;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::MethodCall;
+use mago_syntax::cst::Node;
 use mago_syntax::cst::NullSafeMethodCall;
 use mago_syntax::cst::Variable;
 
@@ -54,6 +55,8 @@ use crate::resolver::method::report_non_existent_method;
 use crate::resolver::method::resolve_method_targets;
 use crate::utils::availability;
 use crate::utils::expression::get_block_expression_id;
+use crate::utils::expression::has_assignment;
+use crate::utils::expression::merge_conditional_locals;
 use crate::visibility::check_method_visibility_by_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodCall<'arena> {
@@ -138,6 +141,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for NullSafeMethodCall<'arena> {
             }
         }
 
+        let pre_call_locals =
+            has_assignment(Node::ArgumentList(&self.argument_list)).then(|| block_context.locals.clone());
+
         analyze_method_call(
             context,
             block_context,
@@ -149,6 +155,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for NullSafeMethodCall<'arena> {
             self.question_mark_arrow.span(),
             self.span(),
         )?;
+
+        if let Some(pre_call_locals) = pre_call_locals
+            && artifacts.get_expression_type(self.object).is_some_and(TUnion::can_be_null)
+        {
+            merge_conditional_locals(context, block_context, &pre_call_locals);
+        }
 
         if context.plugin_registry.has_nullsafe_method_call_hooks() {
             let mut hook_context = HookContext::new(context.codebase, context.source_file, block_context, artifacts);

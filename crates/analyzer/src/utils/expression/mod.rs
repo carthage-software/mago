@@ -546,3 +546,44 @@ pub fn is_derived_access_path(derived_path: Word, base_path: Word) -> bool {
     let base = base_path.as_bytes();
     derived.starts_with(base) && derived.get(base.len()).is_some_and(|&b| b == b':' || b == b'-' || b == b'[')
 }
+
+/// Returns `true` when `node` contains an assignment.
+pub(crate) fn has_assignment(node: mago_syntax::cst::Node<'_, '_>) -> bool {
+    if matches!(node, mago_syntax::cst::Node::Assignment(_)) {
+        return true;
+    }
+
+    let mut found = false;
+    node.visit_children(|child| found = found || has_assignment(child));
+    found
+}
+
+/// Merges the locals of code that may not have run into `block_context`: a changed variable
+/// combines its old and new types, and a new variable becomes possibly undefined.
+pub(crate) fn merge_conditional_locals<A>(
+    context: &crate::context::Context<'_, '_, A>,
+    block_context: &mut crate::context::block::BlockContext<'_>,
+    previous_locals: &mago_word::WordMap<std::rc::Rc<TUnion>>,
+) where
+    A: mago_allocator::Arena,
+{
+    for (variable_id, current_type) in &mut block_context.locals {
+        match previous_locals.get(variable_id) {
+            Some(previous_type) if previous_type != current_type => {
+                *current_type = std::rc::Rc::new(mago_codex::ttype::combine_union_types(
+                    previous_type,
+                    current_type,
+                    context.codebase,
+                    context.settings.combiner_options(),
+                ));
+            }
+            None if !variable_id.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':')) => {
+                let mut possibly_undefined = (**current_type).clone();
+                possibly_undefined.set_possibly_undefined(true, None);
+                *current_type = std::rc::Rc::new(possibly_undefined);
+                block_context.possibly_undefined_variable_ids.insert(*variable_id);
+            }
+            _ => {}
+        }
+    }
+}
