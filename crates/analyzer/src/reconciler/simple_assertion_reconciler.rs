@@ -709,6 +709,22 @@ where
                 acceptable_types.push(atomic.clone());
                 did_remove_type = true;
             }
+            TAtomic::Object(TObject::Any) => {
+                did_remove_type = true;
+                acceptable_types.push(TAtomic::Object(TObject::Named(TNamedObject::new(word("Traversable")))));
+            }
+            TAtomic::Object(TObject::Named(named_object))
+                if context
+                    .codebase
+                    .get_class_like(named_object.name.as_bytes())
+                    .is_some_and(|metadata| !metadata.flags.is_final() && !metadata.kind.is_enum()) =>
+            {
+                did_remove_type = true;
+                let mut intersection = atomic.clone();
+                intersection
+                    .add_intersection_type(TAtomic::Object(TObject::Named(TNamedObject::new(word("Traversable")))));
+                acceptable_types.push(intersection);
+            }
             _ => {
                 did_remove_type = true;
             }

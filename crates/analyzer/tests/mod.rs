@@ -803,6 +803,7 @@ test_case!(trait_property_self_is_using_class);
 test_case!(trait_method_self_matches_interface);
 test_case!(closure_with_bare_return_is_void);
 test_case!(type_check_narrows_template_bound);
+test_case!(is_iterable_on_object_narrows_to_traversable);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);
