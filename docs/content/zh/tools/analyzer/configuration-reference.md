@@ -87,7 +87,6 @@ glob 匹配会遵循 `[source.glob]` 下的项目级设置,因此像 `literal-se
 | `strict-list-index-checks` | `false` | 要求作为列表下标使用的整数必须可被证明非负。 |
 | `strict-array-index-existence` | `false` | 当数组或列表读取的键无法证明存在时,将结果视为 `T\|null` 并发出 `possibly-undefined-{int,string}-array-index` 警告。用于替代 `allow-possibly-undefined-array-keys = false`。 |
 | `allow-array-truthy-operand` | `false` | 允许将数组用作 `&&`、`\|\|` 与 `xor` 的操作数,而不触发 `invalid-operand`。独立的 `if ($array)` 不受影响,也不会发出警告。 |
-| `warn-array-to-int-cast` | `false` | 对数组或包含数组的联合类型的 `(int)` 和 `(integer)` 转换发出 `array-to-int-cast` 警告，不改变推断类型。 |
 | `allow-operator-overloading` | `false` | 接受 `BcMath\Number` 和 `GMP` 重载的运算符（算术、位运算、移位、`-`、`+`、`~`、`++`、`--`），而不报告 `invalid-operand`。无论是否启用该选项，结果类型都会被推断；比较运算不受影响。 |
 | `no-boolean-literal-comparison` | `false` | 禁止与布尔字面量进行直接比较,例如 `$a === true`。 |
 | `check-missing-type-hints` | `false` | 报告参数、属性和返回值缺失的类型提示。 |

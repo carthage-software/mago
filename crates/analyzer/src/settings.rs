@@ -140,12 +140,6 @@ pub struct Settings {
     /// behavior; standalone `if ($array)` is still accepted and never produces this warning.
     pub allow_array_truthy_operand: bool,
 
-    /// Warn about casts from arrays to integers, including unions containing arrays.
-    ///
-    /// PHP converts empty arrays to `0` and non-empty arrays to `1`, not their count.
-    /// This suspicious-conversion check is disabled by default.
-    pub warn_array_to_int_cast: bool,
-
     /// Allow operators on classes that overload them, such as `BcMath\Number` and `GMP`.
     ///
     /// When `true`, the analyzer accepts arithmetic, bitwise and shift operators, as well as
@@ -447,7 +441,6 @@ impl Settings {
             strict_list_index_checks: false,
             strict_array_index_existence: false,
             allow_array_truthy_operand: false,
-            warn_array_to_int_cast: false,
             allow_operator_overloading: false,
             no_boolean_literal_comparison: false,
             enforce_class_finality: false,

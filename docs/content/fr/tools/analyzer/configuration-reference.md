@@ -104,7 +104,6 @@ Ces indicateurs activent ou désactivent des analyses individuelles. Les valeurs
 | `strict-list-index-checks` | `false` | Exige que tout entier utilisé comme index de liste soit prouvé non négatif. |
 | `strict-array-index-existence` | `false` | Traite les lectures de tableau ou de liste dont la clé n'est pas prouvée présente comme `T\|null` et émet un avertissement `possibly-undefined-{int,string}-array-index`. Remplace `allow-possibly-undefined-array-keys = false`. |
 | `allow-array-truthy-operand` | `false` | Accepte les tableaux comme opérandes de `&&`, `\|\|` et `xor` sans déclencher `invalid-operand`. Un `if ($array)` autonome n'est pas affecté et n'émet jamais d'avertissement. |
-| `warn-array-to-int-cast` | `false` | Signale les conversions `(int)` et `(integer)` de tableaux ou d'unions contenant un tableau avec `array-to-int-cast`, sans modifier les types inférés. |
 | `allow-operator-overloading` | `false` | Accepte les opérateurs que `BcMath\Number` et `GMP` surchargent (arithmétique, opérations bit à bit, décalages, `-`, `+`, `~`, `++`, `--`) sans déclencher `invalid-operand`. Le type du résultat est inféré dans tous les cas ; les comparaisons ne sont pas affectées. |
 | `no-boolean-literal-comparison` | `false` | Interdit les comparaisons directes aux littéraux booléens comme `$a === true`. |
 | `check-missing-type-hints` | `false` | Signale les indications de types manquantes sur les paramètres, propriétés et types de retour. |

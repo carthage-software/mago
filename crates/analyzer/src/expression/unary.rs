@@ -380,7 +380,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
             UnaryPrefixOperator::IntCast(_, _) | UnaryPrefixOperator::IntegerCast(_, _) => {
                 let resulting_type = match operand_type {
                     Some(t) => {
-                        if context.settings.warn_array_to_int_cast && has_array_in_cast_operand(&t) {
+                        if has_array_in_cast_operand(&t) {
                             context.collector.report_with_code(
                                 IssueCode::ArrayToIntCast,
                                 Issue::warning("Suspicious cast from array to integer.")
