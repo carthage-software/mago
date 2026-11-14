@@ -165,9 +165,22 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
             None
         };
 
+        let reference_entry = if is_by_reference
+            && matches!(iterator, Expression::Variable(Variable::Direct(_)))
+            && matches!(value_expression, Expression::Variable(Variable::Direct(_)))
+        {
+            iterator_variable_id.zip(value_expression_id)
+        } else {
+            None
+        };
+
         let mut loop_scope = LoopScope::new(self.span(), block_context.locals.clone(), None);
         if let Some((_, _, _, entry_id, entry_type)) = &foreach_entry {
             loop_scope.parent_context_variables.insert(*entry_id, Rc::clone(entry_type));
+            loop_scope.tracks_assignment_targets = true;
+        }
+
+        if reference_entry.is_some() {
             loop_scope.tracks_assignment_targets = true;
         }
 
@@ -201,6 +214,26 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
         } else {
             None
         };
+
+        let refined_entry = refined_entry.or_else(|| {
+            let (iterator_id, value_id) = reference_entry?;
+            if loop_scope.final_actions.contains(ControlAction::Break)
+                || loop_scope.final_actions.contains(ControlAction::Continue)
+                || loop_scope.assignment_targets.iter().any(|target| var_has_root(*target, iterator_id))
+            {
+                return None;
+            }
+
+            let value_type = inner_loop_block_context.locals.get(&value_id)?;
+            if value_type.is_mixed() {
+                return None;
+            }
+
+            let mut value_type = (**value_type).clone();
+            value_type.set_by_reference(false);
+
+            Some((iterator_id, Rc::new(value_type)))
+        });
 
         r#loop::inherit_loop_block_context(
             context,

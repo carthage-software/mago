@@ -3327,6 +3327,7 @@ test_case!(closure_keeps_declared_return_over_mixed_body);
 test_case!(literal_class_name_checked_like_class_constant);
 test_case!(match_class_constant_on_literal_name_of_final_class);
 test_case!(captured_possibly_undefined_variables);
+test_case!(foreach_by_reference_updates_the_array);
 
 #[test]
 #[cfg_attr(miri, ignore)]
