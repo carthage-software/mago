@@ -27,7 +27,10 @@ use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
+use mago_codex::ttype::atomic::scalar::string::TString;
+use mago_codex::ttype::atomic::scalar::string::TStringCasing;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::combiner::combine;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_bool;
@@ -140,7 +143,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                             OverloadedOperator::BitwiseNot,
                         );
 
-                        artifacts.set_rc_expression_type(self, operand_type);
+                        artifacts.set_expression_type(self, bitwise_not_result(&operand_type.types, context));
                     } else {
                         let (classes_without_bitwise_not, other_types): (Vec<&TAtomic>, Vec<&TAtomic>) =
                             operand_type.types.iter().partition(|atomic| is_class_without_bitwise_not(atomic));
@@ -157,7 +160,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                             if other_types.is_empty() {
                                 get_never()
                             } else {
-                                TUnion::from_vec(other_types.into_iter().cloned().collect())
+                                bitwise_not_result(
+                                    other_types.into_iter().cloned().collect::<Vec<_>>().as_slice(),
+                                    context,
+                                )
                             },
                         );
                     }
@@ -2185,6 +2191,35 @@ where
     }
 
     None
+}
+
+/// `~` turns an int or float into an int and keeps a string a string.
+fn bitwise_not_result<A>(atomics: &[TAtomic], context: &Context<'_, '_, A>) -> TUnion
+where
+    A: Arena,
+{
+    let results =
+        atomics
+            .iter()
+            .map(|atomic| match atomic {
+                TAtomic::Scalar(TScalar::Integer(integer)) => match integer.get_literal_value() {
+                    Some(value) => TAtomic::Scalar(TScalar::literal_int(!value)),
+                    None => TAtomic::Scalar(TScalar::int()),
+                },
+                TAtomic::Scalar(TScalar::Float(float)) => match float.get_literal_value() {
+                    Some(value) if value.is_finite() && value.abs() < 9.2e18 => {
+                        TAtomic::Scalar(TScalar::literal_int(!(value as i64)))
+                    }
+                    _ => TAtomic::Scalar(TScalar::int()),
+                },
+                TAtomic::Scalar(TScalar::String(string)) => TAtomic::Scalar(TScalar::String(
+                    TString::general_with_props(false, false, string.is_non_empty(), false, TStringCasing::Unspecified),
+                )),
+                other => other.clone(),
+            })
+            .collect::<Vec<_>>();
+
+    TUnion::from_vec(combine(results, context.codebase, CombinerOptions::default()))
 }
 
 #[cfg(test)]
