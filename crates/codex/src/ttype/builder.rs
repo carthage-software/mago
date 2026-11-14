@@ -560,7 +560,7 @@ fn get_reference_class_name(
 
 fn get_array_key_from_shape_key(key: &ShapeKey<'_>, scope: &NamespaceScope, classname: Option<Word>) -> ArrayKey {
     match key {
-        ShapeKey::String { value, .. } => ArrayKey::from_string(word(value)),
+        ShapeKey::String { value, .. } => ArrayKey::from_string(word(unescape_shape_key(value))),
         ShapeKey::Integer { value, .. } => ArrayKey::Integer(*value),
         ShapeKey::ClassLikeConstant { class_name, constant_name, .. } => {
             let class_like_name = if class_name.value.eq_ignore_ascii_case(b"self")
@@ -578,6 +578,28 @@ fn get_array_key_from_shape_key(key: &ShapeKey<'_>, scope: &NamespaceScope, clas
             ArrayKey::ClassLikeConstant { class_like_name, constant_name: word(constant_name.value) }
         }
     }
+}
+
+/// Reads the quote and backslash escapes of a quoted shape key.
+fn unescape_shape_key(value: &[u8]) -> Cow<'_, [u8]> {
+    if !value.contains(&b'\\') {
+        return Cow::Borrowed(value);
+    }
+
+    let mut result = Vec::with_capacity(value.len());
+    let mut bytes = value.iter().copied().peekable();
+    while let Some(byte) = bytes.next() {
+        if byte == b'\\'
+            && let Some(escaped @ (b'\\' | b'\'' | b'"')) = bytes.peek().copied()
+        {
+            bytes.next();
+            result.push(escaped);
+        } else {
+            result.push(byte);
+        }
+    }
+
+    Cow::Owned(result)
 }
 
 /// Reads the escapes of a docblock string literal the way PHP reads them in source code.
@@ -720,7 +742,7 @@ fn get_object_from_type(
         };
 
         let key = match field_key.key {
-            ShapeKey::String { value, .. } => word(value),
+            ShapeKey::String { value, .. } => word(unescape_shape_key(value)),
             ShapeKey::Integer { value, .. } => i64_word(value),
             ShapeKey::ClassLikeConstant { class_name, constant_name, .. } => {
                 concat_word!(class_name.value, b"::", constant_name.value)

@@ -3226,6 +3226,7 @@ test_case!(closure_keeps_readonly_property_narrowing);
 test_case!(repeated_condition_is_paradoxical);
 test_case!(nullsafe_call_arguments_are_conditional);
 test_case!(template_used_in_other_tags);
+test_case!(docblock_quoted_literal_and_key_escapes);
 
 #[test]
 #[cfg_attr(miri, ignore)]

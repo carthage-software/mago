@@ -508,16 +508,22 @@ where
 }
 
 /// Escapes quotes and control bytes so a literal prints on one line and cannot send escape
-/// codes to a terminal.
+/// codes to a terminal. A backslash is escaped only where it could read as an escape.
 pub(crate) fn escape_literal(value: &[u8]) -> std::borrow::Cow<'_, [u8]> {
-    if !value.iter().any(|byte| matches!(byte, b'\'' | 0x00..=0x1F | 0x7F)) {
+    let ambiguous_backslash =
+        |index: usize| matches!(value.get(index + 1), None | Some(b'n' | b't' | b'r' | b'\'' | b'\\' | b'0'..=b'7'));
+
+    if !value.iter().enumerate().any(|(index, byte)| {
+        matches!(byte, b'\'' | 0x00..=0x1F | 0x7F) || (*byte == b'\\' && ambiguous_backslash(index))
+    }) {
         return std::borrow::Cow::Borrowed(value);
     }
 
     let mut escaped = Vec::with_capacity(value.len() + 8);
-    for &byte in value {
+    for (index, &byte) in value.iter().enumerate() {
         match byte {
             b'\'' => escaped.extend_from_slice(b"\\'"),
+            b'\\' if ambiguous_backslash(index) => escaped.extend_from_slice(b"\\\\"),
             b'\n' => escaped.extend_from_slice(b"\\n"),
             b'\t' => escaped.extend_from_slice(b"\\t"),
             b'\r' => escaped.extend_from_slice(b"\\r"),
