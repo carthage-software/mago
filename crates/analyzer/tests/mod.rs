@@ -781,6 +781,7 @@ test_case!(ternary_with_finishing_branch);
 test_case!(exiting_if_with_elseif_keeps_narrowing);
 test_case!(empty_array_joined_with_sealed_list);
 test_case!(append_to_sealed_list);
+test_case!(array_write_through_several_literal_keys);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);

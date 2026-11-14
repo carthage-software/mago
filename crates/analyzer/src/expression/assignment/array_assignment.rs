@@ -101,19 +101,11 @@ where
 
     let root_is_string = root_array_type.has_string();
 
-    let mut key_values = Vec::new();
-
     let index_type = current_index.map(|current_index| {
         artifacts.get_rc_expression_type(current_index).cloned().unwrap_or_else(|| Rc::new(get_arraykey()))
     });
 
-    if let Some(index_type) = &index_type {
-        for index_atomic_type in index_type.types.as_ref() {
-            if index_atomic_type.is_literal_int() || index_atomic_type.is_known_literal_string() {
-                key_values.push(index_atomic_type.clone());
-            }
-        }
-    }
+    let key_values = index_type.as_deref().map(get_index_literal_types).unwrap_or_default();
 
     let root_array_type = Rc::unwrap_or_clone(root_array_type);
     let root_array_type = if !key_values.is_empty() {
@@ -340,6 +332,19 @@ where
             }
         }
     } else {
+        let definite = key_values.len() == 1;
+        let possible_type = || {
+            let mut possible_type = current_type.clone();
+            possible_type.set_possibly_undefined(true, None);
+            possible_type
+        };
+        let widen = |entry: &TUnion| {
+            let mut widened =
+                combine_union_types(entry, current_type, context.codebase, context.settings.combiner_options());
+            widened.set_possibly_undefined(entry.possibly_undefined(), None);
+            widened
+        };
+
         for key_value in key_values {
             if let TAtomic::Array(array) = &mut atomic_type {
                 let array_key = if let Some(str) = key_value.get_literal_string_value() {
@@ -357,14 +362,23 @@ where
 
                             if let Some(known_elements) = list.known_elements.as_mut().map(Arc::make_mut) {
                                 if let Some((pu, entry)) = known_elements.get_mut(&(key_value as usize)) {
-                                    *entry = current_type.clone();
-                                    *pu = false;
-                                } else {
+                                    if definite {
+                                        *entry = current_type.clone();
+                                        *pu = false;
+                                    } else {
+                                        *entry = widen(entry);
+                                    }
+                                } else if definite {
                                     known_elements.insert(key_value as usize, (false, current_type.clone()));
+                                } else {
+                                    known_elements.insert(key_value as usize, (true, possible_type()));
                                 }
-                            } else {
+                            } else if definite {
                                 list.known_elements =
                                     Some(BTreeMap::from([(key_value as usize, (false, current_type.clone()))]).into());
+                            } else {
+                                list.known_elements =
+                                    Some(BTreeMap::from([(key_value as usize, (true, possible_type()))]).into());
                             }
 
                             list.non_empty = true;
@@ -385,7 +399,11 @@ where
                                 }
                             }
 
-                            known_items.insert(ArrayKey::String(ustr), (false, current_type.clone()));
+                            if definite {
+                                known_items.insert(ArrayKey::String(ustr), (false, current_type.clone()));
+                            } else {
+                                known_items.insert(ArrayKey::String(ustr), (true, possible_type()));
+                            }
 
                             *array = TArray::Keyed(TKeyedArray {
                                 parameters,
@@ -403,14 +421,23 @@ where
 
                         if let Some(known_items) = keyed_array.known_items.as_mut().map(Arc::make_mut) {
                             if let Some((pu, entry)) = known_items.get_mut(&array_key) {
-                                *entry = current_type.clone();
-                                *pu = false;
-                            } else {
+                                if definite {
+                                    *entry = current_type.clone();
+                                    *pu = false;
+                                } else {
+                                    *entry = widen(entry);
+                                }
+                            } else if definite {
                                 known_items.insert(array_key, (false, current_type.clone()));
+                            } else {
+                                known_items.insert(array_key, (true, possible_type()));
                             }
-                        } else {
+                        } else if definite {
                             keyed_array.known_items =
                                 Some(BTreeMap::from([(array_key, (false, current_type.clone()))]).into());
+                        } else {
+                            keyed_array.known_items =
+                                Some(BTreeMap::from([(array_key, (true, possible_type()))]).into());
                         }
 
                         keyed_array.non_empty = true;
@@ -854,9 +881,11 @@ where
 fn get_index_literal_types(expression_index_type: &TUnion) -> Vec<TAtomic> {
     let mut valid_offset_types = vec![];
     for single_atomic in expression_index_type.types.as_ref() {
-        if single_atomic.is_literal_int() || single_atomic.is_known_literal_string() {
-            valid_offset_types.push(single_atomic.clone());
+        if !single_atomic.is_literal_int() && !single_atomic.is_known_literal_string() {
+            return vec![];
         }
+
+        valid_offset_types.push(single_atomic.clone());
     }
 
     valid_offset_types
