@@ -554,6 +554,15 @@ pub(crate) fn can_be_identical(
     inside_assertion: bool,
     allow_type_coercion: bool,
 ) -> bool {
+    if let (TAtomic::Iterable(_), object @ TAtomic::Object(TObject::Named(named)))
+    | (object @ TAtomic::Object(TObject::Named(named)), TAtomic::Iterable(_)) = (first_part, second_part)
+        && !named.has_intersection_types()
+        && !object.is_traversable(codebase)
+        && codebase.get_class_like(named.name.as_bytes()).is_some_and(|metadata| metadata.flags.is_final())
+    {
+        return false;
+    }
+
     if matches!(
         (first_part, second_part),
         // If either part is a variable, they can be identical
