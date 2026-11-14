@@ -45,6 +45,26 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
             }
         }
 
+        let span = self.span();
+        let previous_loop_bounds = loop_block_context.loop_bounds;
+        loop_block_context.loop_bounds = (span.start.offset, span.end.offset);
+
+        let pre_conditions = r#loop::get_and_expressions(self.condition);
+        let (mut inner_loop_block_context, loop_scope) = r#loop::analyze(
+            context,
+            std::slice::from_ref(self.statement),
+            &pre_conditions,
+            Vec::new(),
+            loop_scope,
+            &mut loop_block_context,
+            block_context,
+            artifacts,
+            true,
+            true,
+        )?;
+
+        loop_block_context.loop_bounds = previous_loop_bounds;
+
         let mut while_clauses = get_formula(
             self.condition.span(),
             self.condition.span(),
@@ -91,26 +111,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
                 None,
             ));
         }
-
-        let span = self.span();
-        let previous_loop_bounds = loop_block_context.loop_bounds;
-        loop_block_context.loop_bounds = (span.start.offset, span.end.offset);
-
-        let pre_conditions = r#loop::get_and_expressions(self.condition);
-        let (mut inner_loop_block_context, loop_scope) = r#loop::analyze(
-            context,
-            std::slice::from_ref(self.statement),
-            &pre_conditions,
-            Vec::new(),
-            loop_scope,
-            &mut loop_block_context,
-            block_context,
-            artifacts,
-            true,
-            true,
-        )?;
-
-        loop_block_context.loop_bounds = previous_loop_bounds;
 
         let clauses_to_simplify = {
             let mut c = block_context.clauses.iter().map(|v| (**v).clone()).collect::<Vec<_>>();

@@ -773,6 +773,7 @@ test_case!(list_shape_explicit_zero_key);
 test_case!(template_bound_array_argument_inference);
 test_case!(numeric_type_containment_and_narrowing);
 test_case!(by_reference_output_variables);
+test_case!(loop_condition_call_assertions);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);

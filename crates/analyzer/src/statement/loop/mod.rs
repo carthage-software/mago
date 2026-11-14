@@ -398,7 +398,7 @@ where
 
         artifacts.set_loop_scope(loop_scope.clone());
         for (condition_offset, pre_condition) in pre_conditions.iter().enumerate() {
-            let Some(clauses) = pre_condition_clauses.get(condition_offset) else {
+            let Some(clauses) = pre_condition_clauses.get_mut(condition_offset) else {
                 continue;
             };
 
@@ -454,7 +454,7 @@ where
                         unsafe {
                             // SAFETY: we know the pre_condition_clauses will contain
                             // the clauses for the pre_condition at condition_offset.
-                            pre_condition_clauses.get_unchecked(condition_offset)
+                            pre_condition_clauses.get_unchecked_mut(condition_offset)
                         },
                         loop_context,
                         loop_parent_context,
@@ -501,7 +501,7 @@ where
                         unsafe {
                             // SAFETY: we know the pre_condition_clauses will contain
                             // the clauses for the pre_condition at condition_offset.
-                            pre_condition_clauses.get_unchecked(condition_offset)
+                            pre_condition_clauses.get_unchecked_mut(condition_offset)
                         },
                         &mut continue_context,
                         loop_parent_context,
@@ -802,7 +802,7 @@ where
                         unsafe {
                             // SAFETY: we know the pre_condition_clauses will contain
                             // the clauses for the pre_condition at condition_offset.
-                            pre_condition_clauses.get_unchecked(condition_offset)
+                            pre_condition_clauses.get_unchecked_mut(condition_offset)
                         },
                         &mut continue_context,
                         loop_parent_context,
@@ -883,7 +883,7 @@ where
                             unsafe {
                                 // SAFETY: we know the pre_condition_clauses will contain
                                 // the clauses for the pre_condition at condition_offset.
-                                pre_condition_clauses.get_unchecked(condition_offset)
+                                pre_condition_clauses.get_unchecked_mut(condition_offset)
                             },
                             &mut continue_context,
                             loop_parent_context,
@@ -1089,12 +1089,45 @@ where
                 false,
             );
 
+            let mut parent_assertions = AssertionMap::default();
+            for (variable_id, assertions) in &negated_pre_condition_types {
+                if !changed_variable_ids.contains(variable_id)
+                    && let Some(parent_type) = loop_parent_context.locals.get(variable_id)
+                    && continue_context.locals.get(variable_id).is_some_and(|end_type| end_type != parent_type)
+                {
+                    parent_assertions.insert(*variable_id, assertions.clone());
+                }
+            }
+
             for variable_id in changed_variable_ids {
                 if let Some(reconciled_type) = continue_context.locals.get(&variable_id) {
                     if loop_parent_context.locals.contains_key(&variable_id) {
                         loop_parent_context.locals.insert(variable_id, Rc::clone(reconciled_type));
                     }
 
+                    loop_parent_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
+                }
+            }
+
+            if !parent_assertions.is_empty() {
+                let mut changed_parent_variable_ids = WordSet::default();
+
+                reconcile_keyed_types(
+                    context,
+                    &parent_assertions,
+                    AssertionMap::default(),
+                    loop_parent_context,
+                    &mut changed_parent_variable_ids,
+                    &WordSet::default(),
+                    &unsafe {
+                        // SAFETY: we know that pre_conditions is not empty.
+                        pre_conditions.get_unchecked(0).span()
+                    },
+                    false,
+                    false,
+                );
+
+                for variable_id in changed_parent_variable_ids {
                     loop_parent_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
                 }
             }
@@ -1339,10 +1372,21 @@ fn can_condition_be_initially_false(pre_condition: &Expression<'_>, artifacts: &
     }
 }
 
+fn condition_has_call(expression: &Expression<'_>) -> bool {
+    match expression {
+        Expression::Call(_) => true,
+        Expression::Parenthesized(parenthesized) => condition_has_call(parenthesized.expression),
+        Expression::UnaryPrefix(unary) => condition_has_call(unary.operand),
+        Expression::Binary(binary) => condition_has_call(binary.lhs) || condition_has_call(binary.rhs),
+        Expression::Assignment(assignment) => condition_has_call(assignment.rhs),
+        _ => false,
+    }
+}
+
 fn apply_pre_condition_to_loop_context<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     pre_condition: &Expression<'arena>,
-    pre_condition_clauses: &[Clause],
+    pre_condition_clauses: &mut Vec<Clause>,
     loop_context: &mut BlockContext<'ctx>,
     loop_parent_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
@@ -1362,6 +1406,21 @@ where
 
     loop_context.flags.set_inside_loop_expressions(false);
     loop_context.flags.set_inside_conditional(false);
+
+    if first_application
+        && condition_has_call(pre_condition)
+        && let Some(clauses) = get_formula(
+            pre_condition_span,
+            pre_condition_span,
+            pre_condition,
+            context.get_assertion_context_from_block(loop_context),
+            artifacts,
+            &context.settings.algebra_thresholds(),
+            context.settings.formula_size_threshold,
+        )
+    {
+        *pre_condition_clauses = clauses;
+    }
 
     if first_application {
         let condition_type = artifacts.get_expression_type(pre_condition);
