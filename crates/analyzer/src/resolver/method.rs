@@ -689,13 +689,14 @@ where
             }
         }
 
+        let is_intersection_member = !std::ptr::eq(object_type, outer_object);
         candidates.push(MethodCandidate {
             metadata: class_metadata,
             method_identifier: method_id,
-            object: outer_object.clone(),
+            object: if is_intersection_member { object_type.clone() } else { outer_object.clone() },
             classname: name,
             mixin_without_magic_method: None,
-            receiver_object: None,
+            receiver_object: is_intersection_member.then(|| outer_object.clone()),
         });
     } else if !class_metadata.require_extends.is_empty() || !class_metadata.require_implements.is_empty() {
         for required_class in class_metadata.require_extends.iter().chain(class_metadata.require_implements.iter()) {

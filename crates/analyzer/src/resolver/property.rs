@@ -1960,7 +1960,7 @@ where
 
     for atomic in intersection_types {
         match atomic {
-            TAtomic::Object(TObject::Named(TNamedObject { name, .. }) | TObject::Enum(TEnum { name, .. })) => {
+            TAtomic::Object(part @ (TObject::Named(TNamedObject { name, .. }) | TObject::Enum(TEnum { name, .. }))) => {
                 let Some(class_metadata) = context.codebase.get_class_like(name.as_bytes()) else {
                     continue;
                 };
@@ -2001,12 +2001,19 @@ where
                     return Some(None);
                 }
 
-                return Some(Some(get_resolved_declared_property(
-                    context.codebase,
-                    &resolution,
-                    prop_name,
-                    for_assignment,
-                )));
+                let mut resolved =
+                    get_resolved_declared_property(context.codebase, &resolution, prop_name, for_assignment);
+                if !resolution.declaring_class.template_types.is_empty() {
+                    resolved.property_type = localize_property_type(
+                        context,
+                        &resolved.property_type,
+                        part.get_type_parameters().unwrap_or_default(),
+                        class_metadata,
+                        resolution.declaring_class,
+                    );
+                }
+
+                return Some(Some(resolved));
             }
             TAtomic::Object(TObject::WithProperties(shaped)) => {
                 let key = mago_word::word(trim_start_byte(prop_name.as_bytes(), b'$'));
