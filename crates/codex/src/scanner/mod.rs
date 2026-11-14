@@ -185,6 +185,7 @@ struct Scanner {
     has_constructor: bool,
     file_type_aliases: WordSet,
     file_imported_aliases: WordMap<(Word, Word)>,
+    alias_scopes: Vec<(WordSet, WordMap<(Word, Word)>)>,
     polyfill_depth: u32,
     return_docblock_starts: Vec<Option<u32>>,
     function_like_stack: Vec<Option<(Word, Word)>>,
@@ -233,6 +234,13 @@ fn is_polyfill_existence_check(expr: &Expression<'_>) -> bool {
 impl Scanner {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    fn leave_alias_scope(&mut self) {
+        if let Some((type_aliases, imported_aliases)) = self.alias_scopes.pop() {
+            self.file_type_aliases = type_aliases;
+            self.file_imported_aliases = imported_aliases;
+        }
     }
 
     fn get_current_type_resolution_context(&self) -> TypeResolutionContext {
@@ -599,6 +607,7 @@ where
             register_anonymous_class(&mut self.codebase, anonymous_class, docblock_start, context, &self.scope)
         {
             self.apply_polyfill_flag_to_class_like(id);
+            self.alias_scopes.push((self.file_type_aliases.clone(), self.file_imported_aliases.clone()));
             self.file_type_aliases.extend(type_aliases);
             self.file_imported_aliases.extend(imported_aliases);
             self.stack.push(id);
@@ -624,6 +633,7 @@ where
             register_class(&mut self.codebase, class, context, &self.scope)
         {
             self.apply_polyfill_flag_to_class_like(id);
+            self.alias_scopes.push((self.file_type_aliases.clone(), self.file_imported_aliases.clone()));
             self.file_type_aliases.extend(type_aliases);
             self.file_imported_aliases.extend(imported_aliases);
             self.stack.push(id);
@@ -639,6 +649,7 @@ where
             register_trait(&mut self.codebase, r#trait, context, &self.scope)
         {
             self.apply_polyfill_flag_to_class_like(id);
+            self.alias_scopes.push((self.file_type_aliases.clone(), self.file_imported_aliases.clone()));
             self.file_type_aliases.extend(type_aliases);
             self.file_imported_aliases.extend(imported_aliases);
             self.stack.push(id);
@@ -654,6 +665,7 @@ where
             register_enum(&mut self.codebase, r#enum, context, &self.scope)
         {
             self.apply_polyfill_flag_to_class_like(id);
+            self.alias_scopes.push((self.file_type_aliases.clone(), self.file_imported_aliases.clone()));
             self.file_type_aliases.extend(type_aliases);
             self.file_imported_aliases.extend(imported_aliases);
             self.stack.push(id);
@@ -669,6 +681,7 @@ where
             register_interface(&mut self.codebase, interface, context, &self.scope)
         {
             self.apply_polyfill_flag_to_class_like(id);
+            self.alias_scopes.push((self.file_type_aliases.clone(), self.file_imported_aliases.clone()));
             self.file_type_aliases.extend(type_aliases);
             self.file_imported_aliases.extend(imported_aliases);
             self.stack.push(id);
@@ -822,6 +835,7 @@ where
     ) {
         self.stack.pop().expect("Expected class stack to be non-empty");
         self.template_constraints.pop().expect("Expected template stack to be non-empty");
+        self.leave_alias_scope();
     }
 
     #[inline]
@@ -855,6 +869,7 @@ where
 
     let class_like_id = scanner.stack.pop().expect("Expected class stack to be non-empty");
     scanner.template_constraints.pop().expect("Expected template stack to be non-empty");
+    scanner.leave_alias_scope();
 
     if has_constructor {
         return;
