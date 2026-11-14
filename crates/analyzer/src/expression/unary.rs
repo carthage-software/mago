@@ -691,6 +691,19 @@ fn report_ineffective_increment_or_decrement<A>(
 /// An `TUnion` representing the type of the operand *after* the increment operation.
 ///
 /// Returns `mixed|any` if the operand's type cannot be determined or if a fatal error occurs.
+fn with_generic_bounds(operand_type: &TUnion) -> Vec<TAtomic> {
+    operand_type
+        .types
+        .iter()
+        .flat_map(|atomic| match atomic {
+            TAtomic::GenericParameter(parameter) if !parameter.constraint.is_mixed() => {
+                parameter.constraint.types.to_vec()
+            }
+            _ => vec![atomic.clone()],
+        })
+        .collect()
+}
+
 fn increment_operand<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
@@ -707,7 +720,7 @@ where
 
     let mut possibilities = vec![];
     let mut reported_invalid = false;
-    for operand_atomic_type in operand_type.types.as_ref() {
+    for operand_atomic_type in &with_generic_bounds(operand_type) {
         match operand_atomic_type {
             TAtomic::Scalar(scalar) => match scalar {
                 TScalar::Integer(int_scalar) => {
@@ -962,7 +975,7 @@ where
 
     let mut possibilities = vec![];
 
-    for operand_atomic_type in operand_type.types.as_ref() {
+    for operand_atomic_type in &with_generic_bounds(operand_type) {
         match operand_atomic_type {
             TAtomic::Scalar(scalar) => {
                 match scalar {

@@ -291,7 +291,7 @@ mod tests {
              * @param T $end
              * @param T|null $step
              *
-             * @return non-empty-list<T>
+             * @return non-empty-list<int|float>
              */
             function range(int|float $start, int|float $end, int|float|null $step = null): array
             {

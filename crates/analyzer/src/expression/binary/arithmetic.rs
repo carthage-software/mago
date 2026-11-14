@@ -18,8 +18,6 @@ use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::combiner;
-use mago_codex::ttype::comparator::ComparisonResult;
-use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_non_negative_int;
@@ -62,6 +60,8 @@ where
     let fallback = Rc::new(get_mixed());
     let left_type = artifacts.get_rc_expression_type(&binary.lhs).cloned().unwrap_or_else(|| Rc::clone(&fallback));
     let right_type = artifacts.get_rc_expression_type(&binary.rhs).cloned().unwrap_or_else(|| Rc::clone(&fallback));
+    let left_type = generic_bound(&left_type).map_or(left_type, Rc::new);
+    let right_type = generic_bound(&right_type).map_or(right_type, Rc::new);
 
     if left_type.is_never() || right_type.is_never() {
         assign_arithmetic_type(artifacts, get_never(), binary);
@@ -120,12 +120,6 @@ where
                 "Ensure the right operand is non-null before the operation, potentially using checks or assertions.",
             ),
         );
-    }
-
-    if is_arithmetic_compatible_generic(context, &left_type, &right_type) {
-        final_result_type = Some(left_type.as_ref().clone());
-    } else if is_arithmetic_compatible_generic(context, &right_type, &left_type) {
-        final_result_type = Some(right_type.as_ref().clone());
     }
 
     if let Some(final_result_type) = final_result_type {
@@ -585,34 +579,16 @@ where
     Ok(())
 }
 
-#[inline]
-fn is_arithmetic_compatible_generic<A>(context: &Context<'_, '_, A>, union: &TUnion, other_union: &TUnion) -> bool
-where
-    A: Arena,
-{
+fn generic_bound(union: &TUnion) -> Option<TUnion> {
     if !union.is_single() {
-        return false;
+        return None;
     }
 
     let TAtomic::GenericParameter(generic_parameter) = union.get_single() else {
-        return false;
+        return None;
     };
 
-    for constraint_atomic in generic_parameter.constraint.types.iter() {
-        for other_atomic in other_union.types.iter() {
-            if !atomic_comparator::is_contained_by(
-                context.codebase,
-                other_atomic,
-                constraint_atomic,
-                false,
-                &mut ComparisonResult::new(),
-            ) {
-                return false;
-            }
-        }
-    }
-
-    true
+    (!generic_parameter.constraint.is_mixed()).then(|| (*generic_parameter.constraint).clone())
 }
 
 #[inline]
