@@ -1,0 +1,7 @@
+{% from 'macros' import echo as record %}
+{% block outside %}{{ record(value = "alias") }}{% endblock %}
+{% embed 'base' with {value: value} only %}
+{% block body %}{{ record(label = "embedded", value = value) }}{% endblock %}
+{% endembed %}
+{# @mago-expect lint:twig-no-dump An inactive rule must remain. #}
+{{ "plain" }}

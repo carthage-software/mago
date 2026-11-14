@@ -109,3 +109,12 @@ rules_integration_alternative_separator = "; or "
 rules_join_and_two = "{first} and {second}"
 rules_join_and_many = "{head}, and {last}"
 rules_join_separator = ", "
+
+# Twig linter rules reference page (generated from the `mago-twig-linter` registry).
+twig_rules_page_title = "Rules"
+twig_rules_page_description = "The full reference of every Twig linter rule, sorted by severity. Click any rule to expand its description, examples, and configuration."
+twig_rules_intro = "Mago's Twig linter ships {rules} rules across {categories} categories. Click any rule to expand its description, requirements, default configuration, and examples. Rule codes start with <code>twig-</code>; the configuration keys under <code>[twig.linter.rules]</code> leave that prefix out."
+twig_rules_twig_min = "This rule needs the minimum Twig version, <code>[twig.linter] version</code>, to be <code>{min}</code> or newer."
+twig_rules_category_BestPractices_blurb = "Idiomatic Twig patterns that the Twig documentation and coding standard recommend."
+twig_rules_category_Deprecation_blurb = "Twig features deprecated upstream that a later Twig release removes. Migrate before they break."
+twig_rules_category_Security_blurb = "Output that bypasses escaping, debug output that exposes the template context, and functions, filters, or tags your project bans."

@@ -1,0 +1,19 @@
+{% set badName = 1 %}
+{% macro badMacro(badArg, badArg) %}{{ badArg }}{% endmacro %}
+{% block repeated %}one{% endblock %}
+{% block repeated %}two{% endblock %}
+{{ custom(first = 1, first: 2) }}
+{{ {'key': record(1), 'key': record(2)} }}
+{{ dump(user) }}
+{{ "<ok>"|raw }}
+{% macro once() %}{% endmacro %}
+{% macro once() %}{% endmacro %}
+{{ custom(badNamed: 1) }}
+{{ value|spaceless }}
+{{ attribute(value, 'name') }}
+{% autoescape false %}{% endautoescape %}
+{% include 'fragment' ignore missing %}
+{{ blocked_function()|blocked_filter }}
+{% flush %}
+{{ a ? (b ? c : d) : e }}
+{% if true %}yes{% endif %}

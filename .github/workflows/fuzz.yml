@@ -31,6 +31,7 @@ jobs:
           - { crate: twig-syntax, target: parser, seeds: "fuzz/seeds/parser" }
           - { crate: twig-syntax, target: lexer, seeds: "fuzz/seeds/lexer" }
           - { crate: twig-formatter, target: formatter, seeds: "tests/cases tests/runtime/cases" }
+          - { crate: twig-linter, target: linter, seeds: "tests/fixtures tests/runtime/cases ../twig-formatter/tests/cases" }
 
     steps:
       - name: checkout

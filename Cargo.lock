@@ -1330,6 +1330,8 @@ dependencies = [
  "mago-syntax-core",
  "mago-text-edit",
  "mago-twig-formatter",
+ "mago-twig-linter",
+ "mago-twig-syntax",
  "mago-word",
  "mimalloc",
  "notify",
@@ -1497,6 +1499,7 @@ dependencies = [
  "mago-linter",
  "mago-php-version",
  "mago-reporting",
+ "mago-twig-linter",
  "pulldown-cmark",
  "regex",
  "schemars",
@@ -1686,6 +1689,8 @@ dependencies = [
  "mago-span",
  "mago-syntax",
  "mago-twig-formatter",
+ "mago-twig-linter",
+ "mago-twig-syntax",
  "mago-word",
  "rayon",
  "tracing",
@@ -1834,6 +1839,26 @@ dependencies = [
  "pretty_assertions",
  "schemars",
  "serde",
+]
+
+[[package]]
+name = "mago-twig-linter"
+version = "1.59.0"
+dependencies = [
+ "foldhash",
+ "indoc",
+ "mago-allocator",
+ "mago-bytes",
+ "mago-casing",
+ "mago-collector",
+ "mago-database",
+ "mago-reporting",
+ "mago-span",
+ "mago-text-edit",
+ "mago-twig-syntax",
+ "schemars",
+ "serde",
+ "tracing",
 ]
 
 [[package]]

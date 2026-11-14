@@ -25,7 +25,7 @@ mago-database = { workspace = true }
 mago-casing = { workspace = true }
 mago-names = { workspace = true }
 mago-php-version = { workspace = true }
-mago-collector = { workspace = true }
+mago-collector = { workspace = true, features = ["php"] }
 mago-extension = { workspace = true }
 foldhash = { workspace = true }
 memchr = { workspace = true }

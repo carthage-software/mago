@@ -55,6 +55,9 @@ use std::path::Path;
 use std::process::ExitCode;
 use std::sync::Arc;
 
+mod validation;
+pub(crate) use validation::EditLanguage;
+
 use mago_reporting::baseline::BaselineChangeEntry;
 use serde::Serialize;
 
@@ -117,6 +120,7 @@ use crate::utils;
 /// - Exit code behavior is determined by severity thresholds
 #[derive(Debug)]
 pub struct IssueProcessor {
+    pub(crate) edit_language: EditLanguage,
     /// Filter to show only issues that have automatic fixes available.
     ///
     /// When `true`, issues without fixes are excluded from the report.
@@ -561,6 +565,7 @@ impl IssueProcessor {
         let dry_run = self.dry_run;
         let color_choice = self.color_choice;
         let parser_settings = orchestrator.config.parser_settings;
+        let edit_language = self.edit_language;
 
         let results: Vec<(bool, usize, usize, usize)> = batches_by_file
             .into_par_iter()
@@ -575,7 +580,7 @@ impl IssueProcessor {
                 // Each batch contains all edits from a single issue - they must be applied together
                 for (rule_code, edits) in batches {
                     let rule_code = rule_code.as_deref().unwrap_or("unknown");
-                    let result = editor.apply_unique_batch(edits, Some(|code: &[u8]| check_php_code(arena, file_id, code, parser_settings)));
+                    let result = editor.apply_unique_batch(edits, Some(|code: &[u8]| edit_language.accepts(arena, file_id, code, parser_settings)));
                     arena.reset();
 
                     match result {
@@ -599,7 +604,7 @@ impl IssueProcessor {
                             tracing::warn!("This can happen when multiple fixers modify the same code. Try running the fixer again to apply remaining fixes.");
                         }
                         ApplyResult::Rejected => {
-                            tracing::error!("Edit for `{}` (issue: `{rule_code}`) was rejected because it would produce invalid PHP syntax.", mago_bytes::BytesDisplay(&file.name));
+                            tracing::error!("Edit for `{}` (issue: `{rule_code}`) was rejected because it would produce invalid {} syntax.", mago_bytes::BytesDisplay(&file.name), edit_language.name());
                             tracing::error!("This is a bug in Mago. Please report this issue at {}", ISSUE_URL);
 
                             bugs += 1;

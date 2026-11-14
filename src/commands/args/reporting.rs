@@ -219,6 +219,7 @@ impl ReportingArgs {
         scoped_analysis: bool,
     ) -> IssueProcessor {
         IssueProcessor {
+            edit_language: crate::service::EditLanguage::Php,
             fixable_only: self.fixable_only,
             sort: self.sort,
             fix: self.fix,

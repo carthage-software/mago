@@ -1,0 +1,33 @@
+[package]
+name = "mago-twig-linter"
+description = "Finds style, maintenance, and safety issues in Twig templates."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+mago-allocator = { workspace = true }
+mago-bytes = { workspace = true }
+mago-casing = { workspace = true }
+mago-collector = { workspace = true }
+mago-database = { workspace = true }
+mago-reporting = { workspace = true }
+mago-span = { workspace = true }
+mago-text-edit = { workspace = true }
+mago-twig-syntax = { workspace = true }
+foldhash = { workspace = true }
+indoc = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true, optional = true }
+tracing = { workspace = true }
+
+[features]
+default = []
+serde = ["dep:serde", "mago-reporting/serde"]

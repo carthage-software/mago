@@ -19,7 +19,7 @@ mago-reporting = { workspace = true }
 mago-span = { workspace = true }
 mago-syntax = { workspace = true }
 mago-names = { workspace = true }
-mago-collector = { workspace = true }
+mago-collector = { workspace = true, features = ["php"] }
 mago-syntax-core = { workspace = true }
 mago-database = { workspace = true }
 mago-codex = { workspace = true }

@@ -27,3 +27,7 @@ Mago 在一个二进制文件中提供多种工具。每个命令选择自己的
 ## [Twig 格式化器](/tools/formatter/twig/)
 
 `mago twig:fmt` 使用独立的 `[twig.formatter]` 设置格式化 Twig 语法。模板文本保持不变，HTML 不会被重新格式化。PHP 格式化器和 `mago fix` 不运行此工具。
+
+## [Twig Linter](/tools/twig-linter/)
+
+`mago twig:lint` 使用独立规则和设置检查 Twig，支持报告、基线、pragma、暂存文件、stdin 和安全修复。PHP 命令不会运行 Twig lint 规则。

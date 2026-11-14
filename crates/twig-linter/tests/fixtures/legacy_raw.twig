@@ -1,0 +1,4 @@
+{% block before %}{{ record(label = "first", value = "one") }}{% endblock %}
+{#@mago-ignore lint:twig-no-dump~#}
+{% raw %}{{ "literal" }}{% endraw %}
+{% block after %}{{ record(label = "second", value = "two") }}{% endblock %}

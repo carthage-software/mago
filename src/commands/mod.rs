@@ -71,6 +71,7 @@ use crate::commands::lint::LintCommand;
 use crate::commands::list_files::ListFilesCommand;
 use crate::commands::self_update::SelfUpdateCommand;
 use crate::commands::twig_format::TwigFormatCommand;
+use crate::commands::twig_lint::TwigLintCommand;
 use crate::error::Error;
 
 mod args;
@@ -92,6 +93,7 @@ mod outcome;
 pub mod self_update;
 pub mod stdin_input;
 pub mod twig_format;
+pub mod twig_lint;
 
 /// ANSI color styling configuration for Mago's CLI output.
 ///
@@ -201,6 +203,9 @@ pub enum MagoCommand {
     /// Format Twig templates.
     #[command(name = "twig:fmt")]
     TwigFormat(TwigFormatCommand),
+    /// Run linting rules on Twig templates.
+    #[command(name = "twig:lint")]
+    TwigLint(TwigLintCommand),
 
     /// Apply fixes until guard, analyzer, linter, and formatter make no more changes.
     #[command(name = "fix")]

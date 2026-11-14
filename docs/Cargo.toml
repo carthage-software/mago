@@ -21,6 +21,7 @@ large_enum_variant = "allow"
 anyhow = { workspace = true }
 clap = { workspace = true }
 mago-linter = { workspace = true, features = ["serde"] }
+mago-twig-linter = { workspace = true, features = ["serde"] }
 mago-php-version = { workspace = true }
 mago-reporting = { workspace = true }
 pulldown-cmark = { workspace = true }

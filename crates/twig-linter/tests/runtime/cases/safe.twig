@@ -1,0 +1,8 @@
+Text <p>  keep whitespace  </p>
+{% macro input(class = "input", value = "") %}<input class="{{ class }}" value="{{ value }}">{% endmacro %}
+{% block body %}
+{{ record(label = "first", value = value) }}|{{ record(label: "second", value: "plain") }}
+{{ range(low = 1, high = 3)|join(",") }}
+{{ _self.input(value = value, class = "wide") }}
+{% endblock %}
+{% include 'fragment' with {value: value} only %}

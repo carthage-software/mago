@@ -1,0 +1,5 @@
+{{ "#{record('interpolation', value)}" "tail" }}
+{{ "#{record('other', value)}" 'tail' }}
+{{ {"plain": "value", "it's": "skip", "line\nend": "skip", "#tag": "skip"}|json_encode }}
+{{ record(label = "quote", value = "plain") }}
+{{ record(label = "unicode", value = "café 中文 → café") }}

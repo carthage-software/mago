@@ -1,0 +1,8 @@
+{% do firstName = secondName = record(label = "chain", value = value) %}
+{{ firstName }}|{{ secondName }}
+{% do [first, , lastName] = record(label = "sequence", value = ["first", "skip", value]) %}
+{{ first }}|{{ lastName }}
+{% do {name: namedValue} = record(label = "mapping", value = {name: value}) %}
+{{ namedValue }}
+{% do [(groupedName)] = ["grouped"] %}{{ groupedName }}
+{% if conditionName = record(label = "condition", value = true) %}yes{% endif %}{{ conditionName }}

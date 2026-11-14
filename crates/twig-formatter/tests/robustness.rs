@@ -96,6 +96,18 @@ fn excessive_nesting_returns_an_error() {
 }
 
 #[test]
+fn assignment_targets_keep_tokens_or_fail_before_formatting() {
+    for source in include_str!("../../twig-syntax/tests/fixtures/expressions/valid_assignment_targets.twig").lines() {
+        check(source.as_bytes(), FormatSettings::default());
+    }
+    let arena = LocalArena::new();
+    let formatter = Formatter::new(&arena, FormatSettings::default());
+    for source in include_str!("../../twig-syntax/tests/fixtures/expressions/invalid_assignment_targets.twig").lines() {
+        formatter.format_code(Cow::Borrowed(b"assignment.twig"), Cow::Borrowed(source.as_bytes())).unwrap_err();
+    }
+}
+
+#[test]
 fn newlines_inside_tags_follow_the_setting() {
     let source = include_bytes!("cases/wrapping/before.twig");
     let expected = include_str!("cases/wrapping/after.twig");

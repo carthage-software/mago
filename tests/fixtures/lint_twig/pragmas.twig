@@ -1,0 +1,7 @@
+{# @mago-expect lint:twig-no-dump(2) This outer scope handles the last two calls. #}
+{% if flag %}
+{# @mago-expect lint:twig-no-dump(1) This inner scope handles one call. #}
+{{ dump(first) }}
+{{ dump(second) }}
+{{ dump(third) }}
+{% endif %}

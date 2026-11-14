@@ -121,6 +121,7 @@ pub mod parser;
 pub mod source;
 pub mod twig;
 pub mod twig_formatter;
+pub mod twig_linter;
 
 /// Default value for threads configuration field.
 fn default_threads() -> usize {
@@ -777,6 +778,13 @@ impl Configuration {
             let resolved = if b.is_relative() { self.source.workspace.join(&b) } else { b };
             tracing::debug!("Linter baseline configuration from {}.", resolved.display());
             self.linter.baseline = Some(resolved);
+        }
+
+        if let Some(linter) = self.twig.as_mut().and_then(|twig| twig.linter.as_mut())
+            && let Some(baseline) = linter.baseline.take()
+        {
+            linter.baseline =
+                Some(if baseline.is_relative() { self.source.workspace.join(baseline) } else { baseline });
         }
 
         if let Some(b) = self.guard.baseline.take() {

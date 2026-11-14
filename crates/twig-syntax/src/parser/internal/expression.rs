@@ -54,6 +54,7 @@ where
         while let Some(token) = self.stream.lookahead(0)? {
             // Assignment (`=`): right-associative, lowest precedence.
             if min_precedence == 0 && token.kind == TwigTokenKind::Equal {
+                super::assignment::validate(&left)?;
                 let eq_tok = self.stream.consume()?;
                 let operator = BinaryOperator::Assignment(self.stream.span_of(&eq_tok));
                 let rhs = self.parse_expression()?;

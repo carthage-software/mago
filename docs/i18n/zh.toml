@@ -109,3 +109,12 @@ rules_integration_alternative_separator = ";或 "
 rules_join_and_two = "{first} 和 {second}"
 rules_join_and_many = "{head}、{last}"
 rules_join_separator = "、"
+
+# Twig linter 规则参考页(由 `mago-twig-linter` 注册表生成)。
+twig_rules_page_title = "规则"
+twig_rules_page_description = "Twig linter 每条规则的完整参考,按严重程度排序。点击任意规则可展开其描述、示例和配置。"
+twig_rules_intro = "Mago 的 Twig linter 共提供 {rules} 条规则,分布在 {categories} 个类别中。点击任意规则可展开其描述、要求、默认配置和示例。规则代码以 <code>twig-</code> 开头;<code>[twig.linter.rules]</code> 下的配置键省略该前缀。"
+twig_rules_twig_min = "此规则要求最低 Twig 版本 <code>[twig.linter] version</code> 为 <code>{min}</code> 或更高。"
+twig_rules_category_BestPractices_blurb = "Twig 文档和编码规范推荐的惯用写法。"
+twig_rules_category_Deprecation_blurb = "上游已弃用、后续 Twig 版本会移除的 Twig 特性。请在它们失效前迁移。"
+twig_rules_category_Security_blurb = "绕过转义的输出、暴露模板上下文的调试输出,以及项目禁用的函数、过滤器或标签。"
