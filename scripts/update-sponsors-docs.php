@@ -45,6 +45,13 @@ const MANUAL_SPONSORS = [
         'tier' => 'large',
         'until' => '2028-09-19',
     ],
+    [
+        'name' => 'monbillet.ch',
+        'websiteUrl' => 'https://monbillet.ch/',
+        'avatarUrl' => 'https://carthage.software/media/01a1dcca-6b65-941f-d4f1-ca4aa685f023',
+        'tier' => 'large',
+        'until' => '2027-12-31',
+    ],
 ];
 
 const README_PATH = __DIR__ . '/../README.md';
