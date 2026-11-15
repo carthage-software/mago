@@ -3348,6 +3348,7 @@ test_case!(is_subclass_of_class_string_with_unrelated_type);
 test_case!(env_superglobal_as_process_environment);
 test_case!(nested_foreach_by_reference);
 test_case!(array_write_keyed_by_foreach_variable);
+test_case!(inherited_return_docblock_with_constant_references);
 
 #[test]
 #[cfg_attr(miri, ignore)]
