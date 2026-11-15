@@ -162,7 +162,7 @@ where
             Issue::error(format!(
                 "Cannot use `null` as an array index to access element{}.",
                 match extended_var_id {
-                    Some(var) => format!("of variable {var}"),
+                    Some(var) => format!(" of variable {var}"),
                     None => String::new(),
                 }
             ))
@@ -180,7 +180,7 @@ where
             Issue::warning(format!(
                 "Possibly using `null` as an array index to access element{}.",
                 match extended_var_id {
-                    Some(var) => format!("of variable {var}"),
+                    Some(var) => format!(" of variable {var}"),
                     None => String::new(),
                 }
             ))
