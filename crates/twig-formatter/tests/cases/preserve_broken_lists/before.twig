@@ -1,0 +1,17 @@
+{%
+    set classes = [
+        'block',
+        'block-menu',
+    ]
+%}
+{% include 'card.html.twig' with {
+    title: label,
+    content: content,
+} only %}
+{% set inline = [
+    'a',
+    'b'
+] %}
+{% set short = ['a', 'b'] %}
+{% set map = {one: 1,
+    two: 2} %}

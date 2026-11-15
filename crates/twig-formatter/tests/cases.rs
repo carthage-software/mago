@@ -62,6 +62,7 @@ test_case!(adjacent_strings);
 test_case!(compound_word_names);
 test_case!(mixed_tab_stops);
 test_case!(legacy_raw);
+test_case!(preserve_broken_lists);
 
 #[test]
 fn invalid_templates_are_rejected() {

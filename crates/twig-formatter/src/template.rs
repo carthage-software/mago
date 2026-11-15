@@ -1,3 +1,5 @@
+use std::cell::Cell;
+
 use mago_allocator::Arena;
 use mago_formatter_core::printer::Printer;
 use mago_twig_syntax::cst::Template;
@@ -34,7 +36,7 @@ impl<'arena, 'ctx, A: Arena> TemplateFormatter<'arena, 'ctx, A> {
             template,
             tags: &collected.tags,
             ignored,
-            builder: DocumentBuilder { arena, source: template.source_text },
+            builder: DocumentBuilder { arena, source: template.source_text, preserved_break: Cell::new(false) },
             alignment: Alignment::new(settings),
             output: Output::new(arena, template.source_text.len(), settings.tab_width),
             printer: Printer::new(arena, settings.into()),

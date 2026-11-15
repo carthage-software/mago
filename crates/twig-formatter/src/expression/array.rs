@@ -17,7 +17,12 @@ impl<'arena, A: Arena> DocumentBuilder<'arena, A> {
             ArrayElement::Missing(_) => Document::empty(),
         });
 
-        self.enclosed(self.raw(array.left_bracket), contents, self.raw(array.right_bracket))
+        let first =
+            array.elements.iter().next().map_or(array.right_bracket.start_offset(), |element| element.start_offset());
+        self.preserved_group(
+            self.enclosed(self.raw(array.left_bracket), contents, self.raw(array.right_bracket)),
+            self.breaks_between(array.left_bracket.end_offset(), first),
+        )
     }
 
     pub(super) fn hash_map(&self, map: &HashMap<'arena>) -> Document<'arena, A> {
@@ -43,6 +48,10 @@ impl<'arena, A: Arena> DocumentBuilder<'arena, A> {
             }
         });
 
-        self.enclosed(self.raw(map.left_brace), contents, self.raw(map.right_brace))
+        let first = map.entries.iter().next().map_or(map.right_brace.start_offset(), |entry| entry.start_offset());
+        self.preserved_group(
+            self.enclosed(self.raw(map.left_brace), contents, self.raw(map.right_brace)),
+            self.breaks_between(map.left_brace.end_offset(), first),
+        )
     }
 }

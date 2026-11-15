@@ -1,6 +1,8 @@
+use std::cell::Cell;
+
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec;
-use mago_formatter_core::document::{Align, Document, Group, Line};
+use mago_formatter_core::document::{Align, BreakMode, Document, Group, Line};
 use mago_span::{HasSpan, Span};
 use mago_twig_syntax::cst::{Expression, TokenSeparatedSequence};
 
@@ -10,9 +12,26 @@ use crate::tag::CodeTag;
 pub(super) struct DocumentBuilder<'arena, A: Arena> {
     pub arena: &'arena A,
     pub source: &'arena [u8],
+    pub preserved_break: Cell<bool>,
 }
 
 impl<'arena, A: Arena> DocumentBuilder<'arena, A> {
+    /// Whether the source breaks the line between two offsets.
+    pub(super) fn breaks_between(&self, start: u32, end: u32) -> bool {
+        start < end && memchr::memchr2(b'\n', b'\r', &self.source[start as usize..end as usize]).is_some()
+    }
+
+    /// A group that keeps the line break the source has, as `preserve-breaking-array-like` does for PHP.
+    pub(super) fn preserved_group(&self, group: Document<'arena, A>, preserve: bool) -> Document<'arena, A> {
+        match group {
+            Document::Group(group) if preserve => {
+                self.preserved_break.set(true);
+                Document::Group(group.with_break_mode(BreakMode::Preserve))
+            }
+            document => document,
+        }
+    }
+
     pub(super) fn raw(&self, span: Span) -> Document<'arena, A> {
         Document::String(&self.source[span.start.offset as usize..span.end.offset as usize])
     }
@@ -105,12 +124,35 @@ impl<'arena, A: Arena> DocumentBuilder<'arena, A> {
     }
 
     pub fn tag(&self, tag: CodeTag<'arena>, alignment: &'arena [u8]) -> Document<'arena, A> {
-        let document = self.group([
-            self.raw(tag.open),
-            Document::Indent(self.list([Document::Line(Line::default()), self.header(tag)])),
-            Document::Line(Line::default()),
-            self.raw(tag.close),
-        ]);
+        self.preserved_break.set(false);
+        let header = self.header(tag);
+        let has_preserved_break = self.preserved_break.replace(false);
+        let contents = &self.source[tag.open.end.offset as usize..tag.close.start.offset as usize];
+        let leading = contents.len() - contents.trim_ascii_start().len();
+        let trailing = contents.len() - contents.trim_ascii_end().len();
+        let breaks_after_open = self.breaks_between(tag.open.end.offset, tag.open.end.offset + leading as u32);
+        let breaks_before_close = self.breaks_between(tag.close.start.offset - trailing as u32, tag.close.start.offset);
+
+        let document = if has_preserved_break && !breaks_after_open {
+            self.array([
+                self.raw(tag.open),
+                Document::space(),
+                header,
+                if breaks_before_close { Document::Line(Line::hard()) } else { Document::space() },
+                self.raw(tag.close),
+            ])
+        } else {
+            self.preserved_group(
+                self.group([
+                    self.raw(tag.open),
+                    Document::Indent(self.list([Document::Line(Line::default()), header])),
+                    Document::Line(Line::default()),
+                    self.raw(tag.close),
+                ]),
+                has_preserved_break,
+            )
+        };
+
         if alignment.is_empty() {
             document
         } else {
