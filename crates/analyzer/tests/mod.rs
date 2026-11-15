@@ -3341,6 +3341,7 @@ test_case!(loop_variable_of_previous_iteration_keeps_its_type);
 test_case!(closure_from_callable_on_generic_instance);
 test_case!(discarded_object_without_effect);
 test_case!(array_column_on_enum_cases);
+test_case!(loose_equality_with_non_literal_scalar);
 
 #[test]
 #[cfg_attr(miri, ignore)]
