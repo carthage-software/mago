@@ -958,6 +958,7 @@ test_case!(trait_final_alias_adaptations, {
     settings
 });
 test_case!(inheritdoc_basic_parent_class);
+test_case!(inheritdoc_narrowed_interface_return);
 test_case!(inheritdoc_multiple_interfaces);
 test_case!(inheritdoc_nested_generics);
 test_case!(inheritdoc_priority);

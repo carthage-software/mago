@@ -423,7 +423,13 @@ fn collect_inheritance_work(
             .copied()
             .collect();
         if interfaces.len() > 1 {
-            interfaces.sort_unstable();
+            // Prefer a redeclaration on a derived interface over its ancestors.
+            // Alphabetical order alone can select an ancestor's broader PHPDoc.
+            interfaces.sort_unstable_by_key(|interface| {
+                let depth =
+                    codebase.class_likes.get(interface).map_or(0, |metadata| metadata.all_parent_interfaces.len());
+                (std::cmp::Reverse(depth), *interface)
+            });
         }
         candidates.extend(interfaces);
 
