@@ -61,6 +61,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
         let (invocation_targets, _) =
             resolve_targets(context, block_context, artifacts, self.function, &mut template_result)?;
 
+        let resolved_function = match invocation_targets.as_slice() {
+            [target] => match target.get_function_like_identifier() {
+                Some(FunctionLikeIdentifier::Function(name)) => Some(*name),
+                _ => None,
+            },
+            _ => None,
+        };
+
         analyze_invocation_targets(
             context,
             block_context,
@@ -76,7 +84,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
         )?;
 
         if context.plugin_registry.has_function_call_hooks() {
-            let mut hook_context = HookContext::new(context.codebase, context.source_file, block_context, artifacts);
+            let mut hook_context = HookContext::new(context.codebase, context.source_file, block_context, artifacts)
+                .with_resolved_function(resolved_function);
             context.plugin_registry.after_function_call(self, &mut hook_context)?;
             for reported in hook_context.take_issues() {
                 context.collector.report_with_code(reported.code, reported.issue);
