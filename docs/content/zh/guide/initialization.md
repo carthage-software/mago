@@ -14,6 +14,8 @@ mago init
 
 如果存在 `composer.json`,Mago 会询问是否读取它,以预填源码路径、PHP 版本以及 linter 应启用的框架集成。如果没有特别的情况,直接接受建议即可。否则命令会回退到手动引导流程。
 
+对于 Drupal 项目,请跳过 `mago init`:官方的 [`drupal/mago` 扩展](/recipes/drupal/)提供了一个为 Drupal 配置 Mago 的预设。
+
 ## 它会问什么
 
 在没有 `composer.json` 或你选择手动配置时,提示包括:

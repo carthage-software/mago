@@ -5216,7 +5216,8 @@ Enforces that PHP keywords (like `if`, `else`, `return`, `function`, etc.) be wr
 in lowercase. Using uppercase or mixed case is discouraged for consistency and readability.
 
 When the `drupal` integration is enabled, `TRUE`, `FALSE`, and `NULL` are exempted to
-match Drupal's coding standards (and the `drupal` formatter preset).
+match Drupal's coding standards (and the `drupal` formatter preset). Drupal projects
+should use the official `drupal/mago` extension instead, which sets this rule up for them.
 
 <hr class="rule__separator">
 

@@ -14,6 +14,8 @@ mago init
 
 Si un `composer.json` est présent, Mago propose de le lire et de pré-remplir les chemins source, la version PHP et les intégrations de framework que le linter doit activer. Acceptez la suggestion quand rien d'inhabituel ne se passe. Sinon, la commande passe à un parcours manuel.
 
+Pour un projet Drupal, n'utilisez pas `mago init` : l'[extension officielle `drupal/mago`](/recipes/drupal/) fournit un préréglage qui configure Mago pour Drupal.
+
 ## Ce que la commande demande
 
 S'il n'y a pas de `composer.json` ou si vous choisissez de configurer manuellement, les questions couvrent :

@@ -31,7 +31,7 @@ preset = "laravel"
 | `default` | PER-CS compliant. Same as the built-in defaults. |
 | `psr-12` | PSR-12 coding standard. |
 | `laravel` | Laravel Pint's `laravel` preset. |
-| `drupal` | Drupal coding standard. |
+| `drupal` | Drupal coding standard. The official [`drupal/mago` extension](/recipes/drupal/) sets it for you. |
 
 Presets accept a version suffix:
 

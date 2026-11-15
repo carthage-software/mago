@@ -41,7 +41,7 @@ Mago fournit des ensembles de règles spécifiques aux frameworks PHP populaires
 
 ### CMS
 
-- Drupal
+- Drupal : utilisez plutôt l'[extension officielle `drupal/mago`](/recipes/drupal/).
 - Magento
 - WordPress
 

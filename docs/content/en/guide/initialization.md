@@ -14,6 +14,8 @@ mago init
 
 If a `composer.json` is present, Mago offers to read it and pre-fill the source paths, PHP version, and any framework integrations the linter should enable. Accept the suggestion when nothing unusual is going on. Otherwise the command falls back to a manual walkthrough.
 
+For a Drupal project, skip `mago init`: the official [`drupal/mago` extension](/recipes/drupal/) ships a preset that sets up Mago for Drupal.
+
 ## What it asks
 
 When there is no `composer.json` or you choose to configure things by hand, the prompts cover:

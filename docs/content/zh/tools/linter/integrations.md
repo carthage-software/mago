@@ -41,7 +41,7 @@ Mago 内置了针对主流 PHP 框架、库和测试工具的规则集。当某�
 
 ### CMS
 
-- Drupal
+- Drupal:请改用官方的 [`drupal/mago` 扩展](/recipes/drupal/)。
 - Magento
 - WordPress
 

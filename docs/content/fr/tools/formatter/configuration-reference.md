@@ -31,7 +31,7 @@ preset = "laravel"
 | `default` | Conforme à PER-CS. Identique aux valeurs par défaut intégrées. |
 | `psr-12` | Norme de codage PSR-12. |
 | `laravel` | Préréglage `laravel` de Laravel Pint. |
-| `drupal` | Norme de codage Drupal. |
+| `drupal` | Norme de codage Drupal. L'[extension officielle `drupal/mago`](/recipes/drupal/) le règle pour vous. |
 
 Les préréglages acceptent un suffixe de version :
 

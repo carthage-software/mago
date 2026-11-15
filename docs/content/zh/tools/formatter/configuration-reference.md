@@ -31,7 +31,7 @@ preset = "laravel"
 | `default` | 兼容 PER-CS。等同于内置默认值。 |
 | `psr-12` | PSR-12 编码标准。 |
 | `laravel` | Laravel Pint 的 `laravel` 预设。 |
-| `drupal` | Drupal 编码标准。 |
+| `drupal` | Drupal 编码标准。官方的 [`drupal/mago` 扩展](/recipes/drupal/)会为你设置它。 |
 
 预设支持版本后缀:
 

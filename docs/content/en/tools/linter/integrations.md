@@ -41,7 +41,7 @@ Mago ships rule sets specific to popular PHP frameworks, libraries, and testing 
 
 ### CMS
 
-- Drupal
+- Drupal: use the official [`drupal/mago` extension](/recipes/drupal/) instead.
 - Magento
 - WordPress
 

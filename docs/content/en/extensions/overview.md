@@ -18,6 +18,12 @@ An extension may contribute:
 
 The formatter and guard do not currently expose extension APIs.
 
+## Framework extensions
+
+Some frameworks have an official extension. When one exists, use it rather than Mago's built-in settings for that framework:
+
+- **Drupal**: [`drupal/mago`](https://www.drupal.org/project/mago). See the [Drupal recipe](/recipes/drupal/).
+
 ## When to write an extension
 
 An extension is appropriate when knowledge belongs to a framework, library, or application rather than PHP itself. Typical examples include:
