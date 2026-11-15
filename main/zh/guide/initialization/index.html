@@ -584,6 +584,12 @@
         </a>
       </li>
       
+      <li>
+        <a href="../../../../main/zh/recipes/drupal">
+          <span>Drupal 实用方案</span>
+        </a>
+      </li>
+      
     </ul>
     
 
@@ -635,6 +641,7 @@
 <pre><code class="language-sh">mago init
 </code></pre>
 <p>如果存在 <code>composer.json</code>,Mago 会询问是否读取它,以预填源码路径、PHP 版本以及 linter 应启用的框架集成。如果没有特别的情况,直接接受建议即可。否则命令会回退到手动引导流程。</p>
+<p>对于 Drupal 项目,请跳过 <code>mago init</code>:官方的 <a href="../../../../main/zh/recipes/drupal"><code>drupal/mago</code> 扩展</a>提供了一个为 Drupal 配置 Mago 的预设。</p>
 <h2 id="what-it-asks">它会问什么</h2>
 <p>在没有 <code>composer.json</code> 或你选择手动配置时,提示包括:</p>
 <ul>

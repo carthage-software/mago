@@ -796,6 +796,12 @@
         </a>
       </li>
       
+      <li>
+        <a href="../../../../main/en/recipes/drupal">
+          <span>Drupal recipe</span>
+        </a>
+      </li>
+      
     </ul>
     
 
@@ -847,6 +853,7 @@
 <pre><code class="language-sh">mago init
 </code></pre>
 <p>If a <code>composer.json</code> is present, Mago offers to read it and pre-fill the source paths, PHP version, and any framework integrations the linter should enable. Accept the suggestion when nothing unusual is going on. Otherwise the command falls back to a manual walkthrough.</p>
+<p>For a Drupal project, skip <code>mago init</code>: the official <a href="../../../../main/en/recipes/drupal"><code>drupal/mago</code> extension</a> ships a preset that sets up Mago for Drupal.</p>
 <h2 id="what-it-asks">What it asks</h2>
 <p>When there is no <code>composer.json</code> or you choose to configure things by hand, the prompts cover:</p>
 <ul>

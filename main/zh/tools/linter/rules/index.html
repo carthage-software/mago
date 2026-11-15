@@ -584,6 +584,12 @@
         </a>
       </li>
       
+      <li>
+        <a href="../../../../../main/zh/recipes/drupal">
+          <span>Drupal 实用方案</span>
+        </a>
+      </li>
+      
     </ul>
     
 
@@ -4111,7 +4117,8 @@ interface MyInterface {}
 <p>Enforces that PHP keywords (like <code>if</code>, <code>else</code>, <code>return</code>, <code>function</code>, etc.) be written
 in lowercase. Using uppercase or mixed case is discouraged for consistency and readability.</p>
 <p>When the <code>drupal</code> integration is enabled, <code>TRUE</code>, <code>FALSE</code>, and <code>NULL</code> are exempted to
-match Drupal's coding standards (and the <code>drupal</code> formatter preset).</p>
+match Drupal's coding standards (and the <code>drupal</code> formatter preset). Drupal projects
+should use the official <code>drupal/mago</code> extension instead, which sets this rule up for them.</p>
 <hr class="rule__separator">
 <div class="rule-examples">
 <div class="rule-example rule-example--bad">

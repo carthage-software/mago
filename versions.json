@@ -49,6 +49,7 @@
                 "guide/upgrading",
                 "playground",
                 "recipes/docker",
+                "recipes/drupal",
                 "recipes/github-actions",
                 "recipes/helix",
                 "recipes/pre-commit-hooks",

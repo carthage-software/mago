@@ -44,6 +44,7 @@
   <url><loc>https://mago.carthage.software/main/en/guide/upgrading</loc></url>
   <url><loc>https://mago.carthage.software/main/en/playground</loc></url>
   <url><loc>https://mago.carthage.software/main/en/recipes/docker</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/recipes/drupal</loc></url>
   <url><loc>https://mago.carthage.software/main/en/recipes/github-actions</loc></url>
   <url><loc>https://mago.carthage.software/main/en/recipes/helix</loc></url>
   <url><loc>https://mago.carthage.software/main/en/recipes/pre-commit-hooks</loc></url>
@@ -90,6 +91,7 @@
   <url><loc>https://mago.carthage.software/main/fr/guide/upgrading</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/playground</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/recipes/docker</loc></url>
+  <url><loc>https://mago.carthage.software/main/fr/recipes/drupal</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/recipes/github-actions</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/recipes/helix</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/recipes/pre-commit-hooks</loc></url>
@@ -136,6 +138,7 @@
   <url><loc>https://mago.carthage.software/main/zh/guide/upgrading</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/playground</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/recipes/docker</loc></url>
+  <url><loc>https://mago.carthage.software/main/zh/recipes/drupal</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/recipes/github-actions</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/recipes/helix</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/recipes/pre-commit-hooks</loc></url>
