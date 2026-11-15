@@ -284,6 +284,7 @@ define_rules! {
     NoUnusedClosureCapture(no_unused_closure_capture @ NoUnusedClosureCaptureRule),
     NoRedundantYieldFrom(no_redundant_yield_from @ NoRedundantYieldFromRule),
     NoSelfAssignment(no_self_assignment @ NoSelfAssignmentRule),
+    NoUnusedReturnValue(no_unused_return_value @ NoUnusedReturnValueRule),
     NoProtectedInFinal(no_protected_in_final @ NoProtectedInFinalRule),
     RedundantStatic(redundant_static @ RedundantStaticRule),
     NoPhpTagTerminator(no_php_tag_terminator @ NoPhpTagTerminatorRule),

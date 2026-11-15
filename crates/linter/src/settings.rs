@@ -131,6 +131,7 @@ use crate::rule::NoUnescapedOutputConfig;
 use crate::rule::NoUnsafeFinallyConfig;
 use crate::rule::NoUnusedClosureCaptureConfig;
 use crate::rule::NoUnusedGlobalConfig;
+use crate::rule::NoUnusedReturnValueConfig;
 use crate::rule::NoUnusedStaticConfig;
 use crate::rule::NoVariableVariableConfig;
 use crate::rule::NoVoidReferenceReturnConfig;
@@ -322,6 +323,7 @@ pub struct RulesSettings {
     pub no_unused_closure_capture: RuleSettings<NoUnusedClosureCaptureConfig>,
     pub no_redundant_yield_from: RuleSettings<NoRedundantYieldFromConfig>,
     pub no_self_assignment: RuleSettings<NoSelfAssignmentConfig>,
+    pub no_unused_return_value: RuleSettings<NoUnusedReturnValueConfig>,
     pub no_protected_in_final: RuleSettings<NoProtectedInFinalConfig>,
     pub redundant_static: RuleSettings<RedundantStaticConfig>,
     pub no_php_tag_terminator: RuleSettings<NoPhpTagTerminatorConfig>,

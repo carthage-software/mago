@@ -28,6 +28,7 @@ pub mod no_redundant_use;
 pub mod no_redundant_write_visibility;
 pub mod no_redundant_yield_from;
 pub mod no_self_assignment;
+pub mod no_unused_return_value;
 pub mod redundant_static;
 
 pub use constant_condition::*;
@@ -60,4 +61,5 @@ pub use no_redundant_use::*;
 pub use no_redundant_write_visibility::*;
 pub use no_redundant_yield_from::*;
 pub use no_self_assignment::*;
+pub use no_unused_return_value::*;
 pub use redundant_static::*;
