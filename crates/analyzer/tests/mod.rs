@@ -3343,6 +3343,7 @@ test_case!(discarded_object_without_effect);
 test_case!(array_column_on_enum_cases);
 test_case!(number_cast_of_simplexml_and_gmp);
 test_case!(nested_array_write_with_nullable_keys);
+test_case!(static_access_through_runtime_class_of_interface_object);
 
 #[test]
 #[cfg_attr(miri, ignore)]
