@@ -550,6 +550,19 @@ where
                 return Some(first_type);
             }
         }
+        (
+            TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { kind, constraint })),
+            TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType {
+                constraint: other_constraint, ..
+            })),
+        ) => {
+            let narrowed_constraint = intersect_atomic_with_atomic(context, constraint, other_constraint)?;
+
+            return Some(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::of_type(
+                *kind,
+                narrowed_constraint,
+            ))));
+        }
         (TAtomic::Scalar(TScalar::String(string)), class_string @ TAtomic::Scalar(TScalar::ClassLikeString(_)))
         | (class_string @ TAtomic::Scalar(TScalar::ClassLikeString(_)), TAtomic::Scalar(TScalar::String(string)))
             if string.is_unspecified_literal() && !string.is_numeric =>
