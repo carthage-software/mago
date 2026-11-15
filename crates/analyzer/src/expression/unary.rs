@@ -1515,6 +1515,7 @@ where
                     resulting_float_atomics.push(TAtomic::Scalar(TScalar::literal_float(1.0)));
                 }
             }
+            TAtomic::Object(object) if casts_to_number(object, context) => return get_float(),
             TAtomic::Object(_) => {
                 if !reported_error_for_object {
                     context.collector.report_with_code(
@@ -1681,6 +1682,16 @@ impl NumericInterval {
     }
 }
 
+fn casts_to_number<A>(object: &TObject, context: &Context<'_, '_, A>) -> bool
+where
+    A: Arena,
+{
+    object.get_name().is_some_and(|name| {
+        context.codebase.is_instance_of(name.as_bytes(), b"SimpleXMLElement")
+            || context.codebase.is_instance_of(name.as_bytes(), b"GMP")
+    })
+}
+
 fn has_array_in_cast_operand(operand_type: &TUnion) -> bool {
     operand_type.types.iter().any(|atomic| {
         atomic.is_array()
@@ -1716,6 +1727,7 @@ where
 
                 TAtomic::Scalar(TScalar::literal_int(1))
             }
+            TAtomic::Object(object) if casts_to_number(object, context) => return get_int(),
             TAtomic::Object(_) => TAtomic::Scalar(TScalar::literal_int(1)),
             TAtomic::Callable(callable)
                 if callable
