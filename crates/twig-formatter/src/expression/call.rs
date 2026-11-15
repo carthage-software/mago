@@ -3,7 +3,7 @@ use crate::safety::ambiguous_name;
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec;
 use mago_formatter_core::document::Document;
-use mago_formatter_core::document::{Group, Line};
+use mago_formatter_core::document::{BreakMode, Group, Line};
 use mago_span::HasSpan;
 use mago_twig_syntax::cst::{
     Argument, ArgumentList, ArrowFunction, Filter, NamedArgument, NamedArgumentSeparator, Test, TestArguments,
@@ -11,7 +11,39 @@ use mago_twig_syntax::cst::{
 
 impl<'arena, A: Arena> DocumentBuilder<'arena, A> {
     pub(crate) fn arguments(&self, arguments: &ArgumentList<'arena>) -> Document<'arena, A> {
-        let contents = self.separated(&arguments.arguments, |argument| match argument {
+        let broken_out = self.enclosed(
+            self.raw(arguments.left_parenthesis),
+            self.separated(&arguments.arguments, |argument| self.argument(argument)),
+            self.raw(arguments.right_parenthesis),
+        );
+
+        let Some((last, rest)) = arguments.arguments.as_slice().split_last() else {
+            return broken_out;
+        };
+
+        if arguments.arguments.has_trailing_token()
+            || last.is_unpacked()
+            || !self.hugs(last.value())
+            || self.breaks_between(arguments.left_parenthesis.end_offset(), last.start_offset())
+        {
+            return broken_out;
+        }
+
+        let mut hugged = Vec::with_capacity_in(rest.len() * 2 + 3, self.arena);
+        hugged.push(self.raw(arguments.left_parenthesis));
+        for argument in rest {
+            hugged.push(self.argument(argument));
+            hugged.push(Document::String(b", "));
+        }
+
+        hugged.push(Document::Group(Group::new(self.list([self.argument(last)])).with_break_mode(BreakMode::Force)));
+        hugged.push(self.raw(arguments.right_parenthesis));
+
+        Document::Group(Group::conditional(hugged, self.list([broken_out])))
+    }
+
+    fn argument(&self, argument: &Argument<'arena>) -> Document<'arena, A> {
+        match argument {
             Argument::Positional(argument) => argument
                 .ellipsis
                 .map_or_else(|| self.expression(argument.value), |ellipsis| self.spread(ellipsis, argument.value)),
@@ -20,9 +52,7 @@ impl<'arena, A: Arena> DocumentBuilder<'arena, A> {
                 Document::String(self.named_separator(argument)),
                 self.expression(argument.value),
             ]),
-        });
-
-        self.enclosed(self.raw(arguments.left_parenthesis), contents, self.raw(arguments.right_parenthesis))
+        }
     }
 
     fn named_separator(&self, argument: &NamedArgument<'arena>) -> &'static [u8] {
