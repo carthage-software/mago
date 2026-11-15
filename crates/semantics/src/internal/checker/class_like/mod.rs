@@ -5,6 +5,7 @@ use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::AnonymousClass;
+use mago_syntax::cst::AttributeList;
 use mago_syntax::cst::Class;
 use mago_syntax::cst::ClassLikeMember;
 use mago_syntax::cst::Enum;
@@ -77,6 +78,8 @@ pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Conte
     let class_fqcn_bytes: &[u8] = context.get_name(class.name.span.start);
     let class_name = BytesDisplay(class_name_bytes);
     let class_fqcn = BytesDisplay(class_fqcn_bytes);
+
+    check_deprecated_attribute(&class.attribute_lists, class.span(), "class", class_fqcn_bytes, context);
 
     if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(class_name_bytes))
         || SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED
@@ -348,6 +351,14 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
     let interface_fqcn_bytes: &[u8] = context.get_name(interface.name.span.start);
     let interface_name = BytesDisplay(interface_name_bytes);
     let interface_fqcn = BytesDisplay(interface_fqcn_bytes);
+
+    check_deprecated_attribute(
+        &interface.attribute_lists,
+        interface.span(),
+        "interface",
+        interface_fqcn_bytes,
+        context,
+    );
 
     if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(interface_name_bytes))
         || SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED
@@ -827,6 +838,8 @@ pub fn check_enum<'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Contex
     let enum_fqcn = BytesDisplay(enum_fqcn_bytes);
     let enum_is_backed = r#enum.backing_type_hint.is_some();
 
+    check_deprecated_attribute(&r#enum.attribute_lists, r#enum.span(), "enum", enum_fqcn_bytes, context);
+
     if RESERVED_KEYWORDS.iter().any(|keyword| keyword.eq_ignore_ascii_case(enum_name_bytes))
         || SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED
             .iter()
@@ -1017,6 +1030,15 @@ pub fn check_anonymous_class<'ast, 'arena>(
     context: &mut Context<'_, 'ast, 'arena>,
 ) {
     let anonymous_class_name = BytesDisplay(ANONYMOUS_CLASS_NAME);
+
+    check_deprecated_attribute(
+        &anonymous_class.attribute_lists,
+        anonymous_class.span(),
+        "class",
+        ANONYMOUS_CLASS_NAME,
+        context,
+    );
+
     let mut last_final = None;
     let mut last_readonly = None;
 
@@ -1453,5 +1475,38 @@ pub fn check_members<'ast, 'arena>(
             }
             _ => {}
         }
+    }
+}
+
+#[inline]
+fn check_deprecated_attribute(
+    attribute_lists: &Sequence<'_, AttributeList<'_>>,
+    class_like_span: Span,
+    class_like_kind: &str,
+    class_like_fqcn: &[u8],
+    context: &mut Context<'_, '_, '_>,
+) {
+    if !context.version.is_supported(Feature::DeprecatedAttribute) {
+        return;
+    }
+
+    let class_like_fqcn = BytesDisplay(class_like_fqcn);
+
+    for attribute in attribute_lists.iter().flat_map(|attribute_list| attribute_list.attributes.iter()) {
+        if !context.get_name(attribute.name.span().start).eq_ignore_ascii_case(b"Deprecated") {
+            continue;
+        }
+
+        context.report(
+            Issue::error(format!("Cannot apply `#[\\Deprecated]` to {class_like_kind} `{class_like_fqcn}`."))
+                .with_annotation(Annotation::primary(attribute.span()).with_message("`#[\\Deprecated]` applied here."))
+                .with_annotation(
+                    Annotation::secondary(class_like_span)
+                        .with_message(format!("{class_like_kind} `{class_like_fqcn}` defined here.")),
+                )
+                .with_help(format!(
+                    "Remove the attribute, or mark the {class_like_kind} with a `@deprecated` docblock tag."
+                )),
+        );
     }
 }
