@@ -3351,6 +3351,7 @@ test_case!(array_write_keyed_by_foreach_variable);
 test_case!(inherited_return_docblock_with_constant_references);
 test_case!(pcre_literal_pattern_failure_result);
 test_case!(psl_contains_narrows_like_in_array);
+test_case!(static_call_from_another_scope_ends_static_property_narrowing);
 
 #[test]
 #[cfg_attr(miri, ignore)]
