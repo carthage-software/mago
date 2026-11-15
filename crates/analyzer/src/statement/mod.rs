@@ -1,5 +1,7 @@
 use mago_allocator::Arena;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::identifier::method::MethodIdentifier;
+use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::cast::cast_atomic_to_callable;
 use mago_names::kind::NameKind;
@@ -8,13 +10,17 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::comments::docblock::PrecedingDocblocks;
+use mago_syntax::cst::Argument;
 use mago_syntax::cst::Call;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::ExpressionStatement;
 use mago_syntax::cst::FunctionCall;
+use mago_syntax::cst::Instantiation;
 use mago_syntax::cst::Node;
+use mago_syntax::cst::PartialArgument;
 use mago_syntax::cst::Statement;
 use mago_word::Word;
+use mago_word::word;
 
 use crate::Context;
 use crate::analyzable::Analyzable;
@@ -331,7 +337,46 @@ fn detect_unused_statement_expressions<'ast, 'arena, A>(
         Expression::Access(_) => {
             "Accessing a property or constant as a statement might have no effect (unless it's meant to trigger a magic method call)."
         }
-        Expression::AnonymousClass(_) => "Defining an anonymous class without assigning it has no effect.",
+        Expression::AnonymousClass(anonymous_class) => {
+            let Some(class_like) = context.codebase.get_anonymous_class(context.source_file, expression.span()) else {
+                return;
+            };
+
+            let arguments = anonymous_class.argument_list.iter().flat_map(|list| list.arguments.iter());
+            if arguments.clone().any(|argument| argument.value().is_none())
+                || !discarded_object_has_no_effect(
+                    class_like,
+                    arguments.filter_map(PartialArgument::value),
+                    context,
+                    artifacts,
+                )
+            {
+                return;
+            }
+
+            "Defining an anonymous class without assigning it has no effect."
+        }
+        Expression::Instantiation(Instantiation {
+            class: Expression::Identifier(class_name), argument_list, ..
+        }) => {
+            let Some(class_like) = context.codebase.get_class_like(context.resolved_names.get(class_name)) else {
+                return;
+            };
+
+            if !class_like.kind.is_class()
+                || class_like.flags.is_abstract()
+                || !discarded_object_has_no_effect(
+                    class_like,
+                    argument_list.iter().flat_map(|list| list.arguments.iter()).map(Argument::value),
+                    context,
+                    artifacts,
+                )
+            {
+                return;
+            }
+
+            "Creating an object without using it has no effect."
+        }
         Expression::Closure(_) | Expression::ArrowFunction(_) | Expression::PartialApplication(_) => {
             "Defining a closure or arrow function without assigning or calling it has no effect."
         }
@@ -395,6 +440,38 @@ fn detect_unused_statement_expressions<'ast, 'arena, A>(
                 "To fix this, assign the value to a variable, return it, or remove the statement if it is truly unnecessary.",
             ),
     );
+}
+
+fn discarded_object_has_no_effect<'ast, 'arena, A>(
+    class_like: &ClassLikeMetadata,
+    mut arguments: impl Iterator<Item = &'ast Expression<'arena>>,
+    context: &Context<'_, 'arena, A>,
+    artifacts: &AnalysisArtifacts,
+) -> bool
+where
+    A: Arena,
+    'arena: 'ast,
+{
+    if class_like.appearing_method_ids.contains_key(&word("__destruct")) {
+        return false;
+    }
+
+    let constructor_id = MethodIdentifier::new(class_like.name, word("__construct"));
+    if let Some(constructor) = context.codebase.get_declaring_method_by_id(&constructor_id)
+        && (!(constructor.flags.is_pure()
+            || constructor.flags.is_mutation_free()
+            || constructor.flags.is_external_mutation_free())
+            || constructor.flags.has_throw()
+            || !constructor.thrown_types.is_empty()
+            || constructor.parameters.iter().any(|parameter| parameter.flags.is_by_reference()))
+    {
+        return false;
+    }
+
+    arguments.all(|argument| {
+        !expression_has_observable_side_effect(argument)
+            && !call_may_have_observable_side_effect(argument, context, artifacts)
+    })
 }
 
 fn call_may_have_observable_side_effect<'arena, A>(

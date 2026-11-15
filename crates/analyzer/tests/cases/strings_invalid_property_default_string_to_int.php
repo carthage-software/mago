@@ -8,4 +8,5 @@ final class Foo
     public int $x = 'hello';
 }
 
+/** @mago-expect analysis:unused-statement */
 new Foo();

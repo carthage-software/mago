@@ -3339,6 +3339,7 @@ test_case!(array_is_list_narrows_sealed_shapes);
 test_case!(dead_operand_of_or_is_paradoxical);
 test_case!(loop_variable_of_previous_iteration_keeps_its_type);
 test_case!(closure_from_callable_on_generic_instance);
+test_case!(discarded_object_without_effect);
 
 #[test]
 #[cfg_attr(miri, ignore)]

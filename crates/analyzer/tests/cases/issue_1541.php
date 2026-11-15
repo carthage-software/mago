@@ -26,6 +26,7 @@ deprecated_func();
 (new Foo())->deprecated_method();
 
 /** @mago-expect analysis:deprecated-class */
+/** @mago-expect analysis:unused-statement */
 new Bar();
 
 /** @mago-expect analysis:deprecated-constant */

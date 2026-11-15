@@ -8,13 +8,17 @@ class FooBar {}
 function processRequest(): void {}
 
 /** @mago-expect analysis:incorrect-class-like-casing */
+/** @mago-expect analysis:unused-statement */
 new foobar();
 /** @mago-expect analysis:incorrect-class-like-casing */
+/** @mago-expect analysis:unused-statement */
 new FOOBAR();
 /** @mago-expect analysis:incorrect-class-like-casing */
+/** @mago-expect analysis:unused-statement */
 new Foobar();
 
 // Correct, no warning
+/** @mago-expect analysis:unused-statement */
 new FooBar();
 
 /** @mago-expect analysis:incorrect-function-casing */
@@ -30,10 +34,13 @@ processRequest();
 FoObAr::class;
 
 /** @mago-expect analysis:incorrect-class-like-casing */
+/** @mago-expect analysis:unused-statement */
 new \stdclass();
 /** @mago-expect analysis:incorrect-class-like-casing */
+/** @mago-expect analysis:unused-statement */
 new \STDCLASS();
 // Correct
+/** @mago-expect analysis:unused-statement */
 new \stdClass();
 
 /** @mago-expect analysis:incorrect-class-like-casing */

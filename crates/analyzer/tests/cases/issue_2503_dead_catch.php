@@ -169,6 +169,7 @@ function issue_2503_catches_undocumented_exception_constructor_throw(): void
 function issue_2503_builtin_constructor_does_not_hide_dead_catch(): void
 {
     try {
+        /** @mago-expect analysis:unused-statement */
         new \RuntimeException();
     } catch (\LogicException) {
     }

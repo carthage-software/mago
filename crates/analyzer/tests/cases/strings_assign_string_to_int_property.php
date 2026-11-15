@@ -13,4 +13,5 @@ final class Foo
     }
 }
 
+/** @mago-expect analysis:unused-statement */
 new Foo();
