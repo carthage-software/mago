@@ -1179,6 +1179,9 @@ where
 
     for atomic in existing_var_type.types.as_ref() {
         match atomic {
+            _ if loosely_equals_any_scalar(assertion, atomic) => {
+                acceptable_types.push(atomic.clone());
+            }
             TAtomic::Scalar(TScalar::String(existing_string)) => {
                 if existing_string.is_known_literal() {
                     if atomic_comparator::is_contained_by(
@@ -1349,6 +1352,11 @@ fn intersect_bool<A>(
 where
     A: Arena,
 {
+    // `$value == $bool` casts `$value` to bool, so any type can loosely equal some bool.
+    if boolean.is_general() && matches!(assertion, Assertion::IsEqual(_)) {
+        return existing_var_type.clone();
+    }
+
     // Treat specific boolean values (true/false literals) as equality checks
     // even if the assertion is IsType rather than IsIdentical
     let is_equality = is_equality || !boolean.is_general();
@@ -1424,8 +1432,15 @@ where
 
     for atomic in existing_var_type.types.as_ref() {
         match atomic {
+            _ if loosely_equals_any_scalar(assertion, atomic) => {
+                acceptable_types.push(atomic.clone());
+            }
             TAtomic::Scalar(TScalar::Float(_)) => {
                 acceptable_types.push(TAtomic::Scalar(TScalar::Float(*float)));
+            }
+            // `3 == 3.0` holds, and a float loosely equals a string such as `"INF"`.
+            TAtomic::Scalar(TScalar::Integer(_) | TScalar::String(_)) if matches!(assertion, Assertion::IsEqual(_)) => {
+                acceptable_types.push(atomic.clone());
             }
             TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic | TScalar::Numeric) => {
                 return get_float();
@@ -1480,6 +1495,9 @@ where
 
     for atomic in existing_var_type.types.as_ref() {
         match atomic {
+            _ if loosely_equals_any_scalar(assertion, atomic) => {
+                acceptable_types.push(atomic.clone());
+            }
             TAtomic::Scalar(TScalar::Integer(existing_integer)) => {
                 if let Some(intersection) = intersect_integer_types(*existing_integer, *integer) {
                     acceptable_types.push(TAtomic::Scalar(TScalar::Integer(intersection)));
@@ -1498,6 +1516,9 @@ where
                 if !string.is_known_literal() || string.is_numeric {
                     acceptable_types.push(TAtomic::Scalar(TScalar::String(string.as_numeric(true))));
                 }
+            }
+            TAtomic::Scalar(TScalar::Float(_)) if matches!(assertion, Assertion::IsEqual(_)) => {
+                acceptable_types.push(atomic.clone());
             }
             TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic | TScalar::ArrayKey | TScalar::Numeric) => {
                 return get_union_from_integer(integer);
@@ -1534,6 +1555,12 @@ where
     }
 
     finalize(context, acceptable_types, did_remove_type, key, span, existing_var_type, assertion, negated, is_equality)
+}
+
+/// `null == 0`, `null == ''` and `true == 5` all hold, so a loose `==` against a
+/// scalar cannot rule out `null` or `bool`.
+fn loosely_equals_any_scalar(assertion: &Assertion, atomic: &TAtomic) -> bool {
+    matches!(assertion, Assertion::IsEqual(_)) && matches!(atomic, TAtomic::Null | TAtomic::Scalar(TScalar::Bool(_)))
 }
 
 fn intersect_integer_types(existing: TInteger, asserted: TInteger) -> Option<TInteger> {
