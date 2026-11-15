@@ -5,9 +5,9 @@ nav_order = 70
 nav_section = "Tools"
 nav_subsection = "Linter"
 +++
-Mago 的 linter 共提供 191 条规则,分布在 9 个类别中。点击任意规则可展开其描述、要求、默认配置和示例。
+Mago 的 linter 共提供 193 条规则,分布在 9 个类别中。点击任意规则可展开其描述、要求、默认配置和示例。
 
-<div class="rule-index" role="navigation" aria-label="规则类别"><a class="rule-index__item" href="#clarity"><span class="rule-index__name">清晰度</span><span class="rule-index__count">22 条规则</span><span class="rule-index__blurb">让意图更明确、减少阅读负担的规则。它们指出在技术上合法但会模糊代码意图的写法。</span></a><a class="rule-index__item" href="#bestpractices"><span class="rule-index__name">最佳实践</span><span class="rule-index__count">48 条规则</span><span class="rule-index__blurb">PHP 的惯用写法和被广泛接受的约定。这些规则推动代码靠近经验丰富的 PHP 开发者所采用的现代风格。</span></a><a class="rule-index__item" href="#consistency"><span class="rule-index__name">一致性</span><span class="rule-index__count">27 条规则</span><span class="rule-index__blurb">保持整套代码风格一致。选定一种写法,这些规则帮助所有人坚持下去。</span></a><a class="rule-index__item" href="#deprecation"><span class="rule-index__name">弃用</span><span class="rule-index__count">7 条规则</span><span class="rule-index__blurb">上游已弃用、未来会被移除的 PHP 特性与 API。请在它们彻底失效前迁移。</span></a><a class="rule-index__item" href="#maintainability"><span class="rule-index__name">可维护性</span><span class="rule-index__count">11 条规则</span><span class="rule-index__blurb">难以长期维护的代码,过于复杂、纠缠或脆弱。这些规则提前暴露成本。</span></a><a class="rule-index__item" href="#redundancy"><span class="rule-index__name">冗余</span><span class="rule-index__count">31 条规则</span><span class="rule-index__blurb">无用代码、无效值,以及没有可观察效果的写法。清理它们让代码更诚实。</span></a><a class="rule-index__item" href="#security"><span class="rule-index__name">安全</span><span class="rule-index__count">15 条规则</span><span class="rule-index__blurb">标记安全漏洞的规则,如注入向量、不安全的反序列化,以及不可信输入流入敏感位置。</span></a><a class="rule-index__item" href="#safety"><span class="rule-index__name">安全性</span><span class="rule-index__count">9 条规则</span><span class="rule-index__blurb">可以通过编译但运行时会出问题的写法。这些规则在用户遇到之前就揪出陷阱。</span></a><a class="rule-index__item" href="#correctness"><span class="rule-index__name">正确性</span><span class="rule-index__count">21 条规则</span><span class="rule-index__blurb">缺陷与逻辑错误。本类规则负责发现作者本意之外的行为。</span></a></div>
+<div class="rule-index" role="navigation" aria-label="规则类别"><a class="rule-index__item" href="#clarity"><span class="rule-index__name">清晰度</span><span class="rule-index__count">22 条规则</span><span class="rule-index__blurb">让意图更明确、减少阅读负担的规则。它们指出在技术上合法但会模糊代码意图的写法。</span></a><a class="rule-index__item" href="#bestpractices"><span class="rule-index__name">最佳实践</span><span class="rule-index__count">49 条规则</span><span class="rule-index__blurb">PHP 的惯用写法和被广泛接受的约定。这些规则推动代码靠近经验丰富的 PHP 开发者所采用的现代风格。</span></a><a class="rule-index__item" href="#consistency"><span class="rule-index__name">一致性</span><span class="rule-index__count">27 条规则</span><span class="rule-index__blurb">保持整套代码风格一致。选定一种写法,这些规则帮助所有人坚持下去。</span></a><a class="rule-index__item" href="#deprecation"><span class="rule-index__name">弃用</span><span class="rule-index__count">7 条规则</span><span class="rule-index__blurb">上游已弃用、未来会被移除的 PHP 特性与 API。请在它们彻底失效前迁移。</span></a><a class="rule-index__item" href="#maintainability"><span class="rule-index__name">可维护性</span><span class="rule-index__count">11 条规则</span><span class="rule-index__blurb">难以长期维护的代码,过于复杂、纠缠或脆弱。这些规则提前暴露成本。</span></a><a class="rule-index__item" href="#redundancy"><span class="rule-index__name">冗余</span><span class="rule-index__count">32 条规则</span><span class="rule-index__blurb">无用代码、无效值,以及没有可观察效果的写法。清理它们让代码更诚实。</span></a><a class="rule-index__item" href="#security"><span class="rule-index__name">安全</span><span class="rule-index__count">15 条规则</span><span class="rule-index__blurb">标记安全漏洞的规则,如注入向量、不安全的反序列化,以及不可信输入流入敏感位置。</span></a><a class="rule-index__item" href="#safety"><span class="rule-index__name">安全性</span><span class="rule-index__count">9 条规则</span><span class="rule-index__blurb">可以通过编译但运行时会出问题的写法。这些规则在用户遇到之前就揪出陷阱。</span></a><a class="rule-index__item" href="#correctness"><span class="rule-index__name">正确性</span><span class="rule-index__count">21 条规则</span><span class="rule-index__blurb">缺陷与逻辑错误。本类规则负责发现作者本意之外的行为。</span></a></div>
 
 <h2 id="integration-specific-rules">特定集成的规则</h2>
 
@@ -3633,6 +3633,58 @@ function process($condition) {
 | `enabled` | `boolean` | `false` |
 | `level` | `string` | `"help"` |
 | `max_allowed_statements` | `number` | `0` |
+
+</div>
+
+</details>
+
+<details class="rule" name="rule" id="prefer-null-coalescing-assignment">
+<summary><code class="rule__code">prefer-null-coalescing-assignment</code><a class="rule__anchor" href="#prefer-null-coalescing-assignment" aria-label="prefer-null-coalescing-assignment 的永久链接">¶</a><span class="rule__level rule__level--help">help</span></summary>
+
+<div class="rule__body">
+
+Suggests the null coalescing assignment operator (`??=`) when the right operand
+of `??` assigns to the same variable or property as its left operand.
+
+`$value ?? ($value = $default)` and `$value ??= $default` do the same work, but
+the latter names the target once.
+
+<blockquote class="rule-requirement">此规则要求 PHP <code>7.4.0</code> 或更高版本。</blockquote>
+
+<hr class="rule__separator">
+
+<div class="rule-examples">
+
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">避免</div>
+
+```php
+<?php
+
+return $this->ids ?? ($this->ids = $this->readIds());
+```
+
+</div>
+
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">推荐</div>
+
+```php
+<?php
+
+return $this->ids ??= $this->readIds();
+```
+
+</div>
+
+</div>
+
+<hr class="rule__separator">
+
+| 选项 | 类型 | 默认值 |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"help"` |
 
 </div>
 
@@ -8690,6 +8742,85 @@ function gen(): Generator {
 function gen(): Generator {
     yield 1;
     yield 'foo' => new stdClass();
+}
+```
+
+</div>
+
+</div>
+
+<hr class="rule__separator">
+
+| 选项 | 类型 | 默认值 |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"help"` |
+
+</div>
+
+</details>
+
+<details class="rule" name="rule" id="no-unused-return-value">
+<summary><code class="rule__code">no-unused-return-value</code><a class="rule__anchor" href="#no-unused-return-value" aria-label="no-unused-return-value 的永久链接">¶</a><span class="rule__level rule__level--help">help</span></summary>
+
+<div class="rule__body">
+
+Detects private methods whose return value is thrown away at every call site.
+
+Only the class itself can call a private method, so when each call is a bare
+statement, nothing reads the value the method returns. Declaring the method
+`void` makes that clear.
+
+The rule stays silent when the class uses a trait, calls methods by a dynamic
+name, takes the method as a callable, or mentions its name in a string.
+
+<hr class="rule__separator">
+
+<div class="rule-examples">
+
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">避免</div>
+
+```php
+<?php
+
+final class Counter
+{
+    private int $count = 0;
+
+    public function increment(): void
+    {
+        $this->advance();
+    }
+
+    private function advance(): int
+    {
+        return ++$this->count;
+    }
+}
+```
+
+</div>
+
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">推荐</div>
+
+```php
+<?php
+
+final class Counter
+{
+    private int $count = 0;
+
+    public function increment(): void
+    {
+        $this->advance();
+    }
+
+    private function advance(): void
+    {
+        ++$this->count;
+    }
 }
 ```
 
