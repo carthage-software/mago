@@ -19,15 +19,12 @@ namespace PregMatchPatternValidation {
 
     function compareMatches(string $subject, string $pattern): void
     {
-        // @mago-expect analysis:possibly-false-operand
         if (\preg_match('/foo/', $subject) > 0) {
         }
 
-        // @mago-expect analysis:possibly-false-operand
         if (matchPattern(subject: $subject, pattern: '~foo~i') > 0) {
         }
 
-        // @mago-expect analysis:possibly-false-operand
         if (matchAllPatterns(subject: $subject, pattern: '/foo/') > 0) {
         }
 
@@ -112,5 +109,11 @@ namespace PregMatchPatternValidation\Shadowed {
     {
         // @mago-expect analysis:possibly-false-operand
         return preg_match('not a regular expression', $subject) > 0;
+    }
+
+    function compareCustomFunctionWithValidPattern(string $subject): bool
+    {
+        // @mago-expect analysis:possibly-false-operand
+        return preg_match('/foo/', $subject) > 0;
     }
 }

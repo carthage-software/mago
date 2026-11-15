@@ -389,26 +389,28 @@ where
                     return if_types;
                 };
 
-                let mut iterable_values = None;
-                for atomic in checked_iterable.types.as_ref() {
-                    let Some(value_type) = get_iterable_value_parameter(atomic, assertion_context.codebase) else {
+                if let Some(value_assertions) = get_in_array_assertions(checked_iterable, assertion_context.codebase) {
+                    (1, value_assertions)
+                } else {
+                    let mut iterable_values = None;
+                    for atomic in checked_iterable.types.as_ref() {
+                        let Some(value_type) = get_iterable_value_parameter(atomic, assertion_context.codebase) else {
+                            return if_types;
+                        };
+
+                        iterable_values = Some(add_optional_union_type(
+                            value_type,
+                            iterable_values.as_ref(),
+                            assertion_context.codebase,
+                        ));
+                    }
+
+                    let Some(value_type) = iterable_values else {
                         return if_types;
                     };
 
-                    iterable_values =
-                        Some(add_optional_union_type(value_type, iterable_values.as_ref(), assertion_context.codebase));
+                    (1, vec![Assertion::InArray(value_type)])
                 }
-
-                let Some(value_type) = iterable_values else {
-                    return if_types;
-                };
-
-                let mut value_assertions = vec![];
-                for atomic in value_type.types.into_owned() {
-                    value_assertions.push(Assertion::IsEqual(atomic));
-                }
-
-                (1, value_assertions)
             }
             _ => return if_types,
         }
@@ -559,86 +561,8 @@ where
                     .map(mago_syntax::cst::Argument::value)
                     .and_then(|expr| artifacts.get_expression_type(expr))?;
 
-                let mut value_types = None;
-                let mut required_values: Option<BTreeSet<TAtomic>> = None;
-                for atomic in checked_array.types.as_ref() {
-                    let TAtomic::Array(array) = atomic else {
-                        return None;
-                    };
-
-                    let array_value_type = get_array_value_parameter(array, assertion_context.codebase);
-                    let mut array_required_values = BTreeSet::new();
-                    let mut add_required_value = |value_type: &TUnion| {
-                        if !value_type.is_single() {
-                            return;
-                        }
-
-                        let value = value_type.get_single();
-                        if value.is_literal()
-                            || value.is_literal_class_string()
-                            || matches!(value, TAtomic::Object(TObject::Enum(r#enum)) if r#enum.case.is_some())
-                        {
-                            array_required_values.insert(value.clone());
-                        }
-                    };
-
-                    if array.is_non_empty() {
-                        add_required_value(&array_value_type);
-                    }
-
-                    match array {
-                        TArray::Keyed(keyed) => {
-                            if let Some(items) = keyed.get_known_items() {
-                                for (optional, value_type) in items.values() {
-                                    if !optional {
-                                        add_required_value(value_type);
-                                    }
-                                }
-                            }
-                        }
-                        TArray::List(list) => {
-                            if let Some(items) = list.get_known_elements() {
-                                for (optional, value_type) in items.values() {
-                                    if !optional {
-                                        add_required_value(value_type);
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if let Some(required_values) = &mut required_values {
-                        required_values.retain(|value| array_required_values.contains(value));
-                    } else {
-                        required_values = Some(array_required_values);
-                    }
-
-                    value_types = Some(add_optional_union_type(
-                        array_value_type,
-                        value_types.as_ref(),
-                        assertion_context.codebase,
-                    ));
-                }
-
-                let value_types = value_types?;
-                let required_values = required_values?;
-                let has_unknown_values = value_types.types.iter().any(|value| !required_values.contains(value));
-                let mut value_assertions = required_values
-                    .into_iter()
-                    .map(|value| {
-                        if matches!(value, TAtomic::Object(TObject::Enum(_))) {
-                            Assertion::IsType(value)
-                        } else {
-                            Assertion::IsIdentical(value)
-                        }
-                    })
-                    .collect::<Vec<_>>();
-
-                if has_unknown_values {
-                    value_assertions.insert(0, Assertion::InArray(value_types));
-                }
-
-                Some((0, value_assertions))
+                get_in_array_assertions(checked_array, assertion_context.codebase)
+                    .map(|value_assertions| (0, value_assertions))
             }
             _ => None,
         };
@@ -695,6 +619,85 @@ where
     }
 
     if_types
+}
+
+fn get_in_array_assertions(haystack: &TUnion, codebase: &CodebaseMetadata) -> Option<Vec<Assertion>> {
+    let mut value_types = None;
+    let mut required_values: Option<BTreeSet<TAtomic>> = None;
+    for atomic in haystack.types.as_ref() {
+        let TAtomic::Array(array) = atomic else {
+            return None;
+        };
+
+        let array_value_type = get_array_value_parameter(array, codebase);
+        let mut array_required_values = BTreeSet::new();
+        let mut add_required_value = |value_type: &TUnion| {
+            if !value_type.is_single() {
+                return;
+            }
+
+            let value = value_type.get_single();
+            if value.is_literal()
+                || value.is_literal_class_string()
+                || matches!(value, TAtomic::Object(TObject::Enum(r#enum)) if r#enum.case.is_some())
+            {
+                array_required_values.insert(value.clone());
+            }
+        };
+
+        if array.is_non_empty() {
+            add_required_value(&array_value_type);
+        }
+
+        match array {
+            TArray::Keyed(keyed) => {
+                if let Some(items) = keyed.get_known_items() {
+                    for (optional, value_type) in items.values() {
+                        if !optional {
+                            add_required_value(value_type);
+                        }
+                    }
+                }
+            }
+            TArray::List(list) => {
+                if let Some(items) = list.get_known_elements() {
+                    for (optional, value_type) in items.values() {
+                        if !optional {
+                            add_required_value(value_type);
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(required_values) = &mut required_values {
+            required_values.retain(|value| array_required_values.contains(value));
+        } else {
+            required_values = Some(array_required_values);
+        }
+
+        value_types = Some(add_optional_union_type(array_value_type, value_types.as_ref(), codebase));
+    }
+
+    let value_types = value_types?;
+    let required_values = required_values?;
+    let has_unknown_values = value_types.types.iter().any(|value| !required_values.contains(value));
+    let mut value_assertions = required_values
+        .into_iter()
+        .map(|value| {
+            if matches!(value, TAtomic::Object(TObject::Enum(_))) {
+                Assertion::IsType(value)
+            } else {
+                Assertion::IsIdentical(value)
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if has_unknown_values {
+        value_assertions.insert(0, Assertion::InArray(value_types));
+    }
+
+    Some(value_assertions)
 }
 
 /// Returns the literal class-strings in the subject of an `is_subclass_of()` call that name the

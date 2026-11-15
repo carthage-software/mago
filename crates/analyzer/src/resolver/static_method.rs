@@ -145,6 +145,11 @@ fn resolve_method_from_classname<'ctx, 'arena, A>(
 where
     A: Arena,
 {
+    let names_a_class = std::iter::once(classname)
+        .chain(&classname.intersections)
+        .filter_map(|part| part.fqcn)
+        .any(|name| context.codebase.get_class_like_by_name(name).is_some_and(|metadata| metadata.kind.is_class()));
+
     let mut resolve_method_from_class_id =
         |fq_class_id: Word,
          is_relative: bool,
@@ -165,6 +170,7 @@ where
             if !from_instance
                 && !is_relative
                 && !from_enum_string
+                && !names_a_class
                 && defining_class_metadata.kind.is_interface()
                 && !has_magic_static_call
             {

@@ -28,31 +28,32 @@ use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
+use crate::ttype::expander;
+use crate::ttype::expander::TypeExpansionOptions;
 use crate::ttype::get_arraykey;
 use crate::ttype::intersect_union_types;
 use crate::ttype::template::TemplateResult;
 use crate::ttype::template::inferred_type_replacer;
 use crate::ttype::union::TUnion;
 
+fn fits_native(atomic: &TAtomic, native: &TUnion, codebase: &CodebaseMetadata) -> bool {
+    let contained = |member: &TUnion| {
+        union_comparator::is_contained_by(codebase, member, native, false, false, false, &mut ComparisonResult::new())
+    };
+
+    let mut member = TUnion::from_atomic(atomic.clone());
+
+    contained(&member) || {
+        expander::expand_union(codebase, &mut member, &TypeExpansionOptions::default());
+        contained(&member)
+    }
+}
+
 /// Keeps the members of an inherited docblock type that fit the child's narrower native type,
 /// when some, but not all, of them do.
 fn keep_members_fitting_native(native: &TUnion, docblock: &TUnion, codebase: &CodebaseMetadata) -> Option<TUnion> {
-    let fitting: Vec<TAtomic> = docblock
-        .types
-        .iter()
-        .filter(|atomic| {
-            union_comparator::is_contained_by(
-                codebase,
-                &TUnion::from_atomic((*atomic).clone()),
-                native,
-                false,
-                false,
-                false,
-                &mut ComparisonResult::new(),
-            )
-        })
-        .cloned()
-        .collect();
+    let fitting: Vec<TAtomic> =
+        docblock.types.iter().filter(|atomic| fits_native(atomic, native, codebase)).cloned().collect();
 
     (!fitting.is_empty() && fitting.len() < docblock.types.len()).then(|| TUnion::from_vec(fitting))
 }
@@ -77,15 +78,7 @@ fn narrow_inherited_iterable_to_array(
                 Arc::new(key),
                 Arc::new(iterable.get_value_type().clone()),
             ))));
-        } else if union_comparator::is_contained_by(
-            codebase,
-            &TUnion::from_atomic(atomic.clone()),
-            child_native,
-            false,
-            false,
-            false,
-            &mut ComparisonResult::new(),
-        ) {
+        } else if fits_native(atomic, child_native, codebase) {
             atomics.push(atomic.clone());
         } else {
             return None;

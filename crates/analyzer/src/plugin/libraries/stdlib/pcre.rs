@@ -1,13 +1,21 @@
-//! Delimiter validation for literal `preg_match()` and `preg_match_all()` patterns.
+//! Checks for literal PCRE patterns.
 
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
+use mago_syntax::cst::Argument;
+use mago_syntax::cst::Expression;
+use mago_syntax::cst::FunctionCall;
 
 use crate::code::IssueCode;
+use crate::plugin::context::HookContext;
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
+use crate::plugin::hook::FunctionCallHook;
+use crate::plugin::hook::HookResult;
 use crate::plugin::provider::Provider;
 use crate::plugin::provider::ProviderMeta;
 use crate::plugin::provider::function::FunctionReturnTypeProvider;
@@ -74,6 +82,93 @@ impl FunctionReturnTypeProvider for PregMatchPatternProvider {
     }
 }
 
+#[derive(Default)]
+pub struct PregLiteralPatternHook;
+
+impl Provider for PregLiteralPatternHook {
+    fn meta() -> &'static ProviderMeta {
+        static META: ProviderMeta = ProviderMeta::new(
+            "php::pcre::literal-pattern",
+            "PCRE literal patterns",
+            "Stops reporting the failure result of PCRE functions called with valid literal patterns.",
+        );
+
+        &META
+    }
+}
+
+impl FunctionCallHook for PregLiteralPatternHook {
+    fn after_function_call(&self, call: &FunctionCall<'_>, context: &mut HookContext<'_, '_>) -> HookResult<()> {
+        let Some(name) = context.resolved_function() else {
+            return Ok(());
+        };
+
+        let fails_with_null = match name.to_ascii_lowercase().as_bytes() {
+            b"preg_replace" | b"preg_replace_callback" => true,
+            b"preg_match" | b"preg_match_all" | b"preg_split" | b"preg_grep" => false,
+            _ => return Ok(()),
+        };
+
+        if !context.codebase().get_function(name.as_bytes()).is_some_and(|function| function.flags.is_built_in()) {
+            return Ok(());
+        }
+
+        let Some(pattern) = get_pattern_argument(call) else {
+            return Ok(());
+        };
+
+        if !context.get_expression_type(pattern).is_some_and(has_only_valid_literal_patterns) {
+            return Ok(());
+        }
+
+        let Some(mut call_type) = context.get_expression_type(call).cloned() else {
+            return Ok(());
+        };
+
+        if fails_with_null {
+            call_type.set_ignore_nullable_issues(true);
+        } else {
+            call_type.set_ignore_falsable_issues(true);
+        }
+
+        context.set_expression_type(call, call_type);
+
+        Ok(())
+    }
+}
+
+fn get_pattern_argument<'arena>(call: &FunctionCall<'arena>) -> Option<&'arena Expression<'arena>> {
+    match call.argument_list.arguments.iter().next()? {
+        Argument::Positional(argument) => Some(argument.value),
+        Argument::Named(_) => call.argument_list.arguments.iter().find_map(|argument| match argument {
+            Argument::Named(argument) if argument.name.value.eq_ignore_ascii_case(b"pattern") => Some(argument.value),
+            _ => None,
+        }),
+    }
+}
+
+fn has_only_valid_literal_patterns(pattern_type: &TUnion) -> bool {
+    let is_valid = |atomic: &TAtomic| atomic.get_literal_string_value().is_some_and(is_valid_pattern);
+
+    !pattern_type.types.is_empty()
+        && pattern_type.types.iter().all(|atomic| match atomic {
+            TAtomic::Array(TArray::List(list)) if list.element_type.is_never() => list
+                .known_elements
+                .as_deref()
+                .is_some_and(|elements| elements.values().all(|(_, value)| value.types.iter().all(is_valid))),
+            TAtomic::Array(TArray::Keyed(keyed)) if keyed.parameters.is_none() => keyed
+                .known_items
+                .as_deref()
+                .is_some_and(|items| items.values().all(|(_, value)| value.types.iter().all(is_valid))),
+            atomic => is_valid(atomic),
+        })
+}
+
+fn is_valid_pattern(pattern: &[u8]) -> bool {
+    find_closing_delimiter(pattern)
+        .is_ok_and(|end| pattern[end + 1..].iter().all(|modifier| b"imsxADSUXJnru \n\r".contains(modifier)))
+}
+
 #[derive(Debug, PartialEq, Eq)]
 enum DelimiterError {
     EmptyPattern,
@@ -86,19 +181,23 @@ enum DelimiterError {
 /// PHP scans delimiters before parsing the expression, so character classes do not
 /// shield delimiters, and paired delimiters nest even within character classes.
 fn find_delimiter_error(pattern: &[u8]) -> Option<DelimiterError> {
+    find_closing_delimiter(pattern).err().flatten()
+}
+
+fn find_closing_delimiter(pattern: &[u8]) -> Result<usize, Option<DelimiterError>> {
     let Some(start) = pattern.iter().position(|byte| !matches!(byte, b' ' | b'\t' | b'\n' | b'\r' | 0x0b | 0x0c))
     else {
-        return Some(DelimiterError::EmptyPattern);
+        return Err(Some(DelimiterError::EmptyPattern));
     };
 
     let opening = pattern[start];
     if !opening.is_ascii() {
         // PHP's classification of non-ASCII delimiter bytes depends on the locale.
-        return None;
+        return Err(None);
     }
 
     if opening.is_ascii_alphanumeric() || matches!(opening, b'\\' | b'\0') {
-        return Some(DelimiterError::InvalidDelimiter);
+        return Err(Some(DelimiterError::InvalidDelimiter));
     }
 
     let closing = match opening {
@@ -120,7 +219,7 @@ fn find_delimiter_error(pattern: &[u8]) -> Option<DelimiterError> {
         if byte == closing {
             depth -= 1;
             if depth == 0 {
-                return None;
+                return Ok(index);
             }
         } else if byte == opening {
             depth += 1;
@@ -129,7 +228,7 @@ fn find_delimiter_error(pattern: &[u8]) -> Option<DelimiterError> {
         index += 1;
     }
 
-    Some(DelimiterError::MissingClosingDelimiter(closing))
+    Err(Some(DelimiterError::MissingClosingDelimiter(closing)))
 }
 
 #[cfg(test)]

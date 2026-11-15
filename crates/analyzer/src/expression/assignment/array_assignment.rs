@@ -49,6 +49,7 @@ use crate::utils::expression::array::ArrayTarget;
 use crate::utils::expression::array::get_array_target_type_given_index;
 use crate::utils::expression::get_block_expression_id;
 use crate::utils::expression::get_index_id;
+use crate::utils::expression::get_root_expression_id;
 
 pub(crate) fn analyze<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
@@ -108,10 +109,11 @@ where
     });
 
     let key_values = index_type.as_deref().map(get_index_literal_types).unwrap_or_default();
+    let definite = writes_every_key(block_context, &key_values, current_index);
 
     let root_array_type = Rc::unwrap_or_clone(root_array_type);
     let root_array_type = if !key_values.is_empty() {
-        update_type_with_key_values(context, root_array_type, &current_type, &key_values, index_type.as_ref())
+        update_type_with_key_values(context, root_array_type, &current_type, &key_values, index_type.as_ref(), definite)
     } else if !root_is_string {
         update_array_assignment_child_type(
             context,
@@ -233,22 +235,50 @@ pub(crate) fn update_type_with_key_values<A>(
     current_type: &TUnion,
     key_values: &Vec<TAtomic>,
     key_type: Option<&Rc<TUnion>>,
+    definite: bool,
 ) -> TUnion
 where
     A: Arena,
 {
     let mut has_matching_item = false;
+    let key_type = key_type.map(normalize_key_type);
+    let key_type = key_type.as_ref();
 
     new_type.types = new_type
         .types
         .into_owned()
         .into_iter()
         .map(|atomic_type| {
-            update_atomic_given_key(context, atomic_type, key_values, key_type, &mut has_matching_item, current_type)
+            update_atomic_given_key(
+                context,
+                atomic_type,
+                key_values,
+                key_type,
+                &mut has_matching_item,
+                current_type,
+                definite,
+            )
         })
         .collect();
 
     new_type
+}
+
+fn normalize_key_type(key_type: &Rc<TUnion>) -> Rc<TUnion> {
+    if key_type.is_mixed() {
+        Rc::new(get_arraykey())
+    } else if key_type.has_null() {
+        let mut types: Vec<TAtomic> = key_type.types.iter().filter(|t| !t.is_null()).cloned().collect();
+        types.push(TAtomic::Scalar(TScalar::String(TString::known_literal(empty_word()))));
+
+        Rc::new(TUnion::from_vec(types))
+    } else if key_type.types.iter().any(TAtomic::is_array) {
+        let types: Vec<TAtomic> = key_type.types.iter().filter(|t| !t.is_array()).cloned().collect();
+
+        Rc::new(if types.is_empty() { get_arraykey() } else { TUnion::from_vec(types) })
+    } else {
+        Rc::clone(key_type)
+    }
 }
 
 fn update_atomic_given_key<A>(
@@ -258,6 +288,7 @@ fn update_atomic_given_key<A>(
     key_type: Option<&Rc<TUnion>>,
     has_matching_item: &mut bool,
     current_type: &TUnion,
+    definite: bool,
 ) -> TAtomic
 where
     A: Arena,
@@ -272,6 +303,7 @@ where
             key_type,
             has_matching_item,
             current_type,
+            definite,
         );
     }
 
@@ -356,7 +388,6 @@ where
             }
         }
     } else {
-        let definite = key_values.len() == 1;
         let possible_type = || {
             let mut possible_type = current_type.clone();
             possible_type.set_possibly_undefined(true, None);
@@ -491,27 +522,7 @@ where
     let mut extended_lists: Vec<TAtomic> = Vec::new();
 
     if let Some(key_type) = key_type {
-        // PHP coerces null to empty string '' when used as array key.
-        // If the key type contains null, we need to:
-        // 1. Remove null from the type
-        // 2. Add empty string literal to represent the coerced value
-        let key_type = if key_type.is_mixed() {
-            Rc::new(get_arraykey())
-        } else if key_type.has_null() {
-            // Filter out null types
-            let mut types: Vec<TAtomic> = key_type.types.iter().filter(|t| !t.is_null()).cloned().collect();
-
-            // Add empty string literal since null coerces to ''
-            types.push(TAtomic::Scalar(TScalar::String(TString::known_literal(empty_word()))));
-
-            Rc::new(TUnion::from_vec(types))
-        } else if key_type.types.iter().any(TAtomic::is_array) {
-            let types: Vec<TAtomic> = key_type.types.iter().filter(|t| !t.is_array()).cloned().collect();
-
-            Rc::new(if types.is_empty() { get_arraykey() } else { TUnion::from_vec(types) })
-        } else {
-            Rc::clone(key_type)
-        };
+        let key_type = normalize_key_type(key_type);
 
         let breaks_list = key_type.types.iter().all(|key| match key {
             TAtomic::Scalar(TScalar::String(_) | TScalar::ClassLikeString(_)) => true,
@@ -892,6 +903,7 @@ where
 
         let key_values =
             if let Some(index_type) = index_type.as_ref() { get_index_literal_types(index_type) } else { vec![] };
+        let definite = writes_every_key(block_context, &key_values, last_array_expression_index);
 
         let array_expr_id =
             get_block_expression_id(array_target.get_array(), context, block_context).map(|var_var_id| {
@@ -909,6 +921,7 @@ where
             last_array_expr_type,
             &key_values,
             index_type.as_ref(),
+            definite,
         );
 
         *last_array_expr_type = Rc::new(array_expr_type);
@@ -936,6 +949,11 @@ where
     }
 
     Ok(last_array_expression_index)
+}
+
+fn writes_every_key(block_context: &BlockContext<'_>, key_values: &[TAtomic], index: Option<&Expression<'_>>) -> bool {
+    key_values.len() == 1
+        || index.and_then(get_root_expression_id).is_some_and(|id| block_context.foreach_variables.contains(&id))
 }
 
 fn get_index_literal_types(expression_index_type: &TUnion) -> Vec<TAtomic> {

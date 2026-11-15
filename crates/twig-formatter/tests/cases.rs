@@ -65,6 +65,7 @@ test_case!(legacy_raw);
 test_case!(preserve_broken_lists);
 test_case!(inline_tags_after_text);
 test_case!(method_chains);
+test_case!(hugged_last_argument);
 
 #[test]
 fn invalid_templates_are_rejected() {

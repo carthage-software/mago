@@ -61,6 +61,7 @@ use mago_syntax::cst::UnaryPrefixOperator;
 use mago_syntax::cst::Variable;
 use mago_syntax::walker::MutWalker;
 use mago_word::Word;
+use mago_word::WordMap;
 use mago_word::WordSet;
 use mago_word::word;
 
@@ -219,6 +220,10 @@ where
         }
     }
 
+    let marks_new_keys = always_enters_loop && !infinite_loop;
+    let pre_loop_variables =
+        if marks_new_keys { loop_scope.parent_context_variables.clone() } else { WordMap::default() };
+
     inherit_loop_block_context(
         context,
         block_context,
@@ -229,10 +234,15 @@ where
         infinite_loop,
     );
 
-    if always_enters_loop && !infinite_loop {
-        for variable_type in block_context.locals.values_mut() {
+    if marks_new_keys {
+        for (variable_id, variable_type) in block_context.locals.iter_mut() {
+            let previous_type = pre_loop_variables.get(variable_id);
+            if previous_type.is_some_and(|previous_type| Rc::ptr_eq(previous_type, variable_type)) {
+                continue;
+            }
+
             let mut union = (**variable_type).clone();
-            if mark_array_keys_definite(&mut union) {
+            if mark_new_array_keys_definite(&mut union, previous_type.map(|previous_type| &**previous_type)) {
                 *variable_type = Rc::new(union);
             }
         }
@@ -1398,56 +1408,70 @@ where
     Ok((continue_context, loop_scope))
 }
 
-/// Recursively marks all optional known items in array types as definite.
+/// Marks the optional keys a loop that always enters added to an array as definite.
 ///
-/// After a loop that always enters, keys added inside the loop body are guaranteed
-/// to exist. This applies at all nesting levels, both in known items' values and
-/// in generic parameter values.
-fn mark_array_keys_definite(union: &mut TUnion) -> bool {
+/// The loop writes them on its first pass. Keys the array already had before the loop
+/// keep their optionality, at every nesting level.
+fn mark_new_array_keys_definite(union: &mut TUnion, previous: Option<&TUnion>) -> bool {
+    let previous_atomics = previous.map_or(&[][..], |previous| previous.types.as_ref());
     let mut changed = false;
     for atomic in union.types.to_mut().iter_mut() {
         match atomic {
-            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: Some(items), parameters, .. })) => {
-                for (optional, value) in Arc::make_mut(items).values_mut() {
-                    if *optional {
-                        *optional = false;
-                        changed = true;
-                    }
+            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, parameters, .. })) => {
+                if let Some(items) = known_items {
+                    for (key, (optional, value)) in Arc::make_mut(items).iter_mut() {
+                        let previous_item = previous_atomics.iter().find_map(|previous| match previous {
+                            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: Some(items), .. })) => {
+                                items.get(key)
+                            }
+                            _ => None,
+                        });
 
-                    if mark_array_keys_definite(value) {
-                        changed = true;
+                        if *optional && previous_item.is_none() {
+                            *optional = false;
+                            changed = true;
+                        }
+
+                        changed |= mark_new_array_keys_definite(value, previous_item.map(|(_, value)| value));
                     }
                 }
 
                 if let Some((_, value_type)) = parameters {
-                    let value = Arc::make_mut(value_type);
-                    if mark_array_keys_definite(value) {
-                        changed = true;
-                    }
+                    let previous_value = previous_atomics.iter().find_map(|previous| match previous {
+                        TAtomic::Array(TArray::Keyed(TKeyedArray { parameters: Some((_, value)), .. })) => {
+                            Some(&**value)
+                        }
+                        _ => None,
+                    });
+
+                    changed |= mark_new_array_keys_definite(Arc::make_mut(value_type), previous_value);
                 }
             }
-            TAtomic::Array(TArray::List(TList { known_elements: Some(elements), element_type, .. })) => {
-                for (optional, value) in Arc::make_mut(elements).values_mut() {
-                    if *optional {
-                        *optional = false;
-                        changed = true;
-                    }
+            TAtomic::Array(TArray::List(TList { known_elements, element_type, .. })) => {
+                if let Some(elements) = known_elements {
+                    for (index, (optional, value)) in Arc::make_mut(elements).iter_mut() {
+                        let previous_element = previous_atomics.iter().find_map(|previous| match previous {
+                            TAtomic::Array(TArray::List(TList { known_elements: Some(elements), .. })) => {
+                                elements.get(index)
+                            }
+                            _ => None,
+                        });
 
-                    if mark_array_keys_definite(value) {
-                        changed = true;
+                        if *optional && previous_element.is_none() {
+                            *optional = false;
+                            changed = true;
+                        }
+
+                        changed |= mark_new_array_keys_definite(value, previous_element.map(|(_, value)| value));
                     }
                 }
 
-                let el = Arc::make_mut(element_type);
-                if mark_array_keys_definite(el) {
-                    changed = true;
-                }
-            }
-            TAtomic::Array(TArray::Keyed(TKeyedArray { parameters: Some((_, value_type)), .. })) => {
-                let value = Arc::make_mut(value_type);
-                if mark_array_keys_definite(value) {
-                    changed = true;
-                }
+                let previous_element_type = previous_atomics.iter().find_map(|previous| match previous {
+                    TAtomic::Array(TArray::List(TList { element_type, .. })) => Some(&**element_type),
+                    _ => None,
+                });
+
+                changed |= mark_new_array_keys_definite(Arc::make_mut(element_type), previous_element_type);
             }
             _ => {}
         }

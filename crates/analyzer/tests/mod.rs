@@ -3342,6 +3342,18 @@ test_case!(closure_from_callable_on_generic_instance);
 test_case!(discarded_object_without_effect);
 test_case!(array_column_on_enum_cases);
 test_case!(loose_equality_with_non_literal_scalar);
+test_case!(number_cast_of_simplexml_and_gmp);
+test_case!(nested_array_write_with_nullable_keys);
+test_case!(static_access_through_runtime_class_of_interface_object);
+test_case!(is_subclass_of_class_string_with_unrelated_type);
+test_case!(env_superglobal_as_process_environment);
+test_case!(nested_foreach_by_reference);
+test_case!(array_write_keyed_by_foreach_variable);
+test_case!(inherited_return_docblock_with_constant_references);
+test_case!(pcre_literal_pattern_failure_result);
+test_case!(psl_contains_narrows_like_in_array);
+test_case!(static_call_from_another_scope_ends_static_property_narrowing);
+test_case!(always_entered_loop_keeps_existing_optional_keys);
 
 #[test]
 #[cfg_attr(miri, ignore)]

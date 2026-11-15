@@ -74,6 +74,7 @@ impl Plugin for StdlibPlugin {
         registry.register_function_call_hook(session::SessionSetSaveHandlerHook);
         registry.register_function_call_hook(session::SessionSetCookieParamsHook);
         registry.register_function_call_hook(math::IntdivHook);
+        registry.register_function_call_hook(pcre::PregLiteralPatternHook);
 
         registry.register_method_provider(closure::ClosureFromCallableProvider);
         registry.register_method_provider(closure::ClosureGetCurrentProvider);

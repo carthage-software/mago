@@ -395,7 +395,7 @@ fn populate_codebase_inner(
 
                 let class_chunks = populate_chunks(codebase.class_likes.iter_mut(), |(name, metadata), references| {
                     let force_repopulation =
-                        if incremental { !safe_symbols.contains(name) } else { metadata.flags.is_user_defined() };
+                        if incremental { !safe_symbols.contains(name) } else { !metadata.flags.is_built_in() };
                     if incremental && metadata.flags.is_populated() && !force_repopulation {
                         return;
                     }
@@ -473,7 +473,7 @@ fn populate_codebase_inner(
 
         let entries = codebase.class_likes.iter_mut().filter_map(|(name, metadata)| {
             let force_repopulation =
-                if incremental { !safe_symbols.contains(name) } else { metadata.flags.is_user_defined() };
+                if incremental { !safe_symbols.contains(name) } else { !metadata.flags.is_built_in() };
 
             if incremental && metadata.flags.is_populated() && !force_repopulation {
                 return None;

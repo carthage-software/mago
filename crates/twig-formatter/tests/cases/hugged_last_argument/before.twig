@@ -1,0 +1,27 @@
+<div>
+    {{ form_start(form, {attr: {
+        class: 'example-form',
+        'data-controller': 'example',
+    }}) }}
+    {{ form_row(form.name, {
+        label: 'Name',
+    }) }}
+    {{ form_widget(form.email, {attr: {class: 'x'}}) }}
+    {{ options|merge({attr: {
+        class: 'y',
+    }}) }}
+    {{ form.vars.get('x', [
+        1,
+        2,
+    ]) }}
+    {{ form_start(
+        form,
+        {attr: {
+            class: 'kept',
+        }}
+    ) }}
+    {{ form_row(form.a_very_long_field_name_that_goes_on_and_on, 'with a long label that does not fit in the line at all', {attr: {
+        class: 'example-form',
+    }}) }}
+    {{ form_end(form) }}
+</div>

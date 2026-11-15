@@ -83,6 +83,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
 
         if is_by_reference && let Expression::Variable(Variable::Direct(direct_variable)) = value_expression {
             loop_block_context.references_to_external_scope.remove(&Word::from(direct_variable.name));
+            loop_block_context.references_possibly_from_confusing_scope.remove(&Word::from(direct_variable.name));
         }
 
         let source_value_type = value_type.clone();
@@ -144,6 +145,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
                 );
             }
         }
+
+        loop_block_context.foreach_variables.extend(value_expression_id.into_iter().chain(key_expression_id));
 
         if is_by_reference && let Expression::Variable(Variable::Direct(direct_variable)) = value_expression {
             loop_block_context.references_to_external_scope.insert(Word::from(direct_variable.name));

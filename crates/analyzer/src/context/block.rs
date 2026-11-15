@@ -63,6 +63,7 @@ pub struct BlockContext<'ctx> {
     pub assigned_variable_ids: WordMap<u32>,
     pub possibly_assigned_variable_ids: WordSet,
     pub derived_local_sources: WordMap<Word>,
+    pub foreach_variables: WordSet,
 
     /// Maps a variable holding the result of `get_class($source)` to `$source`, so that
     /// `get_class()` case narrowing on the holder propagates back to the tested variable.
@@ -218,6 +219,7 @@ impl<'ctx> BlockContext<'ctx> {
             assigned_variable_ids: WordMap::default(),
             possibly_assigned_variable_ids: WordSet::default(),
             derived_local_sources: WordMap::default(),
+            foreach_variables: WordSet::default(),
             class_string_sources: WordMap::default(),
             possibly_undefined_variable_ids: WordSet::default(),
             referenced_counts: WordMap::default(),

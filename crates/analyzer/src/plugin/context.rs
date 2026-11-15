@@ -238,6 +238,7 @@ pub struct HookContext<'ctx, 'block> {
     pub(crate) artifacts: &'block mut AnalysisArtifacts,
     pub(crate) reported_issues: RefCell<Vec<ReportedIssue>>,
     expression_type_checkpoints: Option<ExpressionTypeCheckpoints>,
+    resolved_function: Option<Word>,
 }
 
 impl<'ctx, 'block> HookContext<'ctx, 'block> {
@@ -254,7 +255,19 @@ impl<'ctx, 'block> HookContext<'ctx, 'block> {
             block_context,
             reported_issues: RefCell::new(Vec::new()),
             expression_type_checkpoints: None,
+            resolved_function: None,
         }
+    }
+
+    pub(crate) fn with_resolved_function(mut self, resolved_function: Option<Word>) -> Self {
+        self.resolved_function = resolved_function;
+        self
+    }
+
+    /// The name of the function an analyzed function call resolved to, in an `after_function_call` hook.
+    #[inline]
+    pub fn resolved_function(&self) -> Option<Word> {
+        self.resolved_function
     }
 
     /// Report an issue from a hook.
