@@ -5,6 +5,11 @@
             "size": 128,
             "sponsors": [
                 {
+                    "name": "monbillet.ch",
+                    "url": "https://monbillet.ch/",
+                    "avatar": "https://carthage.software/media/01a1dcca-6b65-941f-d4f1-ca4aa685f023"
+                },
+                {
                     "name": "CHECK24",
                     "url": "https://opensource.check24.de/project/mago/",
                     "avatar": "https://carthage.software/media/01a01a1f-9b15-5cd1-1205-96a7452e17cb"
