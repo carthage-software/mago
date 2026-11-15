@@ -1,0 +1,94 @@
+//! In-process LSP tests. Driven via [`tokio::io::duplex`] paired with
+//! [`super::serve`] so each test runs the full backend without the
+//! overhead of spawning a child `mago` binary.
+
+mod client;
+mod harness;
+
+mod binding_navigation;
+mod buffer_sources;
+mod builtin_navigation;
+mod cached_receiver_navigation;
+mod call_hierarchy;
+mod capabilities;
+mod class_rename;
+mod client_preferences;
+mod code_action_protocol;
+mod code_action_ranges;
+mod code_lens;
+mod completion;
+mod completion_builtins;
+mod completion_constructors;
+mod completion_contexts;
+mod completion_details;
+mod completion_documentation;
+mod completion_filtering;
+mod completion_labels;
+mod completion_named_arguments;
+mod completion_named_labels;
+mod completion_native_types;
+mod completion_positions;
+mod completion_ranking;
+mod completion_snippets;
+mod diagnostic_lifecycle;
+mod diagnostic_messages;
+mod document_links;
+mod document_symbols;
+mod external_navigation;
+mod folding;
+mod git_ignores;
+mod global_navigation;
+mod highlights;
+mod incomplete;
+mod initialize;
+mod inlay_hints;
+mod lifecycle;
+mod member_hover;
+mod member_rename;
+mod metadata_only;
+mod navigation;
+mod phpdoc_rendering;
+mod property_documentation;
+mod providers;
+mod range_formatting;
+mod refactor_constant;
+mod refactor_extract;
+mod refactor_extract_method;
+mod refactor_generate;
+mod refactor_import;
+mod refactor_methods;
+mod references;
+mod rename_alias_docs;
+mod rename_bindings;
+mod rename_functions;
+mod rename_parameters;
+mod rename_phpdoc;
+mod rename_positions;
+mod rename_refusals;
+mod restarts;
+mod selection;
+mod signature_positions;
+mod signature_rendering;
+mod signatures;
+mod symbol_boundaries;
+mod symbol_positions;
+mod tool_excludes;
+mod type_definition;
+mod type_hierarchy;
+mod uri_edits;
+mod uri_identity;
+mod uri_implicit_edits;
+mod watchers;
+
+mod shared_buffers;
+mod trait_adaptations;
+mod trait_aliases;
+mod versioned_workspace_edits;
+mod workspace_diagnostics;
+mod workspace_symbols;
+
+mod hover_literals;
+mod hover_parameters;
+mod hover_values;
+
+mod hover_variables;
