@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use mago_codex::metadata::CodebaseMetadata;
-use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::TType;
+use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
@@ -32,6 +32,7 @@ use crate::plugin::provider::Provider;
 use crate::plugin::provider::ProviderMeta;
 use crate::plugin::provider::function::FunctionReturnTypeProvider;
 use crate::plugin::provider::function::FunctionTarget;
+use crate::resolver::property::get_enum_builtin_property_type;
 use crate::resolver::property::resolve_property_for_external_access;
 
 static META: ProviderMeta = ProviderMeta::new(
@@ -75,7 +76,7 @@ impl FunctionReturnTypeProvider for ArrayColumnProvider {
         let index_key_argument = invocation.get_argument(2, &[b"index_key"]);
         let index_key_type = index_key_argument.and_then(|arg| context.get_expression_type(arg));
 
-        if let Some(result) = try_resolve_from_named_object(&element_type, column_key_type, index_key_type, codebase) {
+        if let Some(result) = try_resolve_from_objects(&element_type, column_key_type, index_key_type, codebase) {
             return Some(result);
         }
 
@@ -89,28 +90,54 @@ impl FunctionReturnTypeProvider for ArrayColumnProvider {
     }
 }
 
-/// Resolve column and index types from an object element type by looking up
-/// class properties.
-fn try_resolve_from_named_object(
+/// Resolve column and index types from object element types by looking up their properties.
+fn try_resolve_from_objects(
     element_type: &TUnion,
     column_key_type: &TUnion,
     index_key_type: Option<&TUnion>,
     codebase: &CodebaseMetadata,
 ) -> Option<TUnion> {
-    let obj = element_type.get_single_named_object()?;
-    let class_like = codebase.get_class_like(obj.name.as_bytes())?;
+    let index_key_type = index_key_type.filter(|index_key_type| !index_key_type.is_null());
 
-    let column_type = if column_key_type.is_null() {
-        TUnion::from_atomic(TAtomic::Object(TObject::Named(obj.clone())))
-    } else {
-        let prop_name = column_key_type.get_single_literal_string_value()?;
-        let prop_key = concat_word!(b"$", prop_name);
-        resolve_property_for_external_access(codebase, class_like, prop_key)?.declared_type(codebase)
-    };
+    let mut column_type = None;
+    let mut index_type = None;
+    for atomic in element_type.types.iter() {
+        let TAtomic::Object(object) = atomic else {
+            return None;
+        };
 
-    let index_type = resolve_index_type_from_property(index_key_type, class_like, codebase);
+        let object_column_type = if column_key_type.is_null() {
+            TUnion::from_atomic(atomic.clone())
+        } else {
+            object_property_type(object, column_key_type.get_single_literal_string_value()?, codebase)?
+        };
+        column_type = Some(add_optional_union_type(object_column_type, column_type.as_ref(), codebase));
 
-    Some(build_result(column_type, index_type))
+        if let Some(index_key_type) = index_key_type {
+            let object_index_type = index_key_type
+                .get_single_literal_string_value()
+                .and_then(|property_name| object_property_type(object, property_name, codebase))
+                .map_or_else(get_arraykey, |property_type| key_type_for_index(&property_type));
+            index_type = Some(add_optional_union_type(object_index_type, index_type.as_ref(), codebase));
+        }
+    }
+
+    Some(build_result(column_type?, index_type))
+}
+
+fn object_property_type(object: &TObject, property_name: &[u8], codebase: &CodebaseMetadata) -> Option<TUnion> {
+    match object {
+        TObject::Named(named) => {
+            let class_like = codebase.get_class_like(named.name.as_bytes())?;
+
+            Some(
+                resolve_property_for_external_access(codebase, class_like, concat_word!(b"$", property_name))?
+                    .declared_type(codebase),
+            )
+        }
+        TObject::Enum(r#enum) => get_enum_builtin_property_type(codebase, r#enum, property_name),
+        _ => None,
+    }
 }
 
 /// Resolve column and index types from a keyed-array element type by looking
@@ -242,24 +269,6 @@ fn key_type_for_index(value_type: &TUnion) -> TUnion {
             })
             .collect(),
     )
-}
-
-fn resolve_index_type_from_property(
-    index_key_type: Option<&TUnion>,
-    class_like: &ClassLikeMetadata,
-    codebase: &CodebaseMetadata,
-) -> Option<TUnion> {
-    let index_key_type = index_key_type?;
-    if index_key_type.is_null() {
-        return None;
-    }
-
-    let property_type = index_key_type.get_single_literal_string_value().and_then(|property_name| {
-        resolve_property_for_external_access(codebase, class_like, concat_word!(b"$", property_name))
-            .map(|property| property.declared_type(codebase))
-    });
-
-    Some(property_type.map_or_else(get_arraykey, |property_type| key_type_for_index(&property_type)))
 }
 
 fn build_result(column_type: TUnion, index_type: Option<TUnion>) -> TUnion {

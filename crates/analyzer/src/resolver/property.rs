@@ -583,57 +583,40 @@ where
     A: Arena,
 {
     let prop_str = trim_start_byte(prop_name.as_bytes(), b'$');
-    if prop_str != b"name" && prop_str != b"value" {
-        return None;
-    }
+    let property_type = get_enum_builtin_property_type(context.codebase, enum_type, prop_str)?;
 
-    let class_metadata = context.codebase.get_class_like(enum_type.name.as_bytes())?;
+    Some(ResolvedProperty {
+        lookup_class: None,
+        property_span: None,
+        property_name: prop_name,
+        declaring_class_id: Some(word(if prop_str == b"name" { "UnitEnum" } else { "BackedEnum" })),
+        property_type,
+        is_magic: false,
+        read_type: None,
+    })
+}
 
-    // Determine which cases to process: Either it's a specific case, or all cases
+/// The type of an enum's `name` or `value` property, given without the `$`; `None` for any other
+/// property, or for `value` on a unit enum.
+pub fn get_enum_builtin_property_type(
+    codebase: &CodebaseMetadata,
+    enum_type: &TEnum,
+    property_name: &[u8],
+) -> Option<TUnion> {
+    let class_metadata = codebase.get_class_like(enum_type.name.as_bytes())?;
     let cases: Vec<_> = if let Some(case_name) = enum_type.case {
         class_metadata.enum_cases.get(&case_name).into_iter().collect()
     } else {
         class_metadata.enum_cases.values().collect()
     };
 
-    if prop_str == b"name" {
-        let name_types: Vec<TAtomic> =
-            cases.iter().map(|case| TAtomic::Scalar(TScalar::literal_string(case.name))).collect();
+    let types: Vec<TAtomic> = match property_name {
+        b"name" => cases.iter().map(|case| TAtomic::Scalar(TScalar::literal_string(case.name))).collect(),
+        b"value" => cases.iter().filter_map(|case| case.value_type.clone()).collect(),
+        _ => return None,
+    };
 
-        if name_types.is_empty() {
-            return None;
-        }
-
-        Some(ResolvedProperty {
-            lookup_class: None,
-            property_span: None,
-            property_name: prop_name,
-            declaring_class_id: Some(word(b"UnitEnum")),
-            property_type: TUnion::from_vec(name_types),
-            is_magic: false,
-            read_type: None,
-        })
-    } else if prop_str == b"value" {
-        let value_types: Vec<TAtomic> = cases.iter().filter_map(|case| case.value_type.clone()).collect();
-
-        if value_types.is_empty() {
-            // Unit enum - value property doesn't exist, fall through to normal resolution
-            // which will report an appropriate error
-            return None;
-        }
-
-        Some(ResolvedProperty {
-            lookup_class: None,
-            property_span: None,
-            property_name: prop_name,
-            declaring_class_id: Some(word(b"BackedEnum")),
-            property_type: TUnion::from_vec(value_types),
-            is_magic: false,
-            read_type: None,
-        })
-    } else {
-        None
-    }
+    if types.is_empty() { None } else { Some(TUnion::from_vec(types)) }
 }
 
 /// Checks if this is a backing store access: `$this->prop` inside a hook for that property.
