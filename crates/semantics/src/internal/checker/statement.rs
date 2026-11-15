@@ -1,7 +1,9 @@
 use mago_bytes::BytesDisplay;
+use mago_names::kind::NameKind;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::cst::Declare;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Goto;
@@ -13,7 +15,11 @@ use mago_syntax::cst::Namespace;
 use mago_syntax::cst::NamespaceBody;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::Program;
+use mago_syntax::cst::Sequence;
 use mago_syntax::cst::Statement;
+use mago_syntax::cst::UseItem;
+use mago_syntax::cst::UseItems;
+use mago_syntax::cst::UseType;
 use mago_syntax::walker::Walker;
 
 use crate::internal::consts::DECLARE_DIRECTIVES;
@@ -111,6 +117,8 @@ pub fn check_top_level_statements<'ast, 'arena>(
             );
         }
     }
+
+    check_use_statements(&program.statements, context);
 
     let mut namespaces = vec![];
     NamespaceCollector.walk_program(program, &mut namespaces);
@@ -300,6 +308,84 @@ pub fn check_namespace(namespace: &Namespace, context: &mut Context<'_, '_, '_>)
                 )
                 .with_help("Move the namespace declaration to the top level of the file."),
         );
+    }
+
+    check_use_statements(namespace.statements(), context);
+}
+
+#[inline]
+fn check_use_statements(statements: &Sequence<'_, Statement<'_>>, context: &mut Context<'_, '_, '_>) {
+    let mut imports: Vec<(NameKind, &[u8], Span)> = vec![];
+
+    for statement in statements {
+        let Statement::Use(r#use) = statement else {
+            continue;
+        };
+
+        let items: Vec<(NameKind, &UseItem)> = match &r#use.items {
+            UseItems::Sequence(sequence) => sequence.items.iter().map(|item| (NameKind::Default, item)).collect(),
+            UseItems::TypedSequence(sequence) => {
+                sequence.items.iter().map(|item| (use_type_kind(&sequence.r#type), item)).collect()
+            }
+            UseItems::TypedList(list) => list.items.iter().map(|item| (use_type_kind(&list.r#type), item)).collect(),
+            UseItems::MixedList(list) => list
+                .items
+                .iter()
+                .map(|mixed| (mixed.r#type.as_ref().map_or(NameKind::Default, use_type_kind), &mixed.item))
+                .collect(),
+        };
+
+        for (kind, item) in items {
+            let alias = match &item.alias {
+                Some(alias) => alias.identifier.value,
+                None => item.name.last_segment(),
+            };
+
+            let previous = imports.iter().find_map(|(previous_kind, previous_alias, span)| {
+                let same_alias = if kind.is_case_sensitive() {
+                    alias == *previous_alias
+                } else {
+                    alias.eq_ignore_ascii_case(previous_alias)
+                };
+
+                (*previous_kind == kind && same_alias).then_some(*span)
+            });
+
+            let Some(previous) = previous else {
+                imports.push((kind, alias, item.span()));
+
+                continue;
+            };
+
+            let kind = if kind.is_function() {
+                "function "
+            } else if kind.is_constant() {
+                "const "
+            } else {
+                ""
+            };
+            let name = BytesDisplay(context.get_name(item.name.span().start));
+            let alias = BytesDisplay(alias);
+
+            context.report(
+                Issue::error(format!("Cannot use {kind}`{name}` as `{alias}` because the name is already in use."))
+                    .with_annotation(
+                        Annotation::primary(item.span()).with_message(format!("`{alias}` is imported again here.")),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(previous).with_message(format!("`{alias}` is first imported here.")),
+                    )
+                    .with_help("Remove one of the imports, or import one of them under a different alias."),
+            );
+        }
+    }
+}
+
+#[inline]
+fn use_type_kind(r#type: &UseType) -> NameKind {
+    match r#type {
+        UseType::Function(_) => NameKind::Function,
+        UseType::Const(_) => NameKind::Constant,
     }
 }
 
