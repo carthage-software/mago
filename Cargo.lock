@@ -1296,7 +1296,7 @@ checksum = "5d15f86d12da44cd8d4ec3c73984537eb7f4cadcb9776a575a0a8a05ca11005c"
 
 [[package]]
 name = "mago"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "bincode",
  "clap",
@@ -1359,7 +1359,7 @@ dependencies = [
 
 [[package]]
 name = "mago-algebra"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "codspeed-criterion-compat",
  "foldhash",
@@ -1371,7 +1371,7 @@ dependencies = [
 
 [[package]]
 name = "mago-allocator"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "allocator-api2",
  "blink-alloc",
@@ -1382,7 +1382,7 @@ dependencies = [
 
 [[package]]
 name = "mago-analyzer"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "codspeed-criterion-compat",
  "diffy",
@@ -1415,15 +1415,15 @@ dependencies = [
 
 [[package]]
 name = "mago-bytes"
-version = "1.59.0"
+version = "1.60.0"
 
 [[package]]
 name = "mago-casing"
-version = "1.59.0"
+version = "1.60.0"
 
 [[package]]
 name = "mago-codex"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "codspeed-criterion-compat",
  "foldhash",
@@ -1452,7 +1452,7 @@ dependencies = [
 
 [[package]]
 name = "mago-collector"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "foldhash",
  "mago-allocator",
@@ -1466,7 +1466,7 @@ dependencies = [
 
 [[package]]
 name = "mago-composer"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "foldhash",
  "serde",
@@ -1475,7 +1475,7 @@ dependencies = [
 
 [[package]]
 name = "mago-database"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "foldhash",
  "glob",
@@ -1492,7 +1492,7 @@ dependencies = [
 
 [[package]]
 name = "mago-documentation"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1515,7 +1515,7 @@ dependencies = [
 
 [[package]]
 name = "mago-extension"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "foldhash",
  "mago-names",
@@ -1528,7 +1528,7 @@ dependencies = [
 
 [[package]]
 name = "mago-fingerprint"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "foldhash",
  "indoc",
@@ -1543,14 +1543,14 @@ dependencies = [
 
 [[package]]
 name = "mago-flags"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "serde",
 ]
 
 [[package]]
 name = "mago-formatter"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "foldhash",
  "indoc",
@@ -1570,7 +1570,7 @@ dependencies = [
 
 [[package]]
 name = "mago-formatter-core"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "mago-allocator",
  "memchr",
@@ -1581,7 +1581,7 @@ dependencies = [
 
 [[package]]
 name = "mago-guard"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "foldhash",
  "indoc",
@@ -1605,7 +1605,7 @@ dependencies = [
 
 [[package]]
 name = "mago-hir"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "itoa",
  "mago-allocator",
@@ -1624,7 +1624,7 @@ dependencies = [
 
 [[package]]
 name = "mago-linter"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "foldhash",
  "indoc",
@@ -1655,7 +1655,7 @@ dependencies = [
 
 [[package]]
 name = "mago-names"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "foldhash",
  "mago-allocator",
@@ -1669,7 +1669,7 @@ dependencies = [
 
 [[package]]
 name = "mago-orchestrator"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "foldhash",
  "indicatif",
@@ -1699,7 +1699,7 @@ dependencies = [
 
 [[package]]
 name = "mago-php-version"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "schemars",
  "serde",
@@ -1708,7 +1708,7 @@ dependencies = [
 
 [[package]]
 name = "mago-phpdoc-syntax"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "indoc",
  "mago-allocator",
@@ -1723,7 +1723,7 @@ dependencies = [
 
 [[package]]
 name = "mago-prelude"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "bincode",
  "codspeed-criterion-compat",
@@ -1740,7 +1740,7 @@ dependencies = [
 
 [[package]]
 name = "mago-reporting"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "ariadne",
  "blake3",
@@ -1764,7 +1764,7 @@ dependencies = [
 
 [[package]]
 name = "mago-semantics"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "mago-allocator",
  "mago-bytes",
@@ -1778,7 +1778,7 @@ dependencies = [
 
 [[package]]
 name = "mago-span"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "mago-database",
  "serde",
@@ -1786,7 +1786,7 @@ dependencies = [
 
 [[package]]
 name = "mago-syntax"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "codspeed-criterion-compat",
  "mago-allocator",
@@ -1807,7 +1807,7 @@ dependencies = [
 
 [[package]]
 name = "mago-syntax-core"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "mago-allocator",
  "mago-database",
@@ -1818,7 +1818,7 @@ dependencies = [
 
 [[package]]
 name = "mago-text-edit"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "pretty_assertions",
  "serde",
@@ -1826,7 +1826,7 @@ dependencies = [
 
 [[package]]
 name = "mago-twig-formatter"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "codspeed-criterion-compat",
  "mago-allocator",
@@ -1843,7 +1843,7 @@ dependencies = [
 
 [[package]]
 name = "mago-twig-linter"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "foldhash",
  "indoc",
@@ -1863,7 +1863,7 @@ dependencies = [
 
 [[package]]
 name = "mago-twig-syntax"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "codspeed-criterion-compat",
  "indoc",
@@ -1879,7 +1879,7 @@ dependencies = [
 
 [[package]]
 name = "mago-wasm"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "mago-allocator",
  "mago-analyzer",
@@ -1900,7 +1900,7 @@ dependencies = [
 
 [[package]]
 name = "mago-word"
-version = "1.59.0"
+version = "1.60.0"
 dependencies = [
  "bincode",
  "foldhash",
