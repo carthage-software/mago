@@ -2,6 +2,7 @@ use std::cell::Cell;
 
 use mago_allocator::Arena;
 use mago_formatter_core::printer::Printer;
+use mago_formatter_core::settings::PrinterSettings;
 use mago_twig_syntax::cst::Template;
 
 use crate::alignment::Alignment;
@@ -21,6 +22,7 @@ pub(super) struct TemplateFormatter<'arena, 'ctx, A: Arena> {
     alignment: Alignment<'arena>,
     output: Output<'arena, A>,
     printer: Printer<'arena, A>,
+    inline_printer: Printer<'arena, A>,
     offset: usize,
 }
 
@@ -40,6 +42,7 @@ impl<'arena, 'ctx, A: Arena> TemplateFormatter<'arena, 'ctx, A> {
             alignment: Alignment::new(settings),
             output: Output::new(arena, template.source_text.len(), settings.tab_width),
             printer: Printer::new(arena, settings.into()),
+            inline_printer: Printer::new(arena, PrinterSettings { print_width: usize::MAX >> 2, ..settings.into() }),
             offset: 0,
         }
     }
@@ -67,7 +70,13 @@ impl<'arena, 'ctx, A: Arena> TemplateFormatter<'arena, 'ctx, A> {
                     let position = self.output.position();
                     let alignment = self.alignment.get(self.builder.arena, position.indentation);
                     let document = self.builder.tag(tag, alignment);
-                    self.printer.print_into(document, position.column, &mut self.output.bytes);
+                    let follows_text = position.column > position.indentation;
+                    let printer = if follows_text && memchr::memchr2(b'\n', b'\r', original).is_none() {
+                        &mut self.inline_printer
+                    } else {
+                        &mut self.printer
+                    };
+                    printer.print_into(document, position.column, &mut self.output.bytes);
                 }
             }
         }

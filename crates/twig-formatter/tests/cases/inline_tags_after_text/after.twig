@@ -1,0 +1,12 @@
+<div class="messages__container" data-drupal-selector="messages-container-with-a-longer-name"{% if type == 'error' %} role="alert"{% endif %}>
+<a href="{{ path('entity.node.canonical', {node: node.id, query: {destination: destination}}) }}">{{ label|upper }}</a>
+{{
+    some_function_with_a_long_name(
+        argument_one,
+        argument_two,
+        argument_three,
+        argument_four,
+        argument_five,
+        argument_six
+    )
+}}
