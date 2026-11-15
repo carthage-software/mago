@@ -1,0 +1,7 @@
+{% set attributes = create_attribute().setAttribute('data-progress', page.name).setAttribute('title', page.title).addClass(classes) %}
+<div{{ attributes
+    .addClass(classes)
+    .setAttribute('role', 'contentinfo')
+}}>
+{{ attributes.addClass('a').setAttribute('b', 'c') }}
+{{ attributes.addClass('single') }}

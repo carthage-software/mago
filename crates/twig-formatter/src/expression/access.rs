@@ -1,6 +1,7 @@
 use crate::document::DocumentBuilder;
 use mago_allocator::Arena;
-use mago_formatter_core::document::Document;
+use mago_allocator::vec::Vec;
+use mago_formatter_core::document::{Document, Line};
 use mago_span::HasSpan;
 use mago_twig_syntax::cst::{Call, Expression, GetAttribute, GetItem, MethodCall, Parenthesized, Slice};
 
@@ -46,11 +47,35 @@ impl<'arena, A: Arena> DocumentBuilder<'arena, A> {
     }
 
     pub(super) fn method_call(&self, call: &MethodCall<'arena>) -> Document<'arena, A> {
-        self.array([
-            self.expression(call.object),
-            self.raw(call.dot),
-            self.raw(call.method.span()),
-            self.arguments(&call.argument_list),
-        ])
+        let Expression::MethodCall(_) = call.object else {
+            return self.array([self.method_link(call), self.arguments(&call.argument_list)]);
+        };
+
+        let mut calls = Vec::new_in(self.arena);
+        calls.push(call);
+        while let Expression::MethodCall(object) = calls[calls.len() - 1].object {
+            calls.push(object);
+        }
+
+        let head = calls[calls.len() - 1].object;
+        let mut links = Vec::with_capacity_in(calls.len() * 2, self.arena);
+        let mut breaks_in_source = false;
+        let mut previous_end = head.end_offset();
+        for call in calls.iter().rev() {
+            breaks_in_source |= self.breaks_between(previous_end, call.dot.start_offset());
+            previous_end = call.argument_list.right_parenthesis.end_offset();
+            links.push(Document::Line(Line::soft()));
+            links.push(self.array([
+                self.raw(call.dot),
+                self.raw(call.method.span()),
+                self.arguments(&call.argument_list),
+            ]));
+        }
+
+        self.preserved_group(self.group([self.expression(head), Document::Indent(links)]), breaks_in_source)
+    }
+
+    fn method_link(&self, call: &MethodCall<'arena>) -> Document<'arena, A> {
+        self.array([self.expression(call.object), self.raw(call.dot), self.raw(call.method.span())])
     }
 }
