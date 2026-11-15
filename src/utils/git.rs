@@ -63,6 +63,10 @@ pub fn get_staged_file(workspace: &Path, path: &Path) -> Result<File, Error> {
         .output()
         .map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
 
+    if !output.status.success() {
+        return Err(git_error("cat-file", &output.stderr));
+    }
+
     Ok(File::ephemeral(Cow::Owned(path.as_os_str().as_encoded_bytes().to_vec()), Cow::Owned(output.stdout)))
 }
 
@@ -77,19 +81,16 @@ pub fn update_staged_file(workspace: &Path, path: &Path, new_content: Vec<u8>) -
     let blob_id = create_blob(workspace, path, new_content)?;
     let mode = get_mode(workspace, path)?;
 
-    let mut cacheinfo = OsString::new();
-    cacheinfo.push(&mode);
-    cacheinfo.push(",");
-    cacheinfo.push(&blob_id);
-    cacheinfo.push(",");
-    cacheinfo.push(path.as_os_str());
-
-    Command::new("git")
-        .args(["update-index", "--cacheinfo"])
-        .arg(cacheinfo)
+    let output = Command::new("git")
+        .args(["update-index", "--cacheinfo", &mode, &blob_id])
+        .arg(path)
         .current_dir(workspace)
-        .status()
+        .output()
         .map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
+
+    if !output.status.success() {
+        return Err(git_error("update-index", &output.stderr));
+    }
 
     Ok(())
 }
@@ -158,7 +159,7 @@ where
     let status = cmd.current_dir(workspace).status().map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
 
     if !status.success() {
-        return Err(Error::Database(DatabaseError::IOError(std::io::Error::other("git add failed"))));
+        return Err(Error::GitCommandFailed("git add failed".to_owned()));
     }
 
     Ok(())
@@ -248,6 +249,7 @@ fn create_blob(workspace: &Path, path: &Path, content: Vec<u8>) -> Result<String
     let mut child = Command::new("git")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .args(["hash-object", "-w", "--stdin", "--path"])
         .arg(path)
         .current_dir(workspace)
@@ -260,6 +262,10 @@ fn create_blob(workspace: &Path, path: &Path, content: Vec<u8>) -> Result<String
     });
 
     let output = child.wait_with_output().map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
+
+    if !output.status.success() {
+        return Err(git_error("hash-object", &output.stderr));
+    }
 
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
 }
@@ -276,11 +282,23 @@ fn create_blob(workspace: &Path, path: &Path, content: Vec<u8>) -> Result<String
 /// A string containing the object mode for the path
 fn get_mode(workspace: &Path, path: &Path) -> Result<String, Error> {
     let output = Command::new("git")
-        .args(["ls-files", "--format=%(objectmode)"])
+        .args(["ls-files", "--stage", "--"])
         .arg(path)
         .current_dir(workspace)
         .output()
         .map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
 
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_owned())
+    if !output.status.success() {
+        return Err(git_error("ls-files", &output.stderr));
+    }
+
+    String::from_utf8_lossy(&output.stdout)
+        .split_whitespace()
+        .next()
+        .map(str::to_owned)
+        .ok_or_else(|| git_error("ls-files", format!("'{}' is not in the index", path.display()).as_bytes()))
+}
+
+fn git_error(command: &str, stderr: &[u8]) -> Error {
+    Error::GitCommandFailed(format!("git {command} failed: {}", String::from_utf8_lossy(stderr).trim()))
 }

@@ -251,6 +251,9 @@ pub enum Error {
     /// so the operation is aborted. The string contains the path to the problematic file.
     StagedFileHasUnstagedChanges(String),
 
+    /// A git command that staged mode runs failed.
+    GitCommandFailed(String),
+
     /// An unknown formatter preset was requested.
     UnknownFormatterPreset(String),
 
@@ -355,6 +358,7 @@ impl std::fmt::Display for Error {
             }
             Self::Orchestrator(error) => write!(f, "Orchestrator error: {error}"),
             Self::NotAGitRepository => write!(f, "Not inside a git repository"),
+            Self::GitCommandFailed(message) => write!(f, "{message}"),
             Self::StagedFileHasUnstagedChanges(path) => {
                 write!(f, "Cannot format staged files: '{path}' has both staged and unstaged changes")
             }
