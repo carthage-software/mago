@@ -10,6 +10,7 @@ use mago_syntax::cst::Expression;
 use mago_syntax::cst::FunctionCall;
 use mago_syntax::cst::Literal;
 use mago_word::Word;
+use mago_word::WordMap;
 use mago_word::ascii_lowercase_constant_name_word;
 
 use crate::issue::ScanningIssueKind;
@@ -20,7 +21,7 @@ use crate::scanner::attribute::scan_attribute_lists;
 use crate::scanner::docblock::apply_common_metadata_flag;
 use crate::scanner::docblock::find_most_trusted_tag;
 use crate::scanner::docblock::parse_docblock;
-use crate::scanner::inference::infer;
+use crate::scanner::inference::infer_with_constants;
 use crate::scanner::ttype::get_type_metadata_from_type;
 use crate::scanner::typing_error_issue;
 use crate::scanner::version_claim::evaluate_version_attributes;
@@ -33,6 +34,7 @@ pub fn scan_constant<'arena, A>(
     context: &Context<'_, 'arena, A>,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
+    constants: &WordMap<ConstantMetadata>,
 ) -> Vec<ConstantMetadata>
 where
     A: Arena,
@@ -53,7 +55,7 @@ where
             let mut metadata = ConstantMetadata::new(name, item.span(), flags);
             metadata.version_constraint = verdict.constraint.clone();
             metadata.attributes.clone_from(&attributes);
-            metadata.inferred_type = infer(context, scope, item.value, None);
+            metadata.inferred_type = infer_with_constants(context, scope, item.value, None, Some(constants));
 
             process_constant_docblock(&mut metadata, document.as_ref(), None, type_context, scope);
 
@@ -72,6 +74,7 @@ pub fn scan_defined_constant<'arena, A>(
     context: &Context<'_, 'arena, A>,
     type_context: &TypeResolutionContext,
     scope: &NamespaceScope,
+    constants: &WordMap<ConstantMetadata>,
 ) -> Option<ConstantMetadata>
 where
     A: Arena,
@@ -99,7 +102,7 @@ where
     let flags = MetadataFlags::origin_flags(context.file.file_type);
 
     let mut metadata = ConstantMetadata::new(name, define.span(), flags);
-    metadata.inferred_type = infer(context, scope, value_arg.value(), None);
+    metadata.inferred_type = infer_with_constants(context, scope, value_arg.value(), None, Some(constants));
 
     process_constant_docblock(&mut metadata, document.as_ref(), None, type_context, scope);
 

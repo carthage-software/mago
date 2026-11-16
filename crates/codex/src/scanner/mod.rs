@@ -497,7 +497,13 @@ where
 
     #[inline]
     fn walk_in_constant(&mut self, constant: &'arena Constant<'arena>, context: &mut Context<'ctx, 'arena, A>) {
-        let constants = scan_constant(constant, context, &self.get_current_type_resolution_context(), &self.scope);
+        let constants = scan_constant(
+            constant,
+            context,
+            &self.get_current_type_resolution_context(),
+            &self.scope,
+            &self.codebase.constants,
+        );
 
         for mut constant_metadata in constants {
             if self.polyfill_depth > 0 {
@@ -564,9 +570,13 @@ where
             return;
         }
 
-        let Some(mut constant_metadata) =
-            scan_defined_constant(function_call, context, &self.get_current_type_resolution_context(), &self.scope)
-        else {
+        let Some(mut constant_metadata) = scan_defined_constant(
+            function_call,
+            context,
+            &self.get_current_type_resolution_context(),
+            &self.scope,
+            &self.codebase.constants,
+        ) else {
             return;
         };
 
