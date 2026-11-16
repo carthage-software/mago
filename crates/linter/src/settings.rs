@@ -30,6 +30,7 @@ use crate::rule::ExcessiveNestingConfig;
 use crate::rule::ExcessiveParameterListConfig;
 use crate::rule::ExplicitNullableParamConfig;
 use crate::rule::ExplicitOctalConfig;
+use crate::rule::ExplicitVisibilityConfig;
 use crate::rule::FileNameConfig;
 use crate::rule::FinalControllerConfig;
 use crate::rule::FunctionNameConfig;
@@ -373,6 +374,7 @@ pub struct RulesSettings {
     pub function_name: RuleSettings<FunctionNameConfig>,
     pub explicit_nullable_param: RuleSettings<ExplicitNullableParamConfig>,
     pub explicit_octal: RuleSettings<ExplicitOctalConfig>,
+    pub explicit_visibility: RuleSettings<ExplicitVisibilityConfig>,
     pub prefer_arrow_function: RuleSettings<PreferArrowFunctionConfig>,
     pub prefer_early_continue: RuleSettings<PreferEarlyContinueConfig>,
     pub prefer_early_return: RuleSettings<PreferEarlyReturnConfig>,
