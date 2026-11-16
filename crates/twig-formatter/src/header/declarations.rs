@@ -51,7 +51,11 @@ impl<'arena, A: Arena> DocumentBuilder<'arena, A> {
             ])
         });
         let entries = if let (Some(open), Some(close)) = (node.left_brace, node.right_brace) {
-            self.enclosed(self.raw(open), entries, self.raw(close))
+            let first = node.declarations.iter().next().map_or(close.start_offset(), HasSpan::start_offset);
+            self.preserved_group(
+                self.enclosed(self.raw(open), entries, self.raw(close)),
+                self.breaks_between(open.end_offset(), first),
+            )
         } else {
             entries
         };
