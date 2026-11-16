@@ -187,7 +187,7 @@ where
                 &closure_object
             }
             _ => {
-                result.has_invalid_path = true;
+                result.has_invalid_path |= !object_atomic.is_never();
                 if object_type.is_mixed() {
                     result.encountered_mixed = true;
                 }
