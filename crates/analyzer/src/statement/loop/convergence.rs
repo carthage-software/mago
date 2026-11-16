@@ -150,6 +150,7 @@ impl<'ctx> Snapshot<'ctx> {
         scope: &LoopScope,
         artifacts: &AnalysisArtifacts,
         issues_empty: bool,
+        cleaned: Option<(u32, u32)>,
     ) -> bool
     where
         A: Arena,
@@ -165,11 +166,11 @@ impl<'ctx> Snapshot<'ctx> {
             && same_block(&self.pre_loop, pre_loop)
             && same_scope(&self.loop_scope, scope)
             && same_artifact_inputs(&self.artifacts, artifacts)
-            && artifacts.expression_type_checkpoint_matches(same_union)
+            && artifacts.expression_type_checkpoint_matches(same_union, cleaned)
     }
 }
 
-fn output_lengths(artifacts: &AnalysisArtifacts) -> [usize; 6] {
+pub(super) fn output_lengths(artifacts: &AnalysisArtifacts) -> [usize; 6] {
     [
         artifacts.inferred_return_types.len(),
         artifacts.inferred_yield_key_types.len(),
@@ -282,7 +283,7 @@ fn same_clauses(left: &[Rc<Clause>], right: &[Rc<Clause>]) -> bool {
         })
 }
 
-fn same_block(left: &BlockContext<'_>, right: &BlockContext<'_>) -> bool {
+pub(super) fn same_block(left: &BlockContext<'_>, right: &BlockContext<'_>) -> bool {
     same_types(&left.locals, &right.locals)
         && same_references(left, right)
         && same_flow(left, right)
@@ -313,7 +314,7 @@ fn same_types(left: &WordMap<Rc<TUnion>>, right: &WordMap<Rc<TUnion>>) -> bool {
         && left.iter().all(|(variable, left)| right.get(variable).is_some_and(|right| same_union(left, right)))
 }
 
-fn same_union(left: &TUnion, right: &TUnion) -> bool {
+pub(super) fn same_union(left: &TUnion, right: &TUnion) -> bool {
     std::ptr::eq(left, right)
         || (left.flags == right.flags && std::ptr::eq(left.types.as_ref(), right.types.as_ref()))
         || (left.cmp(right).is_eq() && same_child_exceptions(left, right))
@@ -575,6 +576,129 @@ mod tests {
     }
 
     #[test]
+    fn issue_2742() {
+        let skipped = assert_analysis_parity(
+            "<?php
+            /** @param list<array<string, string>> $rows */
+            function nested(array $rows): void {
+                foreach ($rows as $outer) {
+                    $first = $outer['k'] ?? null;
+                    if ($first === 'skip') {
+                        $skipped = 1;
+                        continue;
+                    }
+                    foreach ($rows as $inner) {
+                        $second = $inner['k'] ?? null;
+                        if ($second === null) {
+                            $items = [];
+                        }
+                        $items[] = $second;
+                    }
+                    echo $first, count($items);
+                }
+            }
+        ",
+            4,
+        );
+        assert!(skipped >= 3, "seeded loop variables must not delay convergence");
+    }
+
+    #[test]
+    fn accumulators_in_nested_loops_converge_after_one_pass() {
+        let skipped = assert_analysis_parity(
+            "<?php
+            /** @param list<array<string, string>> $rows */
+            function nested(array $rows): void {
+                $outer = [];
+                foreach ($rows as $row) {
+                    $first = $row['k'] ?? null;
+                    if ($first === 'skip') {
+                        $outer[] = $first;
+                        continue;
+                    }
+                    $inner = [];
+                    foreach ($rows as $other) {
+                        $second = $other['k'] ?? null;
+                        if ($second === 'skip') {
+                            $inner[] = $second;
+                            continue;
+                        }
+                        echo count($inner);
+                    }
+                    echo count($outer);
+                }
+            }
+        ",
+            4,
+        );
+        assert!(skipped >= 3, "a pass that only changes body expression types must not block convergence");
+    }
+
+    #[test]
+    fn replayed_nested_loops_preserve_diagnostics_and_artifacts() {
+        for source in [
+            "<?php
+            /** @param list<array<string, string>> $rows */
+            function carried(array $rows): void {
+                foreach ($rows as $first) {
+                    $a = $first['k'] ?? null;
+                    if ($a === null) { $out = []; }
+                    if ($a === 'skip') { $out[] = $a; $n = count($out); continue; }
+                    foreach ($rows as $second) {
+                        $b = $second['k'] ?? null;
+                        if ($b === null) { $inner = []; }
+                        if ($b === 'skip') { $inner[] = $b; continue; }
+                        foreach ($rows as $third) {
+                            $c = $third['k'] ?? null;
+                            if ($c === null) { $deep = []; }
+                            if ($c === 'skip') { $deep[] = $c; continue; }
+                            echo $deep ? 'y' : 'n';
+                        }
+                        echo $inner ? 'y' : 'n';
+                    }
+                    echo $out ? 'y' : 'n';
+                }
+            }",
+            "<?php
+            /** @param list<array<string, string>> $rows */
+            function initialized(array $rows): void {
+                $out = [];
+                foreach ($rows as $first) {
+                    $a = $first['k'] ?? null;
+                    if ($a === 'skip') { $out[] = $a; continue; }
+                    $inner = [];
+                    foreach ($rows as $second) {
+                        $b = $second['k'] ?? null;
+                        if ($b === 'skip') { $inner[] = $b; continue; }
+                        $deep = [];
+                        foreach ($rows as $third) {
+                            $c = $third['k'] ?? null;
+                            if ($c === 'skip') { $deep[] = $c; continue; }
+                            echo count($deep);
+                        }
+                        echo count($inner);
+                    }
+                    echo count($out);
+                }
+            }",
+            "<?php
+            /** @param list<list<int>> $rows */
+            function broken(array $rows): int {
+                foreach ($rows as $row) {
+                    if ($row === []) { break; }
+                    foreach ($row as $cell) {
+                        $last = $cell;
+                        foreach ($row as $other) { $sum = $other + $cell; }
+                    }
+                }
+                return $last + $sum;
+            }",
+        ] {
+            assert_analysis_parity(source, 4);
+        }
+    }
+
+    #[test]
     fn loop_flow_cases_preserve_diagnostics_and_artifacts() {
         for source in [
             "<?php function references(bool $more): void {
@@ -773,9 +897,9 @@ mod tests {
         artifacts.begin_expression_type_checkpoint();
         artifacts.begin_expression_type_checkpoint();
         artifacts.extend_expression_types([((0, 1), Rc::new(get_string()))]);
-        assert!(!artifacts.expression_type_checkpoint_matches(same_union));
+        assert!(!artifacts.expression_type_checkpoint_matches(same_union, None));
         artifacts.finish_expression_type_checkpoint(CheckpointAction::Keep);
-        assert!(!artifacts.expression_type_checkpoint_matches(same_union));
+        assert!(!artifacts.expression_type_checkpoint_matches(same_union, None));
         artifacts.finish_expression_type_checkpoint(CheckpointAction::Rollback);
         assert!(Rc::ptr_eq(&artifacts.expression_types[&(0, 1)], &original));
         assert!(artifacts.detach_expression_type_checkpoints().is_none());

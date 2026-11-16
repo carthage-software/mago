@@ -49,16 +49,22 @@ use mago_syntax::cst::Assignment;
 use mago_syntax::cst::AssignmentOperator;
 use mago_syntax::cst::Binary;
 use mago_syntax::cst::BinaryOperator;
+use mago_syntax::cst::Break;
 use mago_syntax::cst::Conditional;
 use mago_syntax::cst::DirectVariable;
+use mago_syntax::cst::DoWhile;
 use mago_syntax::cst::Expression;
+use mago_syntax::cst::For;
 use mago_syntax::cst::Foreach;
 use mago_syntax::cst::Literal;
 use mago_syntax::cst::LiteralInteger;
+use mago_syntax::cst::Node;
 use mago_syntax::cst::Statement;
+use mago_syntax::cst::Switch;
 use mago_syntax::cst::UnaryPrefix;
 use mago_syntax::cst::UnaryPrefixOperator;
 use mago_syntax::cst::Variable;
+use mago_syntax::cst::While;
 use mago_syntax::walker::MutWalker;
 use mago_word::Word;
 use mago_word::WordMap;
@@ -88,6 +94,7 @@ use crate::utils::misc::unwrap_expression;
 mod assignment_map_visitor;
 mod cleaner;
 mod convergence;
+pub(crate) mod memo;
 
 pub mod r#break;
 pub mod r#continue;
@@ -715,6 +722,10 @@ where
         ) && convergence::supports_nodes(statements, pre_conditions, &post_expressions);
         let mut previous_input: Option<Box<convergence::Snapshot<'ctx>>> = None;
         let mut converged_passes = 0;
+        let cleaned_range = statements
+            .first()
+            .zip(statements.last())
+            .map(|(first, last)| (first.span().start.offset, last.span().end.offset));
         let condition_variables: WordSet = {
             let mut variables = ShortCircuitedVariables::default();
             for pre_condition in pre_conditions {
@@ -723,6 +734,7 @@ where
 
             variables.always.into_iter().chain(variables.sometimes).collect()
         };
+        let unseeded_variables = get_unseeded_variables(statements, pre_conditions, &post_expressions);
         while i <= assignment_depth {
             let previous_output = previous_input
                 .as_ref()
@@ -868,10 +880,12 @@ where
                 break;
             }
 
+            loop_scope.seeded_loop_variables.clear();
             for variable_id in variables_to_remove {
                 let is_plain_variable = !variable_id.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':'));
                 if is_plain_variable
                     && !condition_variables.contains(&variable_id)
+                    && !unseeded_variables.contains(&variable_id)
                     && !continue_context.references_in_scope.contains_key(&variable_id)
                 {
                     let end_type = continue_context.locals.get(&variable_id).cloned();
@@ -886,7 +900,10 @@ where
 
                     if let Some(mut seeded_type) = seeded_type {
                         seeded_type.set_possibly_undefined(true, None);
-                        continue_context.locals.insert(variable_id, Rc::new(seeded_type));
+                        seeded_type.set_populated(false);
+                        let seeded_type = Rc::new(seeded_type);
+                        loop_scope.seeded_loop_variables.insert(variable_id, Rc::clone(&seeded_type));
+                        continue_context.locals.insert(variable_id, seeded_type);
                         continue_context.possibly_undefined_variable_ids.insert(variable_id);
                         continue_context.variables_possibly_in_scope.insert(variable_id);
 
@@ -894,10 +911,21 @@ where
                     }
                 }
 
+                if unseeded_variables.contains(&variable_id) {
+                    continue_context.variables_possibly_in_scope.remove(&variable_id);
+                    continue_context.possibly_undefined_variable_ids.remove(&variable_id);
+                }
+
                 continue_context.locals.remove(&variable_id);
             }
 
             continue_context.clauses.clone_from(&pre_loop_context.clauses);
+            continue_context
+                .parent_conflicting_clause_variables
+                .clone_from(&pre_loop_context.parent_conflicting_clause_variables);
+            continue_context
+                .possibly_assigned_variable_ids
+                .clone_from(&pre_loop_context.possibly_assigned_variable_ids);
             continue_context.by_reference_constraints.clone_from(&pre_loop_context.by_reference_constraints);
 
             // Only compare later passes: the first body visit records extra break-path state.
@@ -913,6 +941,7 @@ where
                         &loop_scope,
                         artifacts,
                         recorded_issues.is_empty(),
+                        cleaned_range,
                     )
                 })
             {
@@ -1724,6 +1753,159 @@ fn assigned_when_true(condition: &Expression<'_>) -> WordSet {
     variables.walk_expression(condition, &mut ());
 
     variables.assigned
+}
+
+fn get_unseeded_variables(
+    statements: &[Statement<'_>],
+    pre_conditions: &[&Expression<'_>],
+    post_expressions: &[&Expression<'_>],
+) -> WordSet {
+    let mut owners = NestedLoopOwners::default();
+    for statement in statements {
+        owners.walk_statement(statement, &mut ());
+    }
+
+    if owners.breaks_loop {
+        return WordSet::default();
+    }
+
+    for expression in pre_conditions.iter().chain(post_expressions) {
+        owners.walk_expression(expression, &mut ());
+    }
+
+    let mut read = WordSet::default();
+    let mut unseeded = WordSet::default();
+    for expression in pre_conditions {
+        collect_variables(Node::Expression(expression), &mut read);
+    }
+
+    let mut pending: Vec<&Statement<'_>> = statements.iter().rev().collect();
+    while let Some(statement) = pending.pop() {
+        if let Statement::Block(block) = statement {
+            pending.extend(block.statements.iter().rev());
+        } else if let Statement::Expression(expression_statement) = statement
+            && let Expression::Assignment(assignment) = expression_statement.expression
+            && matches!(assignment.operator, AssignmentOperator::Assign(_))
+            && let Expression::Variable(Variable::Direct(variable)) = assignment.lhs
+        {
+            collect_variables(Node::Expression(assignment.rhs), &mut read);
+            let variable = word(variable.name);
+            if read.insert(variable) {
+                unseeded.insert(variable);
+            }
+        } else {
+            collect_variables(Node::Statement(statement), &mut read);
+        }
+    }
+
+    unseeded.extend(owners.owners.into_iter().filter_map(|(variable, owner)| owner.map(|_| variable)));
+    unseeded
+}
+
+fn collect_variables(node: Node<'_, '_>, variables: &mut WordSet) {
+    let mut pending = vec![node];
+    while let Some(node) = pending.pop() {
+        if let Node::DirectVariable(variable) = node {
+            variables.insert(word(variable.name));
+        }
+
+        node.visit_children(|child| pending.push(child));
+    }
+}
+
+#[derive(Default)]
+struct NestedLoopOwners {
+    depth: usize,
+    breakable_depth: usize,
+    current: u32,
+    owners: WordMap<Option<u32>>,
+    breaks_loop: bool,
+}
+
+impl NestedLoopOwners {
+    fn enter(&mut self, span: Span) {
+        if self.depth == 0 {
+            self.current = span.start.offset;
+        }
+
+        self.depth += 1;
+        self.breakable_depth += 1;
+    }
+
+    fn leave(&mut self) {
+        self.depth -= 1;
+        self.breakable_depth -= 1;
+    }
+}
+
+impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for NestedLoopOwners {
+    fn walk_in_break(&mut self, r#break: &'ast Break<'arena>, _context: &mut ()) {
+        let level = match r#break.level {
+            None => 1,
+            Some(Expression::Literal(Literal::Integer(integer))) => integer.value.unwrap_or(u64::MAX),
+            Some(_) => u64::MAX,
+        };
+
+        if level > self.breakable_depth as u64 {
+            self.breaks_loop = true;
+        }
+    }
+
+    fn walk_in_switch(&mut self, _switch: &'ast Switch<'arena>, _context: &mut ()) {
+        self.breakable_depth += 1;
+    }
+
+    fn walk_out_switch(&mut self, _switch: &'ast Switch<'arena>, _context: &mut ()) {
+        self.breakable_depth -= 1;
+    }
+
+    fn walk_in_direct_variable(&mut self, variable: &'ast DirectVariable<'arena>, _context: &mut ()) {
+        let owner = (self.depth > 0).then_some(self.current);
+        self.owners
+            .entry(word(variable.name))
+            .and_modify(|existing| {
+                if *existing != owner {
+                    *existing = None;
+                }
+            })
+            .or_insert(owner);
+    }
+
+    fn walk_foreach(&mut self, foreach: &'ast Foreach<'arena>, context: &mut ()) {
+        self.walk_expression(foreach.expression, context);
+        self.enter(foreach.span());
+        self.walk_foreach_target(&foreach.target, context);
+        self.walk_foreach_body(&foreach.body, context);
+        self.leave();
+    }
+
+    fn walk_for(&mut self, r#for: &'ast For<'arena>, context: &mut ()) {
+        for expression in r#for.initializations.iter().chain(r#for.conditions.iter()) {
+            self.walk_expression(expression, context);
+        }
+
+        self.enter(r#for.span());
+        for expression in r#for.increments.iter() {
+            self.walk_expression(expression, context);
+        }
+
+        self.walk_for_body(&r#for.body, context);
+        self.leave();
+    }
+
+    fn walk_while(&mut self, r#while: &'ast While<'arena>, context: &mut ()) {
+        self.walk_expression(r#while.condition, context);
+        self.enter(r#while.span());
+        self.walk_while_body(&r#while.body, context);
+        self.leave();
+    }
+
+    fn walk_do_while(&mut self, do_while: &'ast DoWhile<'arena>, context: &mut ()) {
+        self.enter(do_while.span());
+        self.walk_statement(do_while.statement, context);
+        self.leave();
+        self.walk_expression(do_while.condition, context);
+    }
 }
 
 #[derive(Default)]

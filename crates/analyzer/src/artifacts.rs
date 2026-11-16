@@ -23,6 +23,7 @@ use crate::context::block::ReferenceConstraintSource;
 use crate::context::scope::case_scope::CaseScope;
 use crate::context::scope::loop_scope::LoopScope;
 use crate::readonly::PendingReadonlyPropertyWrite;
+use crate::statement::r#loop::memo::LoopMemo;
 
 pub(crate) use self::expression_types::CheckpointAction;
 pub(crate) use self::expression_types::ExpressionTypeCheckpoints;
@@ -92,6 +93,8 @@ pub struct AnalysisArtifacts {
     pub(crate) static_local_types: Option<WordMap<Rc<TUnion>>>,
     expression_type_checkpoints: ExpressionTypeCheckpoints,
     retain_completed_expression_types: bool,
+    pub(crate) assignment_target_log: Option<WordSet>,
+    pub(crate) loop_memos: HashMap<(u32, u32), LoopMemo>,
 }
 
 impl Default for AnalysisArtifacts {
@@ -133,6 +136,8 @@ impl AnalysisArtifacts {
             static_local_types: None,
             expression_type_checkpoints: ExpressionTypeCheckpoints::default(),
             retain_completed_expression_types: true,
+            assignment_target_log: None,
+            loop_memos: HashMap::default(),
         }
     }
 
@@ -142,7 +147,7 @@ impl AnalysisArtifacts {
     }
 
     pub(crate) fn should_retain_completed_expression_types(&self) -> bool {
-        self.retain_completed_expression_types || !self.expression_type_checkpoints.is_empty()
+        self.retain_completed_expression_types || self.expression_type_checkpoints.has_visible_checkpoints()
     }
 
     pub(crate) fn retains_completed_expression_types(&self) -> bool {
@@ -259,6 +264,10 @@ impl AnalysisArtifacts {
     }
 
     pub(crate) fn record_loop_assignment_target(&mut self, target: Word) {
+        if let Some(log) = &mut self.assignment_target_log {
+            log.insert(target);
+        }
+
         let mut loop_scope = self.loop_scope.as_mut();
         while let Some(scope) = loop_scope {
             if scope.tracks_assignment_targets {
@@ -322,8 +331,20 @@ impl AnalysisArtifacts {
         self.expression_type_checkpoints.finish_recording(&self.expression_types)
     }
 
-    pub(crate) fn expression_type_checkpoint_matches(&self, same: impl Fn(&TUnion, &TUnion) -> bool) -> bool {
-        self.expression_type_checkpoints.checkpoint_matches(&self.expression_types, same)
+    pub(crate) fn begin_silent_expression_type_recording(&mut self) {
+        self.expression_type_checkpoints.begin_silent_recording();
+    }
+
+    pub(crate) fn finish_silent_expression_type_recording(&mut self) -> Vec<((u32, u32), Rc<TUnion>)> {
+        self.expression_type_checkpoints.finish_silent_recording(&self.expression_types)
+    }
+
+    pub(crate) fn expression_type_checkpoint_matches(
+        &self,
+        same: impl Fn(&TUnion, &TUnion) -> bool,
+        cleaned: Option<(u32, u32)>,
+    ) -> bool {
+        self.expression_type_checkpoints.checkpoint_matches(&self.expression_types, same, cleaned)
     }
 
     pub(crate) fn finish_expression_type_checkpoint(&mut self, action: CheckpointAction) {

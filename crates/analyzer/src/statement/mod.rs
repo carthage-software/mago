@@ -190,10 +190,21 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
             }
             Statement::Expression(expression) => expression.expression.analyze(context, block_context, artifacts),
             Statement::Try(r#try) => r#try.analyze(context, block_context, artifacts),
-            Statement::Foreach(foreach) => foreach.analyze(context, block_context, artifacts),
-            Statement::For(r#for) => r#for.analyze(context, block_context, artifacts),
-            Statement::While(r#while) => r#while.analyze(context, block_context, artifacts),
-            Statement::DoWhile(do_while) => do_while.analyze(context, block_context, artifacts),
+            Statement::Foreach(_) | Statement::For(_) | Statement::While(_) | Statement::DoWhile(_) => {
+                r#loop::memo::analyze_loop(
+                    self,
+                    context,
+                    block_context,
+                    artifacts,
+                    |context, block_context, artifacts| match self {
+                        Statement::Foreach(foreach) => foreach.analyze(context, block_context, artifacts),
+                        Statement::For(r#for) => r#for.analyze(context, block_context, artifacts),
+                        Statement::While(r#while) => r#while.analyze(context, block_context, artifacts),
+                        Statement::DoWhile(do_while) => do_while.analyze(context, block_context, artifacts),
+                        _ => Ok(()),
+                    },
+                )
+            }
             Statement::Continue(r#continue) => r#continue.analyze(context, block_context, artifacts),
             Statement::Break(r#break) => r#break.analyze(context, block_context, artifacts),
             Statement::If(r#if) => r#if.analyze(context, block_context, artifacts),

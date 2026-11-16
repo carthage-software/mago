@@ -156,6 +156,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
             for (variable_id, variable_type) in &block_context.locals {
                 if loop_scope.parent_context_variables.contains_key(variable_id)
                     || variable_id.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':'))
+                    || loop_scope
+                        .seeded_loop_variables
+                        .get(variable_id)
+                        .is_some_and(|seeded_type| seeded_type == variable_type)
                 {
                     continue;
                 }

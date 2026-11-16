@@ -206,6 +206,51 @@ fn find_accessor_separator(bytes: &[u8]) -> Option<usize> {
 }
 
 impl<'ctx> BlockContext<'ctx> {
+    pub(crate) fn with_scope(self, scope: ScopeContext<'_>) -> BlockContext<'_> {
+        BlockContext {
+            scope,
+            locals: self.locals,
+            static_locals: self.static_locals,
+            variables_possibly_in_scope: self.variables_possibly_in_scope,
+            conditionally_referenced_variable_ids: self.conditionally_referenced_variable_ids,
+            assigned_variable_ids: self.assigned_variable_ids,
+            possibly_assigned_variable_ids: self.possibly_assigned_variable_ids,
+            derived_local_sources: self.derived_local_sources,
+            foreach_variables: self.foreach_variables,
+            class_string_sources: self.class_string_sources,
+            possibly_undefined_variable_ids: self.possibly_undefined_variable_ids,
+            referenced_counts: self.referenced_counts,
+            references_in_scope: self.references_in_scope,
+            references_to_external_scope: self.references_to_external_scope,
+            references_possibly_from_confusing_scope: self.references_possibly_from_confusing_scope,
+            by_reference_constraints: self.by_reference_constraints,
+            flags: self.flags,
+            clauses: self.clauses,
+            reconciled_expression_clauses: self.reconciled_expression_clauses,
+            known_functions: self.known_functions,
+            known_constants: self.known_constants,
+            break_types: self.break_types,
+            finally_scope: self.finally_scope,
+            parent_conflicting_clause_variables: self.parent_conflicting_clause_variables,
+            loop_bounds: self.loop_bounds,
+            if_body_context: None,
+            logical_and_true_context: None,
+            logical_or_false_context: None,
+            control_actions: self.control_actions,
+            possibly_thrown_exceptions: self.possibly_thrown_exceptions,
+            definitely_initialized_properties: self.definitely_initialized_properties,
+            possibly_initialized_properties: self.possibly_initialized_properties,
+            definitely_uninitialized_property_ids: self.definitely_uninitialized_property_ids,
+            definitely_called_methods: self.definitely_called_methods,
+            called_methods: self.called_methods,
+            calls_parent_initializer: self.calls_parent_initializer,
+            active_method_call_assertions: self.active_method_call_assertions,
+            stable_method_call_assertions: self.stable_method_call_assertions,
+            stable_method_calls: self.stable_method_calls,
+            class_type_relations: self.class_type_relations,
+        }
+    }
+
     pub(crate) fn has_same_class_type_relations(&self, other: &BlockContext<'_>) -> bool {
         self.class_type_relations == other.class_type_relations
     }

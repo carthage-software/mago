@@ -510,10 +510,10 @@ where
 /// `variable` changes.
 pub fn uses_variable_as_offset(id: &[u8], variable: &[u8]) -> bool {
     variable.first() == Some(&b'$')
-        && memchr::memmem::find_iter(id, variable).any(|position| {
-            position > 0
-                && id[position - 1] == b'['
-                && id.get(position + variable.len()).is_none_or(|next| !(next.is_ascii_alphanumeric() || *next == b'_'))
+        && memchr::memchr_iter(b'[', id).any(|bracket| {
+            id[bracket + 1..]
+                .strip_prefix(variable)
+                .is_some_and(|rest| rest.first().is_none_or(|next| !(next.is_ascii_alphanumeric() || *next == b'_')))
         })
 }
 

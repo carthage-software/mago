@@ -10,6 +10,7 @@ type TypeMap = HashMap<ExpressionRange, Rc<TUnion>>;
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ExpressionTypeCheckpoints {
     checkpoints: Vec<Checkpoint>,
+    silent: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -33,26 +34,50 @@ impl ExpressionTypeCheckpoints {
         self.checkpoints.is_empty()
     }
 
+    pub(crate) fn has_visible_checkpoints(&self) -> bool {
+        self.checkpoints.len() > self.silent
+    }
+
+    pub(crate) fn begin_silent_recording(&mut self) {
+        self.silent += 1;
+        self.begin_checkpoint();
+    }
+
+    pub(crate) fn finish_silent_recording(&mut self, types: &TypeMap) -> Vec<(ExpressionRange, Rc<TUnion>)> {
+        self.silent -= 1;
+        self.finish_recording(types)
+    }
+
     pub(crate) fn begin_checkpoint(&mut self) {
         self.checkpoints.push(Checkpoint::Changes(HashMap::default()));
     }
 
-    pub(crate) fn checkpoint_matches(&self, types: &TypeMap, same: impl Fn(&TUnion, &TUnion) -> bool) -> bool {
+    pub(crate) fn checkpoint_matches(
+        &self,
+        types: &TypeMap,
+        same: impl Fn(&TUnion, &TUnion) -> bool,
+        cleaned: Option<ExpressionRange>,
+    ) -> bool {
         let Some(checkpoint) = self.checkpoints.last() else {
             unreachable!("expression type checkpoint must exist");
         };
+        let compared = |range: &ExpressionRange| cleaned.is_none_or(|(start, end)| range.0 < start || range.1 > end);
         match checkpoint {
             Checkpoint::Changes(changes) => {
-                changes.iter().all(|(range, previous)| match (previous, types.get(range)) {
-                    (Some(previous), Some(current)) => same(previous, current),
-                    (None, None) => true,
-                    _ => false,
+                changes.iter().filter(|(range, _)| compared(range)).all(|(range, previous)| {
+                    match (previous, types.get(range)) {
+                        (Some(previous), Some(current)) => same(previous, current),
+                        (None, None) => true,
+                        _ => false,
+                    }
                 })
             }
             Checkpoint::Snapshot(snapshot) => {
-                snapshot.len() == types.len()
+                snapshot.keys().filter(|range| compared(range)).count()
+                    == types.keys().filter(|range| compared(range)).count()
                     && snapshot
                         .iter()
+                        .filter(|(range, _)| compared(range))
                         .all(|(range, previous)| types.get(range).is_some_and(|current| same(previous, current)))
             }
         }
@@ -138,7 +163,7 @@ impl ExpressionTypeCheckpoints {
         }
         checkpoints.reverse();
 
-        Self { checkpoints }
+        Self { checkpoints, silent: std::mem::take(&mut self.silent) }
     }
 
     #[inline]
