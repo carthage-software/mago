@@ -1,5 +1,8 @@
 use mago_allocator::Arena;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::expander::expand_union;
 use mago_codex::ttype::expander::get_parameter_dependent_signature_of_function_like_identifier;
 use mago_codex::ttype::expander::get_signature_of_function_like_identifier;
 use mago_codex::ttype::get_mixed_closure;
@@ -73,7 +76,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
                     resolved_method.method_identifier.get_method_name(),
                 );
 
-                let Some(signature) =
+                let Some(mut signature) =
                     get_signature_of_function_like_identifier(&signature_identifier, context.codebase)
                 else {
                     continue;
@@ -82,6 +85,24 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
                 let Some(method_metadata) = context.codebase.get_function_like(&identifier) else {
                     continue;
                 };
+
+                // `static` in the return type is the receiver, with its type arguments.
+                if let Some(declared_return_type) = &method_metadata.return_type_metadata
+                    && declared_return_type.type_union.types.iter().any(TAtomic::is_static)
+                    && let Some(return_type) = signature.get_return_type_mut()
+                {
+                    let mut expanded = declared_return_type.type_union.clone();
+                    expand_union(
+                        context.codebase,
+                        &mut expanded,
+                        &TypeExpansionOptions {
+                            self_class: Some(resolved_method.classname),
+                            static_class_type: resolved_method.static_class_type.clone(),
+                            ..Default::default()
+                        },
+                    );
+                    *return_type = expanded;
+                }
 
                 let class_metadata = context
                     .codebase

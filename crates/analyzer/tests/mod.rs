@@ -3399,6 +3399,7 @@ test_case!(loop_read_before_later_target_assignment_is_possibly_undefined);
 test_case!(hooked_property_writes_are_not_read_back);
 test_case!(array_merge_places_elements_only_after_known_prefix);
 test_case!(combining_non_empty_array_with_required_shape_stays_non_empty);
+test_case!(first_class_method_callable_keeps_static_receiver);
 
 #[test]
 #[cfg_attr(miri, ignore)]
