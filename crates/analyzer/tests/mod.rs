@@ -3377,6 +3377,7 @@ test_case!(filter_var_flags_and_inputs);
 test_case!(constant_expression_uses_earlier_constants);
 test_case!(one_branch_assignment_keeps_its_type);
 test_case!(nested_write_through_append_starts_empty);
+test_case!(escaped_string_keys_share_narrowing);
 
 #[test]
 #[cfg_attr(miri, ignore)]

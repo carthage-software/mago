@@ -21,6 +21,7 @@ use mago_syntax::cst::Construct;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::FunctionCall;
 use mago_syntax::cst::Literal;
+use mago_syntax::cst::LiteralString;
 use mago_syntax::cst::MethodCall;
 use mago_syntax::cst::NullSafeMethodCall;
 use mago_syntax::cst::NullSafePropertyAccess;
@@ -453,6 +454,30 @@ pub fn get_root_expression_id(expression: &Expression<'_>) -> Option<Word> {
     }
 }
 
+/// The id of a string key, written single-quoted from its value so `"a"`, `'a'` and `"\x61"` name the same key.
+fn get_string_key_id(literal_string: &LiteralString<'_>) -> Word {
+    let Some(value) = literal_string.value else {
+        return word(literal_string.raw);
+    };
+
+    if literal_string.raw.first() == Some(&b'\'') && !literal_string.raw.contains(&b'\\') {
+        return word(literal_string.raw);
+    }
+
+    let mut id = Vec::with_capacity(value.len() + 2);
+    id.push(b'\'');
+    for &byte in value {
+        if matches!(byte, b'\'' | b'\\') {
+            id.push(b'\\');
+        }
+
+        id.push(byte);
+    }
+    id.push(b'\'');
+
+    word(&id)
+}
+
 pub fn get_index_id<'ast, 'arena>(
     expression: &'ast Expression<'arena>,
     this_class_name: Option<Word>,
@@ -460,7 +485,7 @@ pub fn get_index_id<'ast, 'arena>(
     codebase: Option<&CodebaseMetadata>,
 ) -> Option<Word> {
     Some(match expression {
-        Expression::Literal(Literal::String(literal_string)) => word(literal_string.raw),
+        Expression::Literal(Literal::String(literal_string)) => get_string_key_id(literal_string),
         Expression::Literal(Literal::Integer(literal_integer)) => word(literal_integer.raw),
         Expression::UnaryPostfix(unary_postfix) => {
             return get_index_id(unary_postfix.operand, this_class_name, resolved_names, codebase);
