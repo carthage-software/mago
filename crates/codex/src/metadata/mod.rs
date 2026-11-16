@@ -562,6 +562,23 @@ impl CodebaseMetadata {
         self.constants.get(&lowercase_name)
     }
 
+    /// The constant a docblock type name refers to when no class-like has that name: the
+    /// namespaced constant, or else the global constant of the same short name.
+    #[inline]
+    #[must_use]
+    pub fn get_constant_name_of_type_reference(&self, name: &[u8]) -> Option<Word> {
+        let constant_name = ascii_lowercase_constant_name_word(name);
+        if self.constants.contains_key(&constant_name) {
+            return Some(constant_name);
+        }
+
+        let short_name =
+            name.rsplit(|byte| *byte == b'\\').next().filter(|short_name| short_name.len() < name.len())?;
+        let short_name = word(short_name);
+
+        self.constants.contains_key(&short_name).then_some(short_name)
+    }
+
     /// The declaration name span of a top-level symbol named `name`: a
     /// class-like (class/interface/trait/enum), a function, or a constant.
     ///

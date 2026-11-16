@@ -3366,6 +3366,7 @@ test_case!(override_resolves_parent_in_declaring_class);
 test_case!(object_cast_types_every_operand_part);
 test_case!(comparison_narrows_int_template_bound);
 test_case!(preg_match_matches_follow_flags);
+test_case!(docblock_types_resolve_global_constants);
 
 #[test]
 #[cfg_attr(miri, ignore)]

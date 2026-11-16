@@ -80,6 +80,10 @@ pub fn populate_docblock_variables_excluding<'ctx, A>(
                 continue;
             };
 
+            if context.codebase.get_constant_name_of_type_reference(ref_name.as_bytes()).is_some() {
+                continue;
+            }
+
             context.collector.report_with_code(
                 IssueCode::NonExistentClassLike,
                 Issue::error(format!("Cannot find class, interface, enum, or type alias `{ref_name}`."))

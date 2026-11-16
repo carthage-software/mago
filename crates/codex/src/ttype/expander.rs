@@ -323,6 +323,19 @@ pub(crate) fn expand_atomic(
             *skip_key = true;
             expand_global_reference(selector, codebase, options, new_return_type_parts);
         }
+        TAtomic::Reference(TReference::Symbol { name, parameters: None, intersection_types: None, .. }) => {
+            if codebase.get_class_like_by_name(*name).is_none()
+                && let Some(constant_name) = codebase.get_constant_name_of_type_reference(name.as_bytes())
+            {
+                *skip_key = true;
+                expand_global_reference(
+                    &TGlobalReferenceSelector::Identifier(constant_name),
+                    codebase,
+                    options,
+                    new_return_type_parts,
+                );
+            }
+        }
         TAtomic::Callable(TCallable::Alias(id)) => {
             if let Some(value) = get_atomic_of_function_like_identifier(id, codebase) {
                 *skip_key = true;
@@ -640,9 +653,13 @@ fn expand_global_reference(
             continue;
         };
 
-        if let Some(inferred_type) = constant.inferred_type.as_ref() {
+        let inferred_type = constant.inferred_type.as_ref().map(|inferred_type| {
             let mut inferred_type = inferred_type.clone();
             expand_union(codebase, &mut inferred_type, options);
+            inferred_type
+        });
+
+        if let Some(inferred_type) = inferred_type.filter(|inferred_type| !inferred_type.is_mixed()) {
             new_return_type_parts.extend(inferred_type.types.into_owned());
         } else if let Some(type_metadata) = constant.type_metadata.as_ref() {
             let mut constant_type = type_metadata.type_union.clone();

@@ -1719,7 +1719,11 @@ where
         }
 
         let name = match type_ref {
-            TypeRef::Atomic(TAtomic::Reference(TReference::Symbol { name, .. })) => name,
+            TypeRef::Atomic(TAtomic::Reference(TReference::Symbol { name, .. }))
+                if context.codebase.get_constant_name_of_type_reference(name.as_bytes()).is_none() =>
+            {
+                name
+            }
             TypeRef::Atomic(TAtomic::Reference(TReference::Member { class_like_name: name, .. }))
                 if !matches!(name.to_ascii_lowercase().as_bytes(), b"self" | b"static" | b"parent" | b"$this") => name,
             TypeRef::Atomic(TAtomic::Object(TObject::Named(TNamedObject { name, .. }) | TObject::Enum(TEnum { name, .. })))
