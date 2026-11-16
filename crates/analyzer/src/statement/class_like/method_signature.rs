@@ -171,6 +171,7 @@ fn replace_used_trait_with_class(codebase: &CodebaseMetadata, type_union: &mut T
 pub fn validate_method_signature_compatibility(
     codebase: &CodebaseMetadata,
     child_class_name: Word,
+    parent_class_name: Word,
     child_method: &FunctionLikeMetadata,
     parent_method: &FunctionLikeMetadata,
     parent_is_final: bool,
@@ -262,6 +263,15 @@ pub fn validate_method_signature_compatibility(
         }
     }
 
+    let child_expansion_options = TypeExpansionOptions {
+        self_class: Some(child_class_name),
+        static_class_type: StaticClassType::Name(child_class_name),
+        function_is_final: child_method_meta.is_final,
+        ..Default::default()
+    };
+    let parent_expansion_options =
+        TypeExpansionOptions { self_class: Some(parent_class_name), ..child_expansion_options.clone() };
+
     for (index, parent_param) in parent_method.parameters.iter().enumerate() {
         let Some(child_param) = child_param_for(index) else {
             continue;
@@ -280,19 +290,12 @@ pub fn validate_method_signature_compatibility(
         let mut expanded_parent_param_type = parent_param_type.clone();
         let mut expanded_child_param_type = child_param_type.clone();
 
-        let expansion_options = TypeExpansionOptions {
-            self_class: Some(child_class_name),
-            static_class_type: StaticClassType::Name(child_class_name),
-            function_is_final: child_method_meta.is_final,
-            ..Default::default()
-        };
-
         if expanded_parent_param_type.is_expandable() {
-            expand_union(codebase, &mut expanded_parent_param_type, &expansion_options);
+            expand_union(codebase, &mut expanded_parent_param_type, &parent_expansion_options);
         }
         replace_used_trait_with_class(codebase, &mut expanded_child_param_type, child_class_name);
         if expanded_child_param_type.is_expandable() {
-            expand_union(codebase, &mut expanded_child_param_type, &expansion_options);
+            expand_union(codebase, &mut expanded_child_param_type, &child_expansion_options);
         }
 
         let is_compatible = union_comparator::is_contained_by(
@@ -335,16 +338,8 @@ pub fn validate_method_signature_compatibility(
         && !parent_method.flags.is_built_in()
     {
         let mut expanded_parent_return_type = parent_return.type_union.clone();
-
-        let expansion_options = TypeExpansionOptions {
-            self_class: Some(child_class_name),
-            static_class_type: StaticClassType::Name(child_class_name),
-            function_is_final: child_method_meta.is_final,
-            ..Default::default()
-        };
-
         if expanded_parent_return_type.is_expandable() {
-            expand_union(codebase, &mut expanded_parent_return_type, &expansion_options);
+            expand_union(codebase, &mut expanded_parent_return_type, &parent_expansion_options);
         }
 
         issues.push(SignatureCompatibilityIssue::MissingReturnTypeDeclaration {
@@ -359,19 +354,12 @@ pub fn validate_method_signature_compatibility(
         let mut expanded_parent_return_type = parent_return.type_union.clone();
         let mut expanded_child_return_type = child_return.type_union.clone();
 
-        let expansion_options = TypeExpansionOptions {
-            self_class: Some(child_class_name),
-            static_class_type: StaticClassType::Name(child_class_name),
-            function_is_final: child_method_meta.is_final,
-            ..Default::default()
-        };
-
         if expanded_parent_return_type.is_expandable() {
-            expand_union(codebase, &mut expanded_parent_return_type, &expansion_options);
+            expand_union(codebase, &mut expanded_parent_return_type, &parent_expansion_options);
         }
         replace_used_trait_with_class(codebase, &mut expanded_child_return_type, child_class_name);
         if expanded_child_return_type.is_expandable() {
-            expand_union(codebase, &mut expanded_child_return_type, &expansion_options);
+            expand_union(codebase, &mut expanded_child_return_type, &child_expansion_options);
         }
 
         let mut comparison_result = ComparisonResult::new();
@@ -408,7 +396,11 @@ pub fn validate_method_signature_compatibility(
         };
 
         if expanded_parent_return_type.is_expandable() {
-            expand_union(codebase, &mut expanded_parent_return_type, &expansion_options);
+            expand_union(
+                codebase,
+                &mut expanded_parent_return_type,
+                &TypeExpansionOptions { self_class: Some(parent_class_name), ..expansion_options.clone() },
+            );
         }
         replace_used_trait_with_class(codebase, &mut expanded_child_return_type, child_class_name);
         if expanded_child_return_type.is_expandable() {

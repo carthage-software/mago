@@ -2355,6 +2355,16 @@ fn check_abstract_method_signatures<'ctx, A>(
             let substituted_appearing_method =
                 get_substituted_method(appearing_method, class_like_metadata, method_fqcn, context.codebase);
 
+            let overridden_scope = if overridden_class.kind.is_trait() {
+                class_like_metadata
+                    .direct_parent_class
+                    .and_then(|parent_name| context.codebase.get_class_like_by_name(parent_name))
+                    .and_then(|parent| parent.appearing_method_ids.get(method_name_atom))
+                    .map_or(declaring_class_name, MethodIdentifier::get_class_name)
+            } else {
+                declaring_class_name
+            };
+
             let mut issues = method_signature::validate_method_signature_compatibility(
                 context.codebase,
                 if appearing_class.kind.is_trait() || returns_static(overridden_method) {
@@ -2362,6 +2372,7 @@ fn check_abstract_method_signatures<'ctx, A>(
                 } else {
                     method_fqcn
                 },
+                overridden_scope,
                 &substituted_appearing_method,
                 &substituted_overridden_method,
                 final_parent_class.is_some(),
@@ -2375,15 +2386,7 @@ fn check_abstract_method_signatures<'ctx, A>(
                         .get(method_name_atom)
                         .map_or(method_fqcn, MethodIdentifier::get_class_name),
                     class_like_metadata.name,
-                    if overridden_class.kind.is_trait() {
-                        class_like_metadata
-                            .direct_parent_class
-                            .and_then(|parent_name| context.codebase.get_class_like_by_name(parent_name))
-                            .and_then(|parent| parent.appearing_method_ids.get(method_name_atom))
-                            .map_or(declaring_class_name, MethodIdentifier::get_class_name)
-                    } else {
-                        declaring_class_name
-                    },
+                    overridden_scope,
                     &substituted_appearing_method,
                     &substituted_overridden_method,
                 )
@@ -2474,6 +2477,7 @@ fn check_trait_method_conflicts<'ctx, 'ast, 'arena, A>(
                             let issues = method_signature::validate_method_signature_compatibility(
                                 context.codebase,
                                 class_like_metadata.name,
+                                class_like_metadata.name,
                                 second_method,
                                 first_method,
                                 false,
@@ -2531,6 +2535,7 @@ fn check_trait_method_conflicts<'ctx, 'ast, 'arena, A>(
                             if first_is_abstract || second_is_abstract {
                                 let issues = method_signature::validate_method_signature_compatibility(
                                     context.codebase,
+                                    class_like_metadata.name,
                                     class_like_metadata.name,
                                     second_method,
                                     first_method,
@@ -3055,6 +3060,7 @@ fn check_interface_method_signatures<'ctx, A>(
         let mut issues = method_signature::validate_method_signature_compatibility(
             context.codebase,
             method_scope,
+            interface_fqcn_word,
             &substituted_class_method,
             &substituted_interface_method,
             false,
