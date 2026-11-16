@@ -286,6 +286,17 @@ fn inherit_loop_block_context<'ctx, A>(
                     continue;
                 }
 
+                // A variable the loop defines and a break leaves undefined is handled with the breaks below.
+                if has_break
+                    && !loop_scope.parent_context_variables.contains_key(&variable)
+                    && !loop_scope
+                        .variables_defined_at_every_break
+                        .as_ref()
+                        .is_some_and(|defined_at_every_break| defined_at_every_break.contains(&variable))
+                {
+                    continue;
+                }
+
                 if let Some(possible_type) = loop_scope.possibly_defined_loop_parent_variables.get(&variable) {
                     block_context.locals.insert(
                         variable,
@@ -1367,6 +1378,16 @@ where
             // that the loop has finished executing, so the assertions at the end
             // the loop in the while conditional may not hold
             if does_sometimes_break || does_sometimes_continue {
+                if does_sometimes_break
+                    && !loop_scope.parent_context_variables.contains_key(variable_id)
+                    && !loop_scope
+                        .variables_defined_at_every_break
+                        .as_ref()
+                        .is_some_and(|defined_at_every_break| defined_at_every_break.contains(variable_id))
+                {
+                    continue;
+                }
+
                 if let Some(possibly_defined_type) = loop_scope.possibly_defined_loop_parent_variables.get(variable_id)
                 {
                     loop_parent_context.locals.insert(
