@@ -625,6 +625,14 @@ where
     }
 }
 
+/// An array or object used as an array offset throws a `TypeError`.
+fn can_throw_as_offset(index_type: &TUnion) -> bool {
+    index_type
+        .types
+        .iter()
+        .any(|atomic| matches!(atomic, TAtomic::Array(_) | TAtomic::Object(_) | TAtomic::Iterable(_)))
+}
+
 pub(crate) fn handle_array_access_on_list<'ctx, A>(
     context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
@@ -662,6 +670,7 @@ where
     // not be present at runtime.
     let expected_contained_by_index = !index_type_contained_by_expected
         && !expected_key_type.is_never()
+        && !can_throw_as_offset(dim_type)
         && is_contained_by(
             context.codebase,
             &expected_key_type,
@@ -1028,6 +1037,7 @@ where
     // array like `[]` with any key.
     let expected_contained_by_index = !index_type_contained_by_expected
         && !key_parameter.is_never()
+        && !can_throw_as_offset(index_type)
         && is_contained_by(
             context.codebase,
             &key_parameter,
