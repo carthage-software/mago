@@ -191,7 +191,7 @@ fn should_inherit_docblock_type(
             &mut ComparisonResult::new(),
         );
 
-        return !parent_docblock_contained_in_child;
+        return parent_docblock_contained_in_child;
     };
 
     if covariant {
