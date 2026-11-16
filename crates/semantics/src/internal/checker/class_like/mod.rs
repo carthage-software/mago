@@ -38,7 +38,7 @@ pub use property::*;
 mod constant;
 mod inheritance;
 mod method;
-mod property;
+pub(crate) mod property;
 
 #[inline]
 pub fn check_trait_use_alias_adaptation<'ast, 'arena>(

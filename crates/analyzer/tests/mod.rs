@@ -3383,6 +3383,7 @@ test_case!(loose_string_equality_keeps_stringable_objects);
 test_case!(nullsafe_property_fetch_keeps_condition_narrowing);
 test_case!(non_empty_string_without_zero_is_non_falsy);
 test_case!(array_or_object_index_union_is_reported);
+test_case!(public_set_readonly_property_written_from_outside);
 
 #[test]
 #[cfg_attr(miri, ignore)]

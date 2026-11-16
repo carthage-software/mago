@@ -66,6 +66,10 @@ where
         flags |= MetadataFlags::READONLY;
     }
 
+    if parameter.modifiers.iter().any(|modifier| matches!(modifier, Modifier::PublicSet(_))) {
+        flags |= MetadataFlags::PUBLIC_SET;
+    }
+
     if parameter.modifiers.contains_abstract() {
         flags |= MetadataFlags::ABSTRACT;
     }
@@ -210,6 +214,10 @@ where
 
                     if plain_property.modifiers.contains_readonly() {
                         item_flags |= MetadataFlags::READONLY;
+                    }
+
+                    if plain_property.modifiers.iter().any(|modifier| matches!(modifier, Modifier::PublicSet(_))) {
+                        item_flags |= MetadataFlags::PUBLIC_SET;
                     }
 
                     if plain_property.modifiers.contains_abstract() {

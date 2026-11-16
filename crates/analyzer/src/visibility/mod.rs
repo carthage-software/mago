@@ -524,7 +524,7 @@ pub(crate) fn effective_write_visibility(property: &PropertyMetadata, version: P
     }
 
     match property.write_visibility {
-        Visibility::Public => Visibility::Protected,
+        Visibility::Public if !property.flags.has_public_set() => Visibility::Protected,
         visibility => visibility,
     }
 }

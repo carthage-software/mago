@@ -7,6 +7,7 @@ use mago_span::Span;
 use mago_syntax::cst::FunctionLikeParameterList;
 use mago_syntax::cst::Modifier;
 
+use crate::internal::checker::class_like::property::check_set_visibility_is_not_wider;
 use crate::internal::context::Context;
 
 #[inline]
@@ -43,6 +44,10 @@ pub fn check_parameter_list(
             );
         } else if !parameter.is_promoted_property() {
             parameters_seen.push((name_bytes, parameter.variable.span()));
+        }
+
+        if parameter.is_promoted_property() {
+            check_set_visibility_is_not_wider(&parameter.modifiers, &name.to_string(), context);
         }
 
         let mut last_readonly = None;

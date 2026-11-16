@@ -55,6 +55,7 @@ impl MetadataFlags {
     pub const USES_FUNC_GET_ARGS: MetadataFlags = MetadataFlags(1 << 44);
     pub const ALLOWS_DYNAMIC_PROPERTIES: MetadataFlags = MetadataFlags(1 << 45);
     pub const CALLS_PARENT_CONSTRUCTOR: MetadataFlags = MetadataFlags(1 << 46);
+    pub const PUBLIC_SET: MetadataFlags = MetadataFlags(1 << 47);
 }
 
 impl MetadataFlags {
@@ -287,6 +288,12 @@ impl MetadataFlags {
     #[must_use]
     pub const fn is_magic_method(self) -> bool {
         self.contains(Self::MAGIC_METHOD)
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn has_public_set(self) -> bool {
+        self.contains(Self::PUBLIC_SET)
     }
 
     #[inline]

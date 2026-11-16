@@ -9,9 +9,44 @@ use mago_syntax::cst::ModifierSequenceExt;
 use mago_syntax::cst::Property;
 use mago_syntax::cst::PropertyHookBody;
 use mago_syntax::cst::PropertyItem;
+use mago_syntax::cst::Sequence;
 
 use crate::internal::checker::function_like::check_for_promoted_properties_outside_constructor;
 use crate::internal::context::Context;
+
+/// PHP rejects a set visibility wider than the read visibility, such as `protected public(set)`.
+pub fn check_set_visibility_is_not_wider(
+    modifiers: &Sequence<'_, Modifier<'_>>,
+    property_name: &str,
+    context: &mut Context<'_, '_, '_>,
+) {
+    let rank = |modifier: &Modifier<'_>| match modifier {
+        Modifier::Private(_) | Modifier::PrivateSet(_) => 0,
+        Modifier::Protected(_) | Modifier::ProtectedSet(_) => 1,
+        _ => 2,
+    };
+
+    let Some(write_visibility) = modifiers.get_first_write_visibility() else {
+        return;
+    };
+
+    let read_visibility = modifiers.get_first_read_visibility();
+    if rank(write_visibility) <= read_visibility.map_or(2, rank) {
+        return;
+    }
+
+    let mut issue =
+        Issue::error(format!("Visibility of property `{property_name}` must not be weaker than its set visibility."))
+            .with_annotation(
+                Annotation::primary(write_visibility.span()).with_message("Set visibility is wider here."),
+            );
+
+    if let Some(read_visibility) = read_visibility {
+        issue = issue.with_annotation(Annotation::secondary(read_visibility.span()).with_message("Read visibility."));
+    }
+
+    context.report(issue.with_help("Make the set visibility as narrow as the read visibility, or narrower."));
+}
 
 #[inline]
 #[allow(clippy::too_many_arguments)]
@@ -32,6 +67,8 @@ pub fn check_property(
     let first_variable_name = BytesDisplay(first_variable.name);
 
     let modifiers = property.modifiers();
+    check_set_visibility_is_not_wider(modifiers, &format!("{class_like_name}::{first_variable_name}"), context);
+
     let mut last_final: Option<Span> = None;
     let mut last_static: Option<Span> = None;
     let mut last_readonly: Option<Span> = None;
