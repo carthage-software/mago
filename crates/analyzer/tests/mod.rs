@@ -3354,6 +3354,7 @@ test_case!(pcre_literal_pattern_failure_result);
 test_case!(psl_contains_narrows_like_in_array);
 test_case!(static_call_from_another_scope_ends_static_property_narrowing);
 test_case!(always_entered_loop_keeps_existing_optional_keys);
+test_case!(unpacked_array_of_unknown_size_satisfies_required_parameters);
 
 #[test]
 #[cfg_attr(miri, ignore)]

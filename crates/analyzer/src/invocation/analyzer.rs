@@ -999,7 +999,7 @@ where
                         base_variadic_parameter_type
                     };
 
-                for unpacked_argument in unpacked_arguments {
+                for unpacked_argument in &unpacked_arguments {
                     let Some(argument_expression) = unpacked_argument.value() else {
                         continue;
                     };
@@ -1192,6 +1192,14 @@ where
         }
         _ if has_unpacked_arguments || has_named_argument_anomaly => {
             number_of_provided_parameters < number_of_required_parameters
+                && !unpacked_arguments.iter().any(|argument| {
+                    argument.value().and_then(|value| artifacts.get_expression_type(value)).is_none_or(|unpacked| {
+                        unpacked
+                            .types
+                            .iter()
+                            .any(|atomic| !matches!(atomic, TAtomic::Array(array) if array.is_sealed()))
+                    })
+                })
         }
         _ => number_of_satisfied_required_parameters < number_of_required_parameters,
     };
