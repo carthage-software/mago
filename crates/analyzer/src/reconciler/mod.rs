@@ -945,7 +945,9 @@ fn refine_array_key(key_type: &TUnion) -> TUnion {
                         types.push(cat.clone());
                     }
                 }
-                TAtomic::Scalar(TScalar::ArrayKey | TScalar::String(_) | TScalar::Integer(_)) => {
+                TAtomic::Scalar(
+                    TScalar::ArrayKey | TScalar::String(_) | TScalar::ClassLikeString(_) | TScalar::Integer(_),
+                ) => {
                     types.push(cat.clone());
                 }
                 _ => {

@@ -3357,6 +3357,7 @@ test_case!(always_entered_loop_keeps_existing_optional_keys);
 test_case!(unpacked_array_of_unknown_size_satisfies_required_parameters);
 test_case!(exception_code_follows_code_property);
 test_case!(class_string_ignores_type_arguments);
+test_case!(is_array_keeps_iterable_key_type);
 
 #[test]
 #[cfg_attr(miri, ignore)]
