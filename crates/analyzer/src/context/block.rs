@@ -30,6 +30,7 @@ use crate::context::scope::finally_scope::FinallyScope;
 use crate::context::scope::var_has_root;
 use crate::reconciler::assertion_reconciler;
 use crate::reconciler::negated_assertion_reconciler;
+use crate::utils::expression::uses_variable_as_offset;
 use mago_bytes::BytesDisplay;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -409,6 +410,7 @@ impl<'ctx> BlockContext<'ctx> {
         'outer: for clause in clauses {
             for (var_id, assertions) in &clause.possibilities {
                 if var_has_root(*var_id, remove_var_id)
+                    || uses_variable_as_offset(var_id.as_bytes(), remove_var_id.as_bytes())
                     || assertions.values().any(|assertion| {
                         assertion.referenced_variable().is_some_and(|variable| var_has_root(variable, remove_var_id))
                     })
@@ -534,7 +536,10 @@ impl<'ctx> BlockContext<'ctx> {
             if existing_type.is_mixed() { None } else { new_type },
         );
 
-        self.locals.retain(|var_id, _| !var_has_root(*var_id, remove_var_id));
+        self.locals.retain(|var_id, _| {
+            !var_has_root(*var_id, remove_var_id)
+                && !uses_variable_as_offset(var_id.as_bytes(), remove_var_id.as_bytes())
+        });
     }
 
     /// Registers a variable that is referenced conditionally, like in a property

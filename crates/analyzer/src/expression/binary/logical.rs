@@ -41,6 +41,7 @@ use crate::formula::negate_or_synthesize;
 use crate::reconciler;
 use crate::utils::expression::expression_has_observable_side_effect;
 use crate::utils::expression::get_cleared_members;
+use crate::utils::expression::uses_variable_as_offset;
 use crate::utils::symbol_existence::extract_function_constant_existence;
 
 /// Merges variables assigned by a short-circuiting right-hand side back into the
@@ -283,6 +284,19 @@ where
         context.settings.formula_size_threshold,
     )
     .unwrap_or_default();
+
+    // What the left operand says about `$a[$i]` is about another element once it also writes `$i`.
+    let left_clauses: Vec<_> = left_clauses
+        .into_iter()
+        .filter(|clause| {
+            !clause.possibilities.keys().any(|key| {
+                left_block_context
+                    .assigned_variable_ids
+                    .keys()
+                    .any(|assigned| uses_variable_as_offset(key.as_bytes(), assigned.as_bytes()))
+            })
+        })
+        .collect();
 
     for (var_id, var_type) in &left_block_context.locals {
         if left_block_context.assigned_variable_ids.contains_key(var_id) {

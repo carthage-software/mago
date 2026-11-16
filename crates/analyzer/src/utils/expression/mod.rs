@@ -506,6 +506,17 @@ where
         .collect()
 }
 
+/// Whether an id such as `$a[$i]` reads `variable` (`$i`) inside an offset, so it names another element once
+/// `variable` changes.
+pub fn uses_variable_as_offset(id: &[u8], variable: &[u8]) -> bool {
+    variable.first() == Some(&b'$')
+        && memchr::memmem::find_iter(id, variable).any(|position| {
+            position > 0
+                && id[position - 1] == b'['
+                && id.get(position + variable.len()).is_none_or(|next| !(next.is_ascii_alphanumeric() || *next == b'_'))
+        })
+}
+
 pub fn get_index_id<'ast, 'arena>(
     expression: &'ast Expression<'arena>,
     this_class_name: Option<Word>,
