@@ -1149,6 +1149,11 @@ where
             } else if left_is_static && !right_is_static {
                 // Foo::class === $var::class  =>  $var is the variable, Foo::class is the type
                 (right_part, left)
+            } else if is_this_class(right_part) && !is_this_class(left_part) {
+                // $var::class === static::class  =>  $var is the variable, static::class is the type
+                (left_part, right)
+            } else if is_this_class(left_part) && !is_this_class(right_part) {
+                (right_part, left)
             } else {
                 // Both are dynamic ($a::class === $b::class) or both static (A::class === B::class).
                 // Let the standard reconciler handle these comparisons.
