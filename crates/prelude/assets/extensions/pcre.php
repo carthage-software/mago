@@ -40,14 +40,29 @@ const PCRE_VERSION_MINOR = 42;
 const PCRE_JIT_SUPPORT = 1;
 
 /**
- * @param-out array<string> $matches
+ * @param-out (
+ *     $flags is 256 ? array<array{string, int<-1, max>}> : (
+ *     $flags is 512 ? array<null|string> : (
+ *     $flags is 768 ? array<array{null|string, int<-1, max>}> :
+ *     array<string>
+ * ))) $matches
  *
  * @return 0|1|false
  */
 function preg_match(string $pattern, string $subject, &$matches = [], int $flags = 0, int $offset = 0): int|false {}
 
 /**
- * @param-out ($flags is 2|258|514|770 ? list<array<string>> : array<array<string>>) $matches
+ * @param-out (
+ *     $flags is 0|1 ? array<list<string>> : (
+ *     $flags is 2 ? list<array<string>> : (
+ *     $flags is 256|257 ? array<list<array{string, int<-1, max>}>> : (
+ *     $flags is 258 ? list<array<array{string, int<-1, max>}>> : (
+ *     $flags is 512|513 ? array<list<null|string>> : (
+ *     $flags is 514 ? list<array<null|string>> : (
+ *     $flags is 768|769 ? array<list<array{null|string, int<-1, max>}>> : (
+ *     $flags is 770 ? list<array<array{null|string, int<-1, max>}>> :
+ *     array<array<mixed>>
+ * )))))))) $matches
  *
  * @return non-negative-int|false
  */
