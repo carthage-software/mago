@@ -3392,6 +3392,7 @@ test_case!(nested_unset_updates_holding_arrays);
 test_case!(loose_null_loop_condition_uses_operand_type);
 test_case!(switch_case_body_sees_condition_assignments);
 test_case!(elseif_reassignment_drops_earlier_negations);
+test_case!(truthy_int_excludes_zero);
 
 #[test]
 #[cfg_attr(miri, ignore)]

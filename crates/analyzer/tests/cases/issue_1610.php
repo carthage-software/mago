@@ -233,7 +233,7 @@ final class Summary
         if ($st->politique) {
             if ($st->politique > 0) {
                 $sum[] = 'Avec une politique de publication';
-            } elseif ($st->politique < 0) {
+            } elseif ($st->politique < 0) { // @mago-expect analysis:redundant-comparison,redundant-condition
                 $sum[] = 'Sans politique de publication';
             }
         }

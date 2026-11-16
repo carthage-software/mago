@@ -1650,6 +1650,14 @@ where
 
                     acceptable_types.push(TAtomic::Scalar(TScalar::String(str)));
                 }
+                TAtomic::Scalar(TScalar::Integer(integer)) => {
+                    acceptable_types.extend(
+                        integer
+                            .difference(TInteger::Literal(0), false)
+                            .into_iter()
+                            .map(|integer| TAtomic::Scalar(TScalar::Integer(integer))),
+                    );
+                }
                 _ => {
                     acceptable_types.push(atomic);
                 }
