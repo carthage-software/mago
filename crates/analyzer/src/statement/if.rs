@@ -903,6 +903,20 @@ where
     let (negated_else_if_types, _) =
         find_satisfying_assignments(negated_if_clauses.as_slice(), None, &mut WordSet::default());
 
+    // The earlier branches' negations describe the old value of a variable this condition reassigns.
+    for assigned_variable_id in assigned_in_conditional_variable_ids.keys() {
+        if_scope.negated_types.swap_remove(assigned_variable_id);
+    }
+
+    if !assigned_in_conditional_variable_ids.is_empty() {
+        if_scope.negated_clauses.retain(|clause| {
+            !clause
+                .possibilities
+                .keys()
+                .any(|variable_id| assigned_in_conditional_variable_ids.contains_key(variable_id))
+        });
+    }
+
     let all_negated_variables =
         negated_else_if_types.keys().copied().chain(if_scope.negated_types.keys().copied()).collect::<HashSet<_>>();
 
