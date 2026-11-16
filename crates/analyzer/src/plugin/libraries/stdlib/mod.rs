@@ -4,6 +4,7 @@ pub mod array;
 pub mod closure;
 pub mod cookie;
 pub mod r#enum;
+pub mod exception;
 pub mod filter;
 pub mod json;
 pub mod math;
@@ -79,6 +80,7 @@ impl Plugin for StdlibPlugin {
         registry.register_method_provider(closure::ClosureFromCallableProvider);
         registry.register_method_provider(closure::ClosureGetCurrentProvider);
         registry.register_method_provider(r#enum::EnumCasesProvider);
+        registry.register_method_provider(exception::ExceptionGetCodeProvider);
         registry.register_method_provider(reflection::ReflectionMethodGetNameProvider);
         registry.register_method_provider(reflection::ReflectionMethodInvokeProvider);
 
