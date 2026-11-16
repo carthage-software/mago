@@ -35,6 +35,7 @@ final class Thrower
 {
     /**
      * @throws T
+     * @mago-expect analysis:too-wide-throw-type
      * @throws Exception
      */
     public function run(): void

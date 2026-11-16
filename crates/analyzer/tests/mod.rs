@@ -3119,6 +3119,19 @@ test_case!(issue_2611);
 test_case!(issue_2612);
 test_case!(issue_2612_intersections);
 test_case!(issue_2619);
+test_case!(throw_context_in_terminating_branches);
+#[test]
+fn throw_context_in_terminating_branches_without_unhandled_check() {
+    let mut settings = default_test_settings();
+    settings.check_throws = false;
+    crate::framework::TestCase::new(
+        "throw_context_in_terminating_branches_without_unhandled_check",
+        include_bytes!("cases/throw_context_in_terminating_branches.php"),
+    )
+    .settings(settings)
+    .run();
+}
+
 test_case!(too_wide_throws, expected_issue_counts = [("too-wide-throw-type", 11), ("unhandled-thrown-type", 1)]);
 test_case!(
     array_map_callback_empty,
@@ -3180,12 +3193,7 @@ test_case!(
 test_case!(unresolved_recursive_generic_throw);
 test_case!(
     too_wide_generic_throw,
-    expected_issue_counts = [
-        ("too-wide-throw-type", 6),
-        ("unhandled-thrown-type", 2),
-        ("unused-template-parameter", 1),
-        ("avoid-catching-error", 2),
-    ]
+    expected_issue_counts = [("too-wide-throw-type", 6), ("unhandled-thrown-type", 2), ("avoid-catching-error", 2)]
 );
 test_case!(
     check_throws_disabled,

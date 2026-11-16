@@ -32,6 +32,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::scope::if_scope::IfScope;
 use crate::context::utils::inherit_branch_context_properties;
+use crate::context::utils::inherit_thrown_exceptions;
 use crate::error::AnalysisError;
 use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
@@ -268,6 +269,10 @@ where
     };
 
     if let Some(continuing_context) = continuing_context {
+        // A terminating branch cannot contribute locals, but its exceptions can still escape.
+        inherit_thrown_exceptions(context, block_context, &if_block_context);
+        inherit_thrown_exceptions(context, block_context, &else_block_context);
+
         for (variable_id, variable_type) in &continuing_context.locals {
             block_context.locals.insert(*variable_id, Rc::clone(variable_type));
         }

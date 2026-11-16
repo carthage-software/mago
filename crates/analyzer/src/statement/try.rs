@@ -40,6 +40,7 @@ use crate::context::scope::control_action::ControlActionSet;
 use crate::context::scope::finally_scope::FinallyScope;
 use crate::context::scope::loop_scope::LoopScope;
 use crate::context::utils::inherit_branch_context_properties;
+use crate::context::utils::inherit_thrown_exceptions;
 use crate::error::AnalysisError;
 use crate::statement::analyze_statements;
 
@@ -632,6 +633,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 &mut finally_block_context,
                 artifacts,
             )?;
+
+            inherit_thrown_exceptions(context, block_context, &finally_block_context);
 
             finally_has_returned = finally_block_context.flags.has_returned();
             block_context.possibly_undefined_variable_ids.extend(finally_block_context.possibly_undefined_variable_ids);

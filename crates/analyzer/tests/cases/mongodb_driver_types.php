@@ -107,6 +107,7 @@ function in_transaction(Session $session): bool
  * @return list<int>
  *
  * @throws MongoDB\Driver\Exception\LogicException
+ * @mago-expect analysis:too-wide-throw-type
  */
 function failed_indexes(WriteResult $result): array
 {
