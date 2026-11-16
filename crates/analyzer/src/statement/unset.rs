@@ -29,6 +29,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::utils::expression::get_block_expression_id;
+use crate::utils::expression::get_root_expression_id;
 use crate::visibility::ProtectedMember;
 use crate::visibility::is_member_visible_from_scope;
 use mago_word::concat_word;
@@ -74,6 +75,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                 let Some(array_id) = get_block_expression_id(array_access.array, context, block_context) else {
                     break 'array_access;
                 };
+
+                // Unsetting an offset writes the array that holds it, and the variable at its root.
+                for written_id in [Some(array_id), get_root_expression_id(array_access.array)].into_iter().flatten() {
+                    artifacts.record_loop_assignment_target(written_id);
+                    block_context.possibly_assigned_variable_ids.insert(written_id);
+                }
 
                 let Some(key_type) = artifacts.get_expression_type(array_access.index) else {
                     break 'array_access;

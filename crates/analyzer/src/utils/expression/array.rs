@@ -575,7 +575,11 @@ where
 
             // Report warning for possibly undefined array keys when accessing union types
             // Only report if we detected that some variants have the key while others don't
-            if has_union_key_mismatch && !block_context.flags.inside_isset() && !in_assignment {
+            if has_union_key_mismatch
+                && !block_context.flags.inside_isset()
+                && !block_context.flags.inside_unset()
+                && !in_assignment
+            {
                 // Determine if this is likely a string or integer key based on the index type
                 let is_likely_string_key =
                     index_type.types.iter().any(|t| matches!(t, TAtomic::Scalar(TScalar::String(_))));
