@@ -1352,6 +1352,11 @@ impl BitXor for TInteger {
     }
 }
 
+/// `value << shift` when no bit is shifted out or into the sign bit; PHP's `<<` wraps otherwise.
+fn exact_shl(value: i64, shift: u32) -> Option<i64> {
+    value.checked_shl(shift).filter(|shifted| shifted >> shift == value)
+}
+
 impl Shl<TInteger> for TInteger {
     type Output = TInteger;
 
@@ -1373,13 +1378,11 @@ impl Shl<TInteger> for TInteger {
                 let s = shift as u32;
                 match val {
                     Literal(v) => Literal(v.wrapping_shl(s)),
-                    From(lo) => lo.checked_shl(s).map_or(Unspecified, From),
-                    To(hi) => hi.checked_shl(s).map_or(Unspecified, To),
-                    Range(lo, hi) => match (lo.checked_shl(s), hi.checked_shl(s)) {
+                    Range(lo, hi) => match (exact_shl(lo, s), exact_shl(hi, s)) {
                         (Some(a), Some(b)) => Range(a, b),
                         _ => Unspecified,
                     },
-                    Unspecified => Unspecified,
+                    From(_) | To(_) | Unspecified => Unspecified,
                     UnspecifiedLiteral => UnspecifiedLiteral,
                 }
             }
@@ -1396,12 +1399,11 @@ impl Shl<TInteger> for TInteger {
                 {
                     let s_min = s_min as u32;
                     let s_max = s_max as u32;
-                    let lower = val.get_minimum_value().and_then(|v| v.checked_shl(s_min));
-                    let upper = val.get_maximum_value().and_then(|v| v.checked_shl(s_max));
+                    let lower = val.get_minimum_value().and_then(|v| exact_shl(v, s_min));
+                    let upper = val.get_maximum_value().and_then(|v| exact_shl(v, s_max));
 
                     match (lower, upper) {
                         (Some(lo), Some(hi)) => TInteger::from_bounds(Some(lo), Some(hi)),
-                        (Some(lo), None) => From(lo),
                         _ => Unspecified,
                     }
                 } else {
@@ -1768,7 +1770,8 @@ mod tests {
         assert_eq!(TInteger::Literal(0) << TInteger::Unspecified, TInteger::Literal(0));
         assert_eq!(TInteger::Range(0, 10) << TInteger::Literal(2), TInteger::Range(0, 40));
         assert_eq!(TInteger::Range(1, 8) << TInteger::Literal(3), TInteger::Range(8, 64));
-        assert_eq!(TInteger::From(1) << TInteger::Literal(1), TInteger::From(2));
+        assert_eq!(TInteger::From(1) << TInteger::Literal(1), TInteger::Unspecified);
+        assert_eq!(TInteger::Range(0, i64::MAX / 2 + 1) << TInteger::Literal(1), TInteger::Unspecified);
         assert_eq!(TInteger::Range(0, 10) << TInteger::Range(0, 2), TInteger::Range(0, 40));
         assert_eq!(TInteger::Range(1, 3) << TInteger::Range(1, 4), TInteger::Range(2, 48));
         assert_eq!(TInteger::Literal(1) << TInteger::Range(0, 3), TInteger::Range(1, 8));

@@ -82,9 +82,7 @@ final class FrameCodec
             throw new ProtocolException("Extension frame reserved bits are non-zero: {$reserved}.");
         }
 
-        /** @var int $id */
         $id = ($fields[4] << 32) | $fields[5];
-        /** @var int $parentId */
         $parentId = ($fields[6] << 32) | $fields[7];
         if ($id < 0 || $parentId < 0) {
             throw new ProtocolException('An extension frame identifier exceeds the largest integer supported by PHP.');
