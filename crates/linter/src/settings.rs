@@ -83,6 +83,7 @@ use crate::rule::NoInsecureComparisonConfig;
 use crate::rule::NoIsNullConfig;
 use crate::rule::NoIssetConfig;
 use crate::rule::NoIteratorToArrayInForeachConfig;
+use crate::rule::NoLegacyConstructorConfig;
 use crate::rule::NoLiteralNamespaceStringConfig;
 use crate::rule::NoLiteralPasswordConfig;
 use crate::rule::NoMissingFormatArgumentConfig;
@@ -367,6 +368,7 @@ pub struct RulesSettings {
     pub instanceof_stringable: RuleSettings<InstanceofStringableConfig>,
     pub interface_name: RuleSettings<InterfaceNameConfig>,
     pub invalid_open_tag: RuleSettings<InvalidOpenTagConfig>,
+    pub no_legacy_constructor: RuleSettings<NoLegacyConstructorConfig>,
     pub file_name: RuleSettings<FileNameConfig>,
     pub function_name: RuleSettings<FunctionNameConfig>,
     pub explicit_nullable_param: RuleSettings<ExplicitNullableParamConfig>,

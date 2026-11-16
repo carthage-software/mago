@@ -223,6 +223,7 @@ define_rules! {
     BlockStatement(block_statement @ BlockStatementRule),
     BracedStringInterpolation(braced_string_interpolation @ BracedStringInterpolationRule),
     ClassName(class_name @ ClassNameRule),
+    NoLegacyConstructor(no_legacy_constructor @ NoLegacyConstructorRule),
     CombineConsecutiveIssets(combine_consecutive_issets @ CombineConsecutiveIssetsRule),
     ConstantName(constant_name @ ConstantNameRule),
     CyclomaticComplexity(cyclomatic_complexity @ CyclomaticComplexityRule),
