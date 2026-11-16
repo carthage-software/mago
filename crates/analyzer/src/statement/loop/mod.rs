@@ -1774,6 +1774,14 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for ShortCircuitedVariables {
     }
 }
 
+pub(super) fn is_always_true_literal(expression: &Expression<'_>) -> bool {
+    match expression {
+        Expression::Literal(Literal::True(_)) => true,
+        Expression::Literal(Literal::Integer(integer)) => integer.value.is_none_or(|value| value > 0),
+        _ => false,
+    }
+}
+
 fn condition_needs_analyzed_types(expression: &Expression<'_>) -> bool {
     match expression {
         Expression::Call(_) => true,

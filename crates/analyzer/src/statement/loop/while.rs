@@ -1,7 +1,5 @@
 use mago_allocator::Arena;
 use mago_span::HasSpan;
-use mago_syntax::cst::Expression;
-use mago_syntax::cst::Literal;
 use mago_syntax::cst::While;
 
 use crate::analyzable::Analyzable;
@@ -21,15 +19,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for While<'arena> {
     where
         A: Arena,
     {
-        let is_while_true = match self.condition {
-            Expression::Literal(literal) => match literal {
-                Literal::True(_) => true,
-                Literal::Integer(integer) => integer.value.is_none_or(|v| v > 0),
-                _ => false,
-            },
-            _ => false,
-        };
-
         r#loop::analyze_for_or_while_loop(
             context,
             block_context,
@@ -39,7 +28,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for While<'arena> {
             &[],
             self.body.statements(),
             self.span(),
-            is_while_true,
+            r#loop::is_always_true_literal(self.condition),
         )
     }
 }
