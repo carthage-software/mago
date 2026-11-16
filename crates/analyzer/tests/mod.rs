@@ -3380,6 +3380,7 @@ test_case!(nested_write_through_append_starts_empty);
 test_case!(escaped_string_keys_share_narrowing);
 test_case!(loop_break_before_assignment_leaves_variable_possibly_undefined);
 test_case!(loose_string_equality_keeps_stringable_objects);
+test_case!(nullsafe_property_fetch_keeps_condition_narrowing);
 
 #[test]
 #[cfg_attr(miri, ignore)]

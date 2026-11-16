@@ -111,6 +111,28 @@ where
         && let Some(property_access_id) = &property_access_id
         && let Some(existing_type) = block_context.locals.get(property_access_id).cloned()
     {
+        // Once the receiver is known not to be null, the nullsafe fetch reads what `->` would.
+        let existing_type = if is_null_safe
+            && let Some(object_id) = get_block_expression_id(object, context, block_context)
+            && block_context
+                .locals
+                .get(&object_id)
+                .is_some_and(|object_type| !object_type.can_be_null() && !object_type.possibly_undefined())
+            && let Some(non_nullsafe_id) = get_property_access_expression_id(
+                object,
+                property_selector,
+                false,
+                block_context.scope.get_class_like_name(),
+                context.resolved_names,
+                Some(context.codebase),
+            )
+            && let Some(narrowed_type) = block_context.locals.get(&non_nullsafe_id)
+        {
+            Rc::clone(narrowed_type)
+        } else {
+            existing_type
+        };
+
         add_memoized_property_reference(context, block_context, artifacts, object, property_selector, is_null_safe)?;
 
         artifacts.set_rc_expression_type(&span, existing_type);
