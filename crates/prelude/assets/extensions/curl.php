@@ -117,11 +117,13 @@ function curl_multi_exec(CurlMultiHandle $multi_handle, &$still_running = 0): in
 function curl_multi_getcontent(CurlHandle $handle): ?string {}
 
 /**
+ * @param-out int $queued_messages
+ *
  * @return array{
  *   msg: int,
  *   result: int,
  *   handle: CurlHandle
- * }
+ * }|false
  */
 function curl_multi_info_read(CurlMultiHandle $multi_handle, &$queued_messages = null): array|false {}
 
