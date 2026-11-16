@@ -682,7 +682,17 @@ fn expand_object(object: &mut TObject, codebase: &CodebaseMetadata, options: &Ty
         return;
     };
 
-    let class_metadata = codebase.get_class_like_by_name(named.name);
+    let mut class_metadata = codebase.get_class_like_by_name(named.name);
+
+    // A trait is not a type: `self` in a trait method names the class using the trait.
+    if let Some(self_class) = options.self_class
+        && class_metadata.is_some_and(|metadata| metadata.kind.is_trait())
+        && codebase.class_uses_trait(self_class.as_bytes(), named.name.as_bytes())
+    {
+        named.name = self_class;
+        class_metadata = codebase.get_class_like_by_name(self_class);
+    }
+
     if named.intersection_types.is_none()
         && let Some(class_metadata) = class_metadata
         && class_metadata.kind.is_enum()
