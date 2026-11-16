@@ -975,7 +975,12 @@ fn add_null_equality_base_clauses<A>(
         && let Some(non_nullsafe_id) = get_non_nullsafe_expression_id(expression_id)
     {
         for clause in formula.iter_mut() {
-            let Some(expression_assertions) = clause.possibilities.get(&expression_id).cloned() else {
+            let Some(expression_assertions) = clause
+                .possibilities
+                .get(&expression_id)
+                .or_else(|| clause.possibilities.get(&non_nullsafe_id))
+                .cloned()
+            else {
                 continue;
             };
 
