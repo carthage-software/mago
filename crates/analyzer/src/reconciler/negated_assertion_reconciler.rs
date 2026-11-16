@@ -452,6 +452,10 @@ where
                             let mut non_empty_string = *existing_string;
                             non_empty_string.is_non_empty = true;
                             acceptable_types.push(TAtomic::Scalar(TScalar::String(non_empty_string)));
+                        } else if assertion_value == b"0" && existing_string.is_non_empty {
+                            let mut truthy_string = *existing_string;
+                            truthy_string.is_truthy = true;
+                            acceptable_types.push(TAtomic::Scalar(TScalar::String(truthy_string)));
                         } else {
                             acceptable_types.push(existing_atomic_type);
                         }
