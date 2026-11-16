@@ -19,6 +19,7 @@ use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_arraykey;
+use mago_codex::ttype::get_empty_keyed_array;
 use mago_codex::ttype::get_int;
 use mago_codex::ttype::get_iterable_parameters;
 use mago_codex::ttype::get_mixed;
@@ -844,7 +845,13 @@ where
 
         block_context.flags.set_inside_assignment(false);
 
-        let array_expr_type = Rc::new(if is_last { assign_value_type.clone() } else { array_expr_type });
+        let array_expr_type = Rc::new(if is_last {
+            assign_value_type.clone()
+        } else if array_target.get_index().is_none() {
+            get_empty_keyed_array()
+        } else {
+            array_expr_type
+        });
         artifacts.set_rc_expression_type(&array_target, Rc::clone(&array_expr_type));
 
         artifacts.set_rc_expression_type(array_target.get_array(), Rc::clone(&array_expression_type));
