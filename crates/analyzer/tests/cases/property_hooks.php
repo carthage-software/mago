@@ -365,7 +365,9 @@ class DocblockValidation
         }
     }
 
-    // OK: docblock wider than native
+    /**
+     * @mago-expect analysis:docblock-type-mismatch
+     */
     public int $wider {
         /** @param int|string $v */
         set(int $v) {
@@ -373,9 +375,7 @@ class DocblockValidation
         }
     }
 
-    /**
-     * @mago-expect analysis:docblock-type-mismatch
-     */
+    // OK: docblock narrower than native
     public int $narrower {
         /** @param positive-int $v */
         set(int $v) {
@@ -383,9 +383,7 @@ class DocblockValidation
         }
     }
 
-    /**
-     * @mago-expect analysis:docblock-type-mismatch
-     */
+    // OK: docblock narrower than native
     public string $narrowerString {
         /** @param non-empty-string $v */
         set(string $v) {

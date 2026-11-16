@@ -71,10 +71,27 @@ where
     let mut resolved_property_type = None;
     let mut readable_type: Option<TUnion> = None;
     let mut has_read_clamp = false;
+    let mut has_hooks = false;
     let mut matched_all_properties = true;
     let mut widened_assigned_type: Option<TUnion> = None;
     for resolved_property in resolution_result.properties {
         has_read_clamp |= resolved_property.read_type.is_some();
+        // A virtual property, or a hooked one whose hooks an implementation provides, may read back
+        // something else than what was written.
+        has_hooks |= resolved_property.declaring_class_id.is_some_and(|class| {
+            context
+                .codebase
+                .get_declaring_property(class.as_bytes(), resolved_property.property_name.as_bytes())
+                .is_some_and(|property| {
+                    !property.hooks.is_empty()
+                        && (property.flags.is_virtual_property()
+                            || property.flags.is_abstract()
+                            || context
+                                .codebase
+                                .get_class_like(class.as_bytes())
+                                .is_some_and(|metadata| metadata.kind.is_interface()))
+                })
+        });
 
         // A magic-governed write goes through `__set()`, never through the real property of the
         // same name that may exist on the declaring class (e.g. a `readonly` backing property).
@@ -240,7 +257,7 @@ where
     let resulting_type = Rc::new(resulting_type.unwrap_or_else(get_never));
 
     if let Some(property_access_id) = property_access_id
-        && (!context.settings.memoize_properties || resolution_result.has_unreadable_property)
+        && (!context.settings.memoize_properties || resolution_result.has_unreadable_property || has_hooks)
     {
         block_context.locals.remove(&property_access_id);
     } else if let Some(property_access_id) = property_access_id {

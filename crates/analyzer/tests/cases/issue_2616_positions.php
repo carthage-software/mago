@@ -192,7 +192,7 @@ class Hooks
             return null;
         }
 
-        // @mago-expect analysis:missing-template-parameter,docblock-type-mismatch
+        // @mago-expect analysis:missing-template-parameter
         /** @param Box<string>|null $value */
         set (?Box $value) {
             $this->value = null;

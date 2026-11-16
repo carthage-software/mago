@@ -3512,13 +3512,13 @@ fn check_class_like_properties<'ctx, A>(
             }
         }
 
-        // Validate docblock param type >= native param type
+        // A `@param` docblock type refines the native set hook parameter type, so it must fit inside it.
         if let Some(set_hook) = property_metadata.hooks.get(&word("set"))
             && let Some(param) = &set_hook.parameter
             && let Some(native_type) = param.type_declaration_metadata.as_ref()
             && let Some(effective_type) = param.type_metadata.as_ref()
             && effective_type.from_docblock
-            && !is_type_compatible(context.codebase, &native_type.type_union, &effective_type.type_union)
+            && !is_type_compatible(context.codebase, &effective_type.type_union, &native_type.type_union)
         {
             let native_type_str = native_type.type_union.get_id();
             let docblock_type_str = effective_type.type_union.get_id();
@@ -3526,17 +3526,17 @@ fn check_class_like_properties<'ctx, A>(
             context.collector.report_with_code(
                     IssueCode::DocblockTypeMismatch,
                     Issue::error(format!(
-                        "Docblock type `{docblock_type_str}` is narrower than native parameter type `{native_type_str}`."
+                        "Docblock type `{docblock_type_str}` is incompatible with native parameter type `{native_type_str}`."
                     ))
                     .with_annotation(
                         Annotation::primary(effective_type.span)
-                            .with_message(format!("Docblock type `{docblock_type_str}` cannot narrow native type `{native_type_str}`")),
+                            .with_message(format!("Docblock type `{docblock_type_str}` does not fit native type `{native_type_str}`")),
                     )
                     .with_note(
-                        "The @param docblock type must be a supertype of the native type. It can widen the type (e.g., int to int|string) but not narrow it.",
+                        "The @param docblock type refines the native type, so it must be the same type or a narrower one.",
                     )
                     .with_help(format!(
-                        "Change the docblock type to `{native_type_str}` or a wider type.",
+                        "Change the docblock type to `{native_type_str}` or a narrower type.",
                     )),
                 );
         }
