@@ -1783,6 +1783,12 @@ fn condition_needs_analyzed_types(expression: &Expression<'_>) -> bool {
             BinaryOperator::Identical(_) | BinaryOperator::NotIdentical(_) => {
                 [binary.lhs, binary.rhs].iter().any(|side| side.is_true() || side.is_false())
             }
+            // A loose comparison with `null` keeps only the falsy values the operand's type can hold.
+            BinaryOperator::Equal(_) | BinaryOperator::NotEqual(_) | BinaryOperator::AngledNotEqual(_) => {
+                [binary.lhs, binary.rhs]
+                    .iter()
+                    .any(|side| matches!(unwrap_expression(side), Expression::Literal(Literal::Null(_))))
+            }
             BinaryOperator::And(_) | BinaryOperator::Or(_) | BinaryOperator::LowAnd(_) | BinaryOperator::LowOr(_) => {
                 let mut right_assignments = vec![];
                 collect_condition_assignments(binary.rhs, &mut right_assignments);
