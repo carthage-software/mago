@@ -6,14 +6,17 @@ use mago_syntax::cst::ArrowFunction;
 use mago_syntax::cst::Assignment;
 use mago_syntax::cst::Closure;
 use mago_syntax::cst::Expression;
+use mago_syntax::cst::ForeachTarget;
 use mago_syntax::cst::MethodCall;
 use mago_syntax::cst::MethodPartialApplication;
 use mago_syntax::cst::Statement;
+use mago_syntax::cst::StaticItem;
 use mago_syntax::cst::UnaryPostfix;
 use mago_syntax::cst::UnaryPrefix;
 use mago_syntax::cst::Unset;
 use mago_syntax::walker::MutWalker;
 use mago_word::Word;
+use mago_word::word;
 
 use crate::utils::expression::get_root_expression_id;
 
@@ -46,6 +49,19 @@ struct AssignmentMapWalker {
     assignment_map: BTreeMap<Word, BTreeSet<Word>>,
 }
 
+impl AssignmentMapWalker {
+    /// Records the variables a write target assigns, looking into nested `[...]` / `list(...)` targets.
+    fn record_targets(&mut self, target: &Expression<'_>, source_id: Word) {
+        if let Some(array_elements) = target.get_array_like_elements() {
+            for value in array_elements.iter().filter_map(|element| element.get_value()) {
+                self.record_targets(value, source_id);
+            }
+        } else if let Some(target_id) = get_root_expression_id(target) {
+            self.assignment_map.entry(target_id).or_default().insert(source_id);
+        }
+    }
+}
+
 impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for AssignmentMapWalker {
     fn walk_unary_postfix(&mut self, unary_postfix: &'ast UnaryPostfix<'arena>, _context: &mut ()) {
         let root_expression_id = get_root_expression_id(unary_postfix.operand);
@@ -70,23 +86,23 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for AssignmentMapWalker {
     fn walk_assignment(&mut self, assignment: &'ast Assignment<'arena>, _context: &mut ()) {
         let right_expression_id = get_root_expression_id(assignment.rhs).unwrap_or_else(|| Word::from("isset"));
 
-        if let Some(array_elements) = assignment.lhs.get_array_like_elements() {
-            for array_element in array_elements {
-                if let Some(expression) = array_element.get_value() {
-                    let left_expression_id = get_root_expression_id(expression);
+        self.record_targets(assignment.lhs, right_expression_id);
+    }
 
-                    if let Some(left_expression_id) = left_expression_id {
-                        self.assignment_map.entry(left_expression_id).or_default().insert(right_expression_id);
-                    }
-                }
-            }
-        } else {
-            let left_expression_id = get_root_expression_id(assignment.lhs);
-
-            if let Some(left_expression_id) = left_expression_id {
-                self.assignment_map.entry(left_expression_id).or_default().insert(right_expression_id);
+    fn walk_in_foreach_target(&mut self, foreach_target: &'ast ForeachTarget<'arena>, _context: &mut ()) {
+        match foreach_target {
+            ForeachTarget::Value(target) => self.record_targets(target.value, Word::from("isset")),
+            ForeachTarget::KeyValue(target) => {
+                self.record_targets(target.key, Word::from("isset"));
+                self.record_targets(target.value, Word::from("isset"));
             }
         }
+    }
+
+    fn walk_in_static_item(&mut self, static_item: &'ast StaticItem<'arena>, _context: &mut ()) {
+        let variable_id = word(static_item.variable().name);
+
+        self.assignment_map.entry(variable_id).or_default().insert(variable_id);
     }
 
     fn walk_in_argument_list(&mut self, argument_list: &'ast ArgumentList<'arena>, _context: &mut ()) {
