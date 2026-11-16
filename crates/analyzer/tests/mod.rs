@@ -3372,6 +3372,7 @@ test_case!(new_on_intersection_class_string_keeps_intersection);
 test_case!(new_this_is_static);
 test_case!(class_constant_equality_with_static_class_narrows);
 test_case!(left_shift_range_allows_overflow);
+test_case!(unpacked_temporary_array_to_by_reference_parameter);
 
 #[test]
 #[cfg_attr(miri, ignore)]

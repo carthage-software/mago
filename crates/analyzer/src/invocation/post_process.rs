@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use std::cell::OnceCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use mago_algebra::AssertionMap;
 use mago_algebra::assertion_set::AssertionSet;
@@ -14,9 +15,12 @@ use mago_algebra::find_satisfying_assignments;
 use mago_algebra::saturate_clauses;
 use mago_codex::assertion::Assertion;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
+use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::resource::TResource;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
@@ -25,6 +29,7 @@ use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_ide
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::expand_union;
+use mago_codex::ttype::get_array_parameters;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::template::TemplateResult;
@@ -470,6 +475,35 @@ fn apply_assertion_to_call_context<'ctx, 'arena, A>(
     );
 }
 
+/// Unpacking an array into by-reference parameters binds each of its values, so the out type replaces the values.
+fn with_unpacked_values(array_type: &TUnion, value_type: TUnion, codebase: &CodebaseMetadata) -> TUnion {
+    let value_type = Arc::new(value_type);
+
+    TUnion::from_vec(
+        array_type
+            .types
+            .iter()
+            .map(|atomic| match atomic {
+                TAtomic::Array(TArray::List(list)) => TAtomic::Array(TArray::List(if list.non_empty {
+                    TList::new_non_empty(Arc::clone(&value_type))
+                } else {
+                    TList::new(Arc::clone(&value_type))
+                })),
+                TAtomic::Array(array @ TArray::Keyed(keyed)) => {
+                    let mut values = TKeyedArray::new_with_parameters(
+                        Arc::new(get_array_parameters(array, codebase).0),
+                        Arc::clone(&value_type),
+                    );
+                    values.non_empty = keyed.non_empty;
+
+                    TAtomic::Array(TArray::Keyed(values))
+                }
+                atomic => atomic.clone(),
+            })
+            .collect(),
+    )
+}
+
 fn update_by_reference_argument_types<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
@@ -507,7 +541,7 @@ where
                 continue;
             }
 
-            if is_array_multisort(&invocation.target) && !is_argument_referenceable(argument, &argument_type) {
+            if !is_argument_referenceable(argument, &argument_type) {
                 continue;
             }
 
@@ -517,7 +551,7 @@ where
                 .is_some_and(|declared| declared.has_template_types());
 
             let mut new_type = if parameter_offset > 0 && is_array_multisort(&invocation.target) {
-                argument_type
+                argument_type.clone()
             } else {
                 parameter_ref
                     .get_out_type()
@@ -545,6 +579,11 @@ where
                 && !invocation.target.get_function_like_metadata().is_some_and(|metadata| metadata.flags.is_built_in())
             {
                 new_type.widen_literals();
+            }
+
+            if invocation.arguments_source.get_argument(parameter_offset).is_some_and(|argument| argument.is_unpacked())
+            {
+                new_type = with_unpacked_values(&argument_type, new_type, context.codebase);
             }
 
             new_type.set_by_reference(true);

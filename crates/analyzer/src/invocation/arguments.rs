@@ -105,6 +105,10 @@ where
         return Ok(());
     }
 
+    // An unpacked argument that is not a variable is a temporary array: PHP binds its elements by reference.
+    let referenced_parameter =
+        referenced_parameter && (argument_offset != usize::MAX || argument_expression.is_referenceable(false));
+
     let (inferred_parameter_types, inferred_return_type) =
         match closure_parameter_type.map(|closure_type| closure_signature_hints(context, closure_type)) {
             Some((parameter_types, return_type)) => (Some(parameter_types), return_type),
@@ -151,7 +155,8 @@ where
     let argument_type =
         artifacts.get_rc_expression_type(argument_expression).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
 
-    if requires_referenceable_argument(invocation_target, referenced_parameter)
+    if argument_offset != usize::MAX
+        && requires_referenceable_argument(invocation_target, referenced_parameter)
         && !is_argument_referenceable(argument_expression, &argument_type)
     {
         let target_kind_str = invocation_target.guess_kind();
