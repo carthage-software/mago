@@ -40,6 +40,8 @@ pub struct State {
     pub within_string_interpolation: bool,
     /// Whether the parser is currently inside a `{% verbatim %}` block.
     pub within_verbatim: bool,
+    pub within_component_tag: bool,
+    pub component_attribute_quote: Option<u8>,
     /// Current expression recursion depth.
     pub recursion_depth: u16,
 }

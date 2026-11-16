@@ -12,7 +12,10 @@ mod templates;
 impl<'arena, A: Arena> DocumentBuilder<'arena, A> {
     pub(super) fn header(&self, tag: CodeTag<'arena>) -> Document<'arena, A> {
         match tag.contents {
-            TagContents::Print(expression) => self.expression(expression),
+            TagContents::Print(print) => match print.ellipsis {
+                Some(ellipsis) => self.spread(ellipsis, &print.expression),
+                None => self.expression(&print.expression),
+            },
             TagContents::If(branch) => self.keyword_expression(branch.keyword.span, &branch.condition),
             TagContents::For(node) => self.array([
                 self.raw(node.keyword.span),

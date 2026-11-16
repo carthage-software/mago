@@ -1,12 +1,12 @@
 use mago_span::Span;
 use mago_twig_syntax::cst::{
-    Apply, Autoescape, Block, Cache, Deprecated, Do, Embed, Expression, Extends, Flush, For, From, Guard, IfBranch,
-    Import, Include, Macro, Sandbox, Set, Trivia, TriviaKind, Types, Use, Verbatim, With,
+    Apply, Autoescape, Block, Cache, Deprecated, Do, Embed, Extends, Flush, For, From, Guard, IfBranch, Import,
+    Include, Macro, Print, Sandbox, Set, Trivia, TriviaKind, Types, Use, Verbatim, With,
 };
 
 #[derive(Clone, Copy)]
 pub(super) enum TagContents<'arena> {
-    Print(&'arena Expression<'arena>),
+    Print(&'arena Print<'arena>),
     If(&'arena IfBranch<'arena>),
     For(&'arena For<'arena>),
     Set(&'arena Set<'arena>),

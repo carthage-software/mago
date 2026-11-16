@@ -76,14 +76,26 @@ where
             match token.kind {
                 TwigTokenKind::RawText => {
                     let t = self.stream.consume()?;
+                    self.track_component_tag(t.value);
                     statements.push(Statement::Text(Text { value: t.value, span: self.stream.span_of(&t) }));
                 }
                 kind if kind.is_open_variable() => {
                     let start_tok = self.stream.consume()?;
                     let open_variable = self.stream.span_of(&start_tok);
+                    let ellipsis = match self.stream.lookahead(0)? {
+                        Some(token)
+                            if self.state.within_component_tag
+                                && self.state.component_attribute_quote.is_none()
+                                && token.kind == TwigTokenKind::DotDotDot =>
+                        {
+                            let ellipsis = self.stream.consume()?;
+                            Some(self.stream.span_of(&ellipsis))
+                        }
+                        _ => None,
+                    };
                     let expression = self.parse_expression()?;
                     let close_variable = self.stream.expect_variable_end()?;
-                    statements.push(Statement::Print(Print { open_variable, expression, close_variable }));
+                    statements.push(Statement::Print(Print { open_variable, ellipsis, expression, close_variable }));
                 }
                 kind if kind.is_open_block() => {
                     let Some(name_tok) = self.stream.lookahead(1)? else {
@@ -121,5 +133,38 @@ where
         }
 
         Ok(Sequence::new(statements))
+    }
+
+    fn track_component_tag(&mut self, mut text: &[u8]) {
+        loop {
+            let end = if let Some(quote) = self.state.component_attribute_quote {
+                let Some(index) = memchr::memchr(quote, text) else {
+                    return;
+                };
+
+                self.state.component_attribute_quote = None;
+                index
+            } else if self.state.within_component_tag {
+                let Some(index) = memchr::memchr3(b'>', b'"', b'\'', text) else {
+                    return;
+                };
+
+                match text[index] {
+                    b'>' => self.state.within_component_tag = false,
+                    quote => self.state.component_attribute_quote = Some(quote),
+                }
+
+                index
+            } else {
+                let Some(index) = memchr::memmem::find(text, b"<twig:") else {
+                    return;
+                };
+
+                self.state.within_component_tag = true;
+                index + 5
+            };
+
+            text = &text[end + 1..];
+        }
     }
 }

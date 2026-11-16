@@ -7,6 +7,7 @@ use crate::cst::expression::Expression;
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Print<'arena> {
     pub open_variable: Span,
+    pub ellipsis: Option<Span>,
     pub expression: Expression<'arena>,
     pub close_variable: Span,
 }

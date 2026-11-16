@@ -96,9 +96,7 @@ impl<'arena, A: Arena> Walker<'arena, 'arena, Collector<'arena, A>> for Visit {
 
         match statement {
             Statement::Text(_) | Statement::If(_) => {}
-            Statement::Print(node) => {
-                context.push(node.open_variable, node.close_variable, TagContents::Print(&node.expression))
-            }
+            Statement::Print(node) => context.push(node.open_variable, node.close_variable, TagContents::Print(node)),
             Statement::Set(node) => {
                 let close = match &node.body {
                     SetBody::Inline(body) => body.close_tag,
