@@ -398,6 +398,7 @@ where
             has_ending_statements || (!case_actions.is_empty() && !case_actions.contains(ControlAction::None));
 
         let mut case_block_context = original_block_context.clone();
+        let mut condition_assigned_variables = WordSet::default();
 
         let mut case_equality_expression = None;
 
@@ -467,8 +468,12 @@ where
                 );
 
                 case_condition.analyze(self.context, &mut condition_context, self.artifacts)?;
+                condition_assigned_variables =
+                    copy_condition_assignments(original_block_context, &condition_context, &mut case_block_context);
             } else {
                 case_condition.analyze(self.context, self.block_context, self.artifacts)?;
+                condition_assigned_variables =
+                    copy_condition_assignments(original_block_context, self.block_context, &mut case_block_context);
             }
 
             let has_alternate_entry = self.has_reachable_fallthrough || has_non_duplicate_empty_case;
@@ -638,6 +643,13 @@ where
         } else {
             original_block_context.clauses.clone()
         };
+
+        // What the earlier cases said about a variable no longer holds once this condition reassigns it.
+        if !condition_assigned_variables.is_empty() {
+            entry_clauses.retain(|clause| {
+                !clause.possibilities.keys().any(|variable_id| condition_assigned_variables.contains(variable_id))
+            });
+        }
 
         case_block_context.clauses = if case_clauses.is_empty() {
             entry_clauses
@@ -1098,4 +1110,26 @@ where
             _ => None,
         }
     }
+}
+
+/// The body of a case runs after its condition, so it sees the variables the condition assigns.
+fn copy_condition_assignments<'ctx>(
+    original_context: &BlockContext<'ctx>,
+    condition_context: &BlockContext<'ctx>,
+    case_context: &mut BlockContext<'ctx>,
+) -> WordSet {
+    let mut assigned_variables = WordSet::default();
+    for (variable_id, variable_type) in &condition_context.locals {
+        let Some(offset) = condition_context.assigned_variable_ids.get(variable_id) else {
+            continue;
+        };
+
+        if original_context.assigned_variable_ids.get(variable_id) != Some(offset) {
+            case_context.locals.insert(*variable_id, Rc::clone(variable_type));
+            case_context.assigned_variable_ids.insert(*variable_id, *offset);
+            assigned_variables.insert(*variable_id);
+        }
+    }
+
+    assigned_variables
 }
