@@ -3404,6 +3404,7 @@ test_case!(nullsafe_call_arguments_see_non_null_receiver);
 test_case!(offset_narrowing_forgotten_when_index_changes);
 test_case!(issue_2736);
 test_case!(issue_2740);
+test_case!(issue_2735);
 
 #[test]
 #[cfg_attr(miri, ignore)]

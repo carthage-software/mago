@@ -7,14 +7,18 @@ use mago_algebra::clause::Clause;
 use mago_algebra::disjoin_clauses;
 use mago_codex::assertion::Assertion;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
+use mago_codex::ttype::get_array_value_parameter;
 use mago_codex::ttype::get_literal_int;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
@@ -39,6 +43,7 @@ use mago_syntax::cst::UnaryPrefixOperator;
 use mago_syntax::cst::Variable;
 use mago_word::Word;
 use mago_word::WordSet;
+use mago_word::concat_word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -793,10 +798,20 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(
     if let Some(source) = source_expression
         && let Expression::Call(Call::Function(function_call)) = unwrap_expression(source)
         && function_call.argument_list.arguments.len() == 1
-        && is_builtin_function_call(function_call, b"get_class", context.resolved_names, context.codebase)
+        && let Some(argument) = function_call.argument_list.arguments.first()
     {
-        let argument = function_call.argument_list.arguments.first();
-        if let Some(argument) = argument
+        let is_get_class =
+            is_builtin_function_call(function_call, b"get_class", context.resolved_names, context.codebase);
+        let is_key_lookup = !is_get_class
+            && (is_builtin_function_call(function_call, b"array_key_first", context.resolved_names, context.codebase)
+                || is_builtin_function_call(
+                    function_call,
+                    b"array_key_last",
+                    context.resolved_names,
+                    context.codebase,
+                ));
+
+        if (is_get_class || is_key_lookup)
             && let Some(source_id) = get_expression_id(
                 argument.value(),
                 block_context.scope.get_class_like_name(),
@@ -805,9 +820,37 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(
             )
             && variable_id != source_id
         {
-            block_context.class_string_sources.insert(variable_id, source_id);
+            if is_get_class {
+                block_context.class_string_sources.insert(variable_id, source_id);
+            } else if let Some(array_type) = block_context.locals.get(&source_id)
+                && let Some(value_type) = get_array_union_value_type(array_type, context.codebase)
+            {
+                block_context.locals.insert(
+                    concat_word!(source_id.as_bytes(), b"[", variable_id.as_bytes(), b"]"),
+                    Rc::new(value_type),
+                );
+            }
         }
     }
+}
+
+fn get_array_union_value_type(array_type: &TUnion, codebase: &CodebaseMetadata) -> Option<TUnion> {
+    let mut value_type: Option<TUnion> = None;
+    for atomic in array_type.types.iter() {
+        let TAtomic::Array(array) = atomic else {
+            return None;
+        };
+
+        let array_value_type = get_array_value_parameter(array, codebase);
+        value_type = Some(match value_type {
+            Some(value_type) => {
+                combine_union_types(&value_type, &array_value_type, codebase, CombinerOptions::default())
+            }
+            None => array_value_type,
+        });
+    }
+
+    value_type.filter(|value_type| !value_type.is_never())
 }
 
 fn analyze_destructuring<'ctx, 'ast, 'arena, A>(
