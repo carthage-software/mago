@@ -3368,6 +3368,7 @@ test_case!(comparison_narrows_int_template_bound);
 test_case!(preg_match_matches_follow_flags);
 test_case!(docblock_types_resolve_global_constants);
 test_case!(loop_exit_keeps_unnarrowed_mixed);
+test_case!(new_on_intersection_class_string_keeps_intersection);
 
 #[test]
 #[cfg_attr(miri, ignore)]

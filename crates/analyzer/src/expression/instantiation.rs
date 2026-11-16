@@ -529,7 +529,7 @@ where
         return Ok(get_never());
     }
 
-    let constraint_object = TAtomic::Object(TObject::Named(TNamedObject {
+    let mut constraint_object = TAtomic::Object(TObject::Named(TNamedObject {
         name: metadata.original_name,
         type_parameters: type_parameters.map(Vec::into_boxed_slice),
         variances: None,
@@ -538,6 +538,10 @@ where
         intersection_types: None,
         remapped_parameters: false,
     }));
+
+    for intersection in &classname.intersections {
+        constraint_object.add_intersection_type(intersection.get_object_type(context.codebase));
+    }
 
     // `new $className()` where `$className: class-string<T>` produces a `T`, not the constraint.
     // Preserve the template parameter so the function's `@return T` keeps narrowing on the call site.
