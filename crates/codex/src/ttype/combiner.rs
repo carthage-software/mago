@@ -932,6 +932,10 @@ fn scrape_type_properties(
                         };
 
                         for (candidate_item_name, (cu, candidate_item_type)) in known_items {
+                            if !cu {
+                                has_defined_keys = true;
+                            }
+
                             if let Some((eu, existing_type)) =
                                 combination.keyed_array_entries.get_mut(&candidate_item_name)
                             {
@@ -965,10 +969,6 @@ fn scrape_type_properties(
                             }
 
                             possibly_undefined_entries.remove(&candidate_item_name);
-
-                            if !cu {
-                                has_defined_keys = true;
-                            }
                         }
 
                         if !has_defined_keys {
