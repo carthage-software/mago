@@ -53,6 +53,10 @@ pub fn check_hint(hint: &Hint, context: &mut Context<'_, '_, '_>) {
             }
         }
         Hint::Union(union_hint) => {
+            if context.hint_depth == 1 {
+                check_redundant_union_members(hint, context);
+            }
+
             if !union_hint.left.is_unionable() {
                 let val = BytesDisplay(context.get_code_snippet(union_hint.left));
 
@@ -221,4 +225,99 @@ pub fn check_hint(hint: &Hint, context: &mut Context<'_, '_, '_>) {
         Issue::error("Disjunctive Normal Form (DNF) types are only available in PHP 8.2 and above.")
             .with_annotation(Annotation::primary(hint.span()).with_message("DNF type used here.")),
     );
+}
+
+/// PHP rejects a union that names a type twice or holds a member another member already covers.
+fn check_redundant_union_members(hint: &Hint, context: &mut Context<'_, '_, '_>) {
+    let mut members = vec![];
+    collect_union_members(hint, &mut members);
+
+    let names: Vec<Vec<Vec<u8>>> = members.iter().map(|member| get_member_names(member, context)).collect();
+
+    for (index, (member, member_names)) in members.iter().zip(&names).enumerate() {
+        for (other_member, other_names) in members.iter().zip(&names).take(index) {
+            if !is_redundant(other_names, member_names) {
+                continue;
+            }
+
+            let member_code = BytesDisplay(context.get_code_snippet(*member));
+            let other_code = BytesDisplay(context.get_code_snippet(*other_member));
+
+            context.report(
+                Issue::error(format!("Type `{member_code}` is redundant with type `{other_code}` in this union."))
+                    .with_annotation(Annotation::primary(member.span()).with_message("Redundant type."))
+                    .with_annotation(Annotation::secondary(other_member.span()).with_message("Already covered here."))
+                    .with_note("PHP rejects a union type that repeats a type or holds a type another member covers.")
+                    .with_help("Remove the redundant type from the union."),
+            );
+
+            break;
+        }
+    }
+}
+
+fn collect_union_members<'hint, 'arena>(hint: &'hint Hint<'arena>, members: &mut Vec<&'hint Hint<'arena>>) {
+    match hint {
+        Hint::Union(union_hint) => {
+            collect_union_members(union_hint.left, members);
+            collect_union_members(union_hint.right, members);
+        }
+        _ => members.push(hint),
+    }
+}
+
+/// The lowercase names of a union member: one name, or the sorted names of an intersection.
+fn get_member_names(hint: &Hint, context: &Context<'_, '_, '_>) -> Vec<Vec<u8>> {
+    match hint {
+        Hint::Parenthesized(parenthesized_hint) => get_member_names(parenthesized_hint.hint, context),
+        Hint::Intersection(intersection_hint) => {
+            let mut names = get_member_names(intersection_hint.left, context);
+            names.extend(get_member_names(intersection_hint.right, context));
+            names.sort();
+            names
+        }
+        Hint::Identifier(identifier) => vec![context.get_name(identifier.span().start).to_ascii_lowercase()],
+        _ => vec![context.get_code_snippet(hint).to_ascii_lowercase()],
+    }
+}
+
+fn is_redundant(first: &[Vec<u8>], second: &[Vec<u8>]) -> bool {
+    match (first, second) {
+        ([first], [second]) => match (first.as_slice(), second.as_slice()) {
+            (first, second) if first == second => true,
+            (b"bool", b"true" | b"false")
+            | (b"true" | b"false", b"bool")
+            | (b"true", b"false")
+            | (b"false", b"true")
+            | (b"iterable", b"array" | b"traversable")
+            | (b"array" | b"traversable", b"iterable") => true,
+            (b"object", name) | (name, b"object") => is_class_name(name),
+            _ => false,
+        },
+        ([name], intersection) | (intersection, [name]) => intersection.contains(name),
+        (first, second) => first == second,
+    }
+}
+
+const fn is_class_name(name: &[u8]) -> bool {
+    !matches!(
+        name,
+        b"int"
+            | b"float"
+            | b"string"
+            | b"bool"
+            | b"true"
+            | b"false"
+            | b"null"
+            | b"array"
+            | b"iterable"
+            | b"callable"
+            | b"object"
+            | b"mixed"
+            | b"void"
+            | b"never"
+            | b"static"
+            | b"self"
+            | b"parent"
+    )
 }
