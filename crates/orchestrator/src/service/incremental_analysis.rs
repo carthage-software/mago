@@ -2165,6 +2165,55 @@ new Consumer();
     }
 
     #[test]
+    fn test_unused_classes_recognize_test_and_benchmark_entry_points() {
+        let mut db = make_database(vec![(
+            "src/tests.php",
+            r"<?php
+class ExampleTest extends PHPUnit\Framework\TestCase {}
+abstract class ProjectTestCase extends PHPUnit\Framework\TestCase {}
+class IndirectTest extends ProjectTestCase {}
+class UnusedTest {}
+class ConventionBenchmark { public function benchExample(): void {} }
+trait BenchmarkSubjects { protected function measure(): void {} }
+class AliasedBenchmark { use BenchmarkSubjects { measure as public benchExample; } }
+trait HiddenBenchmarkSubjects { public function benchHidden(): void {} }
+class UnusedHiddenBenchmark { use HiddenBenchmarkSubjects { benchHidden as private; } }
+class AttributeBenchmark {
+    #[PhpBench\Attributes\Subject]
+    public function measure(): void {}
+}
+class UnusedBenchmark { private function benchPrivate(): void {} }
+",
+        )]);
+        db.add(File::new(
+            Cow::Borrowed(b"vendor/frameworks.php"),
+            FileType::Vendored,
+            None,
+            Cow::Borrowed(
+                br"<?php
+namespace PHPUnit\Framework { abstract class TestCase {} }
+namespace PhpBench\Benchmark\Metadata { class MetadataFactory {} }
+namespace PhpBench\Attributes { #[\Attribute] class Subject {} }
+",
+            ),
+        ));
+        let result = make_service(&db).analyze().unwrap();
+        assert_eq!(
+            unused_class_names(&result.issues),
+            vec![
+                "Class `UnusedBenchmark` is never referenced.",
+                "Class `UnusedHiddenBenchmark` is never referenced.",
+                "Class `UnusedTest` is never referenced.",
+            ]
+        );
+        db.delete(FileId::new(b"vendor/frameworks.php"));
+        let result = make_service(&db).analyze().unwrap();
+        assert!(
+            unused_class_names(&result.issues).contains(&"Class `ConventionBenchmark` is never referenced.".to_owned())
+        );
+    }
+
+    #[test]
     fn incremental_scan_merge_moves_metadata_storage() {
         let db =
             make_database(vec![("src/main.php", "<?php function value(int $argument): int { return $argument; }")]);
