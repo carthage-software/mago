@@ -3405,6 +3405,7 @@ test_case!(offset_narrowing_forgotten_when_index_changes);
 test_case!(issue_2736);
 test_case!(issue_2740);
 test_case!(issue_2735);
+test_case!(issue_2734);
 
 #[test]
 #[cfg_attr(miri, ignore)]

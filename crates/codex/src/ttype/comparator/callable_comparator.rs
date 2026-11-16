@@ -3,6 +3,8 @@ use std::borrow::Cow;
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::callable::TCallable;
+use crate::ttype::atomic::callable::TCallableSignature;
+use crate::ttype::atomic::callable::parameter::TCallableParameter;
 use crate::ttype::cast::can_atomic_be_callable;
 use crate::ttype::cast::cast_atomic_to_callable;
 use crate::ttype::comparator::ComparisonResult;
@@ -67,6 +69,12 @@ pub(crate) fn is_contained_by(
         }
     }
 
+    let input_signature = match bind_own_templates(codebase, &input_signature, container_params) {
+        Some(bound_signature) => Cow::Owned(bound_signature),
+        None => input_signature,
+    };
+
+    let input_params = input_signature.get_parameters();
     let mut own_bounds = TemplateResult::default();
     for (i, input_parameter) in input_params.iter().enumerate() {
         let container_parameter;
@@ -163,4 +171,73 @@ pub(crate) fn is_contained_by(
         input_return_type.ignore_falsable_issues(),
         atomic_comparison_result,
     )
+}
+
+fn bind_own_templates(
+    codebase: &CodebaseMetadata,
+    signature: &TCallableSignature,
+    container_parameters: &[TCallableParameter],
+) -> Option<TCallableSignature> {
+    let templates = &codebase.get_function_like(&signature.get_source()?)?.template_types;
+    if templates.is_empty() {
+        return None;
+    }
+
+    let mut bounds = TemplateResult::default();
+    for (parameter, container_parameter) in signature.get_parameters().iter().zip(container_parameters) {
+        let (Some(parameter_type), Some(container_type)) =
+            (parameter.get_type_signature(), container_parameter.get_type_signature())
+        else {
+            continue;
+        };
+
+        if container_type.has_template_types() {
+            continue;
+        }
+
+        let mut non_null_parts = parameter_type.types.iter().filter(|atomic| !atomic.is_null());
+        let (Some(TAtomic::GenericParameter(generic)), None) = (non_null_parts.next(), non_null_parts.next()) else {
+            continue;
+        };
+
+        let Some(template) = templates.get(&generic.parameter_name) else {
+            continue;
+        };
+
+        if template.defining_entity != generic.defining_entity {
+            continue;
+        }
+
+        let bound = if parameter_type.has_null() { container_type.to_non_nullable() } else { container_type.clone() };
+        if union_comparator::is_contained_by(
+            codebase,
+            &bound,
+            &template.constraint,
+            false,
+            false,
+            false,
+            &mut ComparisonResult::new(),
+        ) {
+            bounds.add_lower_bound(generic.parameter_name, generic.defining_entity, bound);
+        }
+    }
+
+    for (name, template) in templates {
+        if !bounds.has_lower_bound(*name, &template.defining_entity) {
+            bounds.add_lower_bound(*name, template.defining_entity, template.constraint.clone());
+        }
+    }
+
+    let mut bound_signature = signature.clone();
+    for parameter in bound_signature.get_parameters_mut() {
+        if let Some(parameter_type) = parameter.get_type_signature_mut() {
+            *parameter_type = inferred_type_replacer::replace(parameter_type, &bounds, codebase);
+        }
+    }
+
+    if let Some(return_type) = bound_signature.get_return_type_mut() {
+        *return_type = inferred_type_replacer::replace(return_type, &bounds, codebase);
+    }
+
+    Some(bound_signature)
 }
