@@ -1491,6 +1491,15 @@ where
                     acceptable_types.push(atomic);
                 }
             }
+            // An object with `__toString()` can be loosely equal to a string.
+            TAtomic::Object(TObject::Any) if is_loose_equality => {
+                acceptable_types.push(existing_var_atomic_type.clone());
+            }
+            TAtomic::Object(TObject::Named(named_object))
+                if is_loose_equality && context.codebase.method_exists(named_object.name.as_bytes(), b"__toString") =>
+            {
+                acceptable_types.push(existing_var_atomic_type.clone());
+            }
             _ => {
                 did_remove_type = true;
             }
