@@ -129,7 +129,8 @@ fn populate_class_like_metadata(
     seeds: &mut OverrideSeeds,
 ) {
     for attribute_metadata in &metadata.attributes {
-        symbol_references.add_symbol_reference_to_symbol(metadata.name, attribute_metadata.name, true);
+        symbol_references
+            .add_class_like_reference(ReferenceSource::ClassLike(true, metadata.name), attribute_metadata.name);
     }
 
     for property_name in metadata.get_property_names() {
@@ -179,6 +180,7 @@ fn populate_class_like_metadata(
 
     let pending_imports = std::mem::take(&mut metadata.imported_type_aliases);
     for (local_name, (source_class_name, imported_type, import_span)) in pending_imports {
+        symbol_references.add_class_like_reference(ReferenceSource::ClassLike(true, metadata.name), source_class_name);
         if let Some(source_class) = codebase.get_class_like_by_word(source_class_name) {
             if source_class.type_aliases.contains_key(&imported_type) {
                 let alias_metadata = TypeMetadata {
@@ -494,7 +496,7 @@ pub fn populate_class_like_types(
     symbol_references: &mut SymbolReferences,
     force_repopulation: bool,
 ) {
-    let class_like_reference_source = ReferenceSource::Symbol(true, name);
+    let class_like_reference_source = ReferenceSource::ClassLike(true, name);
 
     for (property_name, property_metadata) in &mut metadata.properties {
         let property_reference_source = ReferenceSource::ClassLikeMember(true, name, *property_name);
@@ -744,7 +746,7 @@ pub fn populate_class_like_types(
         populate_atomic_type(
             enum_type,
             codebase_symbols,
-            Some(&ReferenceSource::Symbol(true, name)),
+            Some(&ReferenceSource::ClassLike(true, name)),
             symbol_references,
             force_repopulation,
         );

@@ -1103,7 +1103,10 @@ impl<T> Backend<T> {
                     matches += 1;
                 }
                 if matched_class {
-                    references.add_symbol_reference_to_symbol(entry_point.source, class.name, false);
+                    references.add_class_like_reference(
+                        mago_codex::reference::ReferenceSource::Symbol(false, entry_point.source),
+                        class.name,
+                    );
                 }
             }
 
@@ -1134,7 +1137,10 @@ impl<T> Backend<T> {
                     matches += 1;
                 }
                 if matched_class {
-                    references.add_symbol_reference_to_symbol(entry_point.source, class.name, false);
+                    references.add_class_like_reference(
+                        mago_codex::reference::ReferenceSource::Symbol(false, entry_point.source),
+                        class.name,
+                    );
                 }
             }
         }

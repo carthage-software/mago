@@ -1256,6 +1256,25 @@ pub(super) fn decode_lifecycle_response(
 
         let references =
             discovery_file.map_or(&mut references, |file_id| references_by_file.entry(file_id).or_default());
+        if codebase.class_like_exists(target.0.as_bytes())
+            && matches!(kind, SymbolReferenceKind::Body | SymbolReferenceKind::Signature)
+        {
+            let signature = kind == SymbolReferenceKind::Signature;
+            let source = match source {
+                ReferenceOrigin::File(file) => mago_codex::reference::ReferenceSource::File(signature, file),
+                ReferenceOrigin::Symbol((name, member)) if member.is_empty() => {
+                    if codebase.class_like_exists(name.as_bytes()) {
+                        mago_codex::reference::ReferenceSource::ClassLike(signature, name)
+                    } else {
+                        mago_codex::reference::ReferenceSource::Symbol(signature, name)
+                    }
+                }
+                ReferenceOrigin::Symbol((name, member)) => {
+                    mago_codex::reference::ReferenceSource::ClassLikeMember(signature, name, member)
+                }
+            };
+            references.add_class_like_reference(source, target.0);
+        }
         match kind {
             SymbolReferenceKind::Body => references.add_reference(source, target, false),
             SymbolReferenceKind::Signature => references.add_reference(source, target, true),
