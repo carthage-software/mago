@@ -46,6 +46,8 @@ interface Iterator extends Traversable
 {
     /**
      * @return null|V
+     *
+     * @ignore-nullable-return
      */
     public function current(): mixed;
 
@@ -53,6 +55,8 @@ interface Iterator extends Traversable
 
     /**
      * @return null|K
+     *
+     * @ignore-nullable-return
      */
     public function key(): mixed;
 
@@ -376,7 +380,7 @@ interface Countable
 }
 
 /**
- * @template T of object
+ * @template-covariant T of object
  */
 final class WeakReference
 {

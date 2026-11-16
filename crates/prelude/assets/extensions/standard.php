@@ -2606,21 +2606,34 @@ function ftruncate($stream, int $size): bool {}
 /**
  * @param resource $stream
  *
- * @return false|array{
- *   'dev': int<0, max>,
- *   'ino': int<0, max>,
- *   'mode': int<0, max>,
- *   'nlink': int<0, max>,
- *   'uid': int<0, max>,
- *   'gid': int<0, max>,
- *   'rdev': int<0, max>,
- *   'size': int<0, max>,
- *   'atime': int<1750171087, max>,
- *   'mtime': int<1750171087, max>,
- *   'ctime': int<1750171087, max>,
- *   'blksize': int<0, max>,
- *   'blocks': int<0, max>,
- * }
+ * @return array{
+ *   0: int,
+ *   1: int,
+ *   2: int,
+ *   3: int,
+ *   4: int,
+ *   5: int,
+ *   6: int,
+ *   7: int,
+ *   8: int,
+ *   9: int,
+ *   10: int,
+ *   11: int,
+ *   12: int,
+ *   'dev': int,
+ *   'ino': int,
+ *   'mode': int,
+ *   'nlink': int,
+ *   'uid': int,
+ *   'gid': int,
+ *   'rdev': int,
+ *   'size': int,
+ *   'atime': int,
+ *   'mtime': int,
+ *   'ctime': int,
+ *   'blksize': int,
+ *   'blocks': int,
+ * }|false
  */
 function fstat($stream): array|false {}
 
@@ -2721,44 +2734,36 @@ function file_put_contents(string $filename, mixed $data, int $flags = 0, $conte
 function error_get_last(): ?array {}
 
 /**
- * @template I
  * @template R
  *
- * @param callable(I...): R|callable-string|string $callback
- * @param I ...$args
+ * @param callable(mixed...): R|callable-string|string $callback
  *
  * @return R
  */
 function call_user_func(callable|string $callback, mixed ...$args): mixed {}
 
 /**
- * @template I
  * @template R
  *
- * @param callable(I...): R|callable-string|string $callback
- * @param array<I> $args
+ * @param callable(mixed...): R|callable-string|string $callback
  *
  * @return R
  */
 function call_user_func_array(callable|string $callback, array $args): mixed {}
 
 /**
- * @template I
  * @template R
  *
- * @param callable(I...): R|callable-string|string $callback
- * @param I ...$args
+ * @param callable(mixed...): R|callable-string|string $callback
  *
  * @return R
  */
 function forward_static_call(callable|string $callback, mixed ...$args): mixed {}
 
 /**
- * @template I
  * @template R
  *
- * @param callable(I...): R|callable-string|string $callback
- * @param array<I> $args
+ * @param callable(mixed...): R|callable-string|string $callback
  *
  * @return R
  */
@@ -2793,20 +2798,12 @@ function memory_get_peak_usage(bool $real_usage = false): int {}
 function memory_reset_peak_usage(): void {}
 
 /**
- * @template I
- *
- * @param (callable(I...)) $callback
- * @param I ...$args
- *
- * @return bool|null
+ * @param (callable(mixed...)) $callback
  */
 function register_shutdown_function(callable $callback, mixed ...$args): void {}
 
 /**
- * @template I
- *
- * @param (callable(I...)) $callback
- * @param I ...$args
+ * @param (callable(mixed...)) $callback
  */
 function register_tick_function(callable $callback, mixed ...$args): bool {}
 
@@ -3516,6 +3513,19 @@ function is_link(string $filename): bool {}
 
 /**
  * @return array{
+ *   0: int,
+ *   1: int,
+ *   2: int,
+ *   3: int,
+ *   4: int,
+ *   5: int,
+ *   6: int,
+ *   7: int,
+ *   8: int,
+ *   9: int,
+ *   10: int,
+ *   11: int,
+ *   12: int,
  *   'dev': int,
  *   'ino': int,
  *   'mode': int,
@@ -3535,6 +3545,19 @@ function stat(string $filename): array|false {}
 
 /**
  * @return array{
+ *   0: int,
+ *   1: int,
+ *   2: int,
+ *   3: int,
+ *   4: int,
+ *   5: int,
+ *   6: int,
+ *   7: int,
+ *   8: int,
+ *   9: int,
+ *   10: int,
+ *   11: int,
+ *   12: int,
  *   'dev': int,
  *   'ino': int,
  *   'mode': int,

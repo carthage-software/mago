@@ -3359,6 +3359,8 @@ test_case!(exception_code_follows_code_property);
 test_case!(class_string_ignores_type_arguments);
 test_case!(is_array_keeps_iterable_key_type);
 test_case!(property_access_on_never_stays_never);
+test_case!(mongodb_driver_types);
+test_case!(core_stub_callbacks_and_stat);
 
 #[test]
 #[cfg_attr(miri, ignore)]
