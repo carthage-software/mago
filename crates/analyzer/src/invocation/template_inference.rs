@@ -764,13 +764,24 @@ fn infer_templates_from_input_and_container_types<A>(
                         continue;
                     };
 
-                    let Some(input_meta) = context.codebase.get_class_like(input_obj.name.as_bytes()) else {
+                    // In an intersection such as `I&Coll<object>`, the member that extends the container binds it.
+                    let Some(input_obj) = std::iter::once(input_obj)
+                        .chain(input_obj.intersection_types.iter().flat_map(|types| types.iter()).filter_map(
+                            |intersection| match intersection {
+                                TAtomic::Object(TObject::Named(named)) => Some(named),
+                                _ => None,
+                            },
+                        ))
+                        .find(|candidate| {
+                            context.codebase.is_instance_of(candidate.name.as_bytes(), container_obj.name.as_bytes())
+                        })
+                    else {
                         continue;
                     };
 
-                    if !context.codebase.is_instance_of(input_obj.name.as_bytes(), container_obj.name.as_bytes()) {
+                    let Some(input_meta) = context.codebase.get_class_like(input_obj.name.as_bytes()) else {
                         continue;
-                    }
+                    };
 
                     for (index, parameter_template_union) in container_params.iter().enumerate() {
                         let generic_parameters =
