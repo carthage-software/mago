@@ -38,6 +38,7 @@ use crate::formula::negate_or_synthesize;
 use crate::reconciler::assertion_reconciler;
 use crate::reconciler::reconcile_keyed_types;
 use crate::utils::conditional;
+use crate::utils::expression::get_cleared_members;
 use crate::utils::expression::is_derived_access_path;
 use crate::utils::symbol_existence::extract_function_constant_existence;
 
@@ -388,6 +389,15 @@ where
                 combine_optional_union_types(Some(else_type.as_ref()), Some(previous_type.as_ref()), context.codebase);
 
             block_context.locals.insert(else_redefined_variable, Rc::new(combined_type));
+        }
+    }
+
+    // A call in a branch may clear a member narrowed before the ternary.
+    for (branch_context, finishes) in [(&if_block_context, then_finishes), (&else_block_context, else_finishes)] {
+        if !finishes {
+            for cleared_member in get_cleared_members(&block_context.locals, &branch_context.locals) {
+                block_context.locals.remove(&cleared_member);
+            }
         }
     }
 

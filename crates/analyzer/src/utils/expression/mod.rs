@@ -32,6 +32,7 @@ use mago_syntax::cst::UnaryPrefix;
 use mago_syntax::cst::UnaryPrefixOperator;
 use mago_syntax::cst::Variable;
 use mago_word::Word;
+use mago_word::WordMap;
 use mago_word::concat_word;
 use mago_word::empty_word;
 use mago_word::word;
@@ -476,6 +477,33 @@ fn get_string_key_id(literal_string: &LiteralString<'_>) -> Word {
     id.push(b'\'');
 
     word(&id)
+}
+
+/// The members (properties, elements, static members) of `before` that `after` lost while their root variable kept
+/// the same type: something that ran in between, such as a call, cleared their narrowing.
+pub fn get_cleared_members<V>(before: &WordMap<V>, after: &WordMap<V>) -> Vec<Word>
+where
+    V: PartialEq,
+{
+    before
+        .keys()
+        .filter(|id| {
+            let bytes = id.as_bytes();
+            let Some(root_end) =
+                [memchr::memmem::find(bytes, b"->"), memchr::memmem::find(bytes, b"::"), memchr::memchr(b'[', bytes)]
+                    .into_iter()
+                    .flatten()
+                    .min()
+            else {
+                return false;
+            };
+
+            let root = word(&bytes[..root_end]);
+
+            !after.contains_key(*id) && before.get(&root) == after.get(&root)
+        })
+        .copied()
+        .collect()
 }
 
 pub fn get_index_id<'ast, 'arena>(

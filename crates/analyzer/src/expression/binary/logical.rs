@@ -40,6 +40,7 @@ use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
 use crate::reconciler;
 use crate::utils::expression::expression_has_observable_side_effect;
+use crate::utils::expression::get_cleared_members;
 use crate::utils::symbol_existence::extract_function_constant_existence;
 
 /// Merges variables assigned by a short-circuiting right-hand side back into the
@@ -70,6 +71,18 @@ fn merge_short_circuited_assignments<'ctx, A>(
             *var_id,
             combine_union_types_rc(left_type, right_type, context.codebase, context.settings.combiner_options()),
         );
+    }
+}
+
+/// A call in the right operand may change the members the left operand narrowed: when it clears
+/// a property, element or static member, the narrowing no longer holds after the expression.
+fn forget_members_cleared_by_right_operand(
+    block_context: &mut BlockContext<'_>,
+    left_locals: &WordMap<Rc<TUnion>>,
+    right_locals: &WordMap<Rc<TUnion>>,
+) {
+    for cleared_member in get_cleared_members(left_locals, right_locals) {
+        block_context.locals.remove(&cleared_member);
     }
 }
 
@@ -479,6 +492,8 @@ where
     block_context
         .locals
         .extend(left_block_context.locals.iter().map(|(var_id, var_type)| (*var_id, Rc::clone(var_type))));
+
+    forget_members_cleared_by_right_operand(block_context, &left_block_context.locals, &right_block_context.locals);
 
     let has_right_assignments =
         right_assigned_var_ids.keys().any(|var_id| right_block_context.locals.contains_key(var_id));
@@ -905,6 +920,8 @@ where
                 .is_some_and(|current| assertions.iter().all(|clause| current.contains(clause)))
         });
     }
+
+    forget_members_cleared_by_right_operand(block_context, &left_block_context.locals, &right_block_context.locals);
 
     let has_right_assignments =
         right_assigned_var_ids.keys().any(|var_id| right_block_context.locals.contains_key(var_id));

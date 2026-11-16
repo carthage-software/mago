@@ -3394,6 +3394,7 @@ test_case!(switch_case_body_sees_condition_assignments);
 test_case!(elseif_reassignment_drops_earlier_negations);
 test_case!(truthy_int_excludes_zero);
 test_case!(for_loop_without_false_condition_is_infinite);
+test_case!(conditional_operand_call_forgets_property_narrowing);
 
 #[test]
 #[cfg_attr(miri, ignore)]

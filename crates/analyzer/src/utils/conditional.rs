@@ -26,6 +26,7 @@ use crate::context::scope::conditional_scope::IfConditionalScope;
 use crate::context::scope::if_scope::IfScope;
 use crate::error::AnalysisError;
 use crate::reconciler::reconcile_keyed_types;
+use crate::utils::expression::get_cleared_members;
 
 pub(crate) fn analyze<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
@@ -130,6 +131,11 @@ where
         if_conditional_context.flags.set_inside_conditional(was_inside_conditional);
 
         for target_context in [&mut post_if_context, &mut *externally_applied_context] {
+            // A call in the rest of the condition may clear a member the definitely evaluated part narrowed.
+            for cleared_member in get_cleared_members(&target_context.locals, &if_conditional_context.locals) {
+                target_context.locals.remove(&cleared_member);
+            }
+
             target_context.stable_method_calls.clone_from(&if_conditional_context.stable_method_calls);
             target_context.stable_method_call_assertions.retain(|method_call, assertions| {
                 if_conditional_context
