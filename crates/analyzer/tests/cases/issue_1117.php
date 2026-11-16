@@ -45,27 +45,27 @@ function test_filter_validate_regexp(mixed $value): false|string
     return filter_var($value, FILTER_VALIDATE_REGEXP, ['options' => ['regexp' => '/^[a-z]+$/']]);
 }
 
-function test_filter_sanitize_email(mixed $value): string
+function test_filter_sanitize_email(mixed $value): false|string
 {
     return filter_var($value, FILTER_SANITIZE_EMAIL);
 }
 
-function test_filter_sanitize_url(mixed $value): string
+function test_filter_sanitize_url(mixed $value): false|string
 {
     return filter_var($value, FILTER_SANITIZE_URL);
 }
 
-function test_filter_sanitize_number_int(mixed $value): string
+function test_filter_sanitize_number_int(mixed $value): false|string
 {
     return filter_var($value, FILTER_SANITIZE_NUMBER_INT);
 }
 
-function test_filter_sanitize_add_slashes(mixed $value): string
+function test_filter_sanitize_add_slashes(mixed $value): false|string
 {
     return filter_var($value, FILTER_SANITIZE_ADD_SLASHES);
 }
 
-function test_filter_default(mixed $value): string
+function test_filter_default(mixed $value): false|string
 {
     return filter_var($value, FILTER_DEFAULT);
 }

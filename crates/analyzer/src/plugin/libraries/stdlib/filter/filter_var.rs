@@ -41,6 +41,6 @@ impl FunctionReturnTypeProvider for FilterVarProvider {
     ) -> Option<TUnion> {
         // filter_var($value, $filter, $options)
         //            0       1        2
-        common::resolve_filter_return_type(context, invocation, 1, 2)
+        common::resolve_filter_return_type(context, invocation, Some(0), 1, 2)
     }
 }

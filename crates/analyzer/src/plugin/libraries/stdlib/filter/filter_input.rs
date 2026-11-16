@@ -41,6 +41,6 @@ impl FunctionReturnTypeProvider for FilterInputProvider {
     ) -> Option<TUnion> {
         // filter_input($type, $var_name, $filter, $options)
         //              0      1          2        3
-        common::resolve_filter_return_type(context, invocation, 2, 3)
+        common::resolve_filter_return_type(context, invocation, None, 2, 3)
     }
 }
