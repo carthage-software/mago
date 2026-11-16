@@ -86,7 +86,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                     break 'array_access;
                 };
 
-                let Some(array_variable) = block_context.locals.remove(&array_id) else {
+                let Some(array_variable) = block_context.locals.remove(&array_id).or_else(|| {
+                    matches!(array_access.array, Expression::ArrayAccess(_))
+                        .then(|| artifacts.get_rc_expression_type(array_access.array).cloned())
+                        .flatten()
+                }) else {
                     break 'array_access;
                 };
 
@@ -339,12 +343,71 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
 
                 block_context.locals.insert(array_id, Rc::clone(&rc));
                 block_context.remove_variable_from_conflicting_clauses(context, array_id, Some(rc.as_ref()));
+                write_back_to_holding_arrays(context, block_context, artifacts, array_access.array, rc);
             };
         }
 
         block_context.flags.set_inside_unset(was_inside_unset);
 
         Ok(())
+    }
+}
+
+/// Writes the new type of a nested array into the arrays that hold it, up to the root variable.
+fn write_back_to_holding_arrays<A>(
+    context: &Context<'_, '_, A>,
+    block_context: &mut BlockContext<'_>,
+    artifacts: &AnalysisArtifacts,
+    mut array: &Expression<'_>,
+    mut array_type: Rc<TUnion>,
+) where
+    A: Arena,
+{
+    while let Expression::ArrayAccess(holder_access) = array {
+        let Some(key) = artifacts.get_expression_type(holder_access.index).and_then(TUnion::get_single_array_key)
+        else {
+            return;
+        };
+
+        let Some(holder_id) = get_block_expression_id(holder_access.array, context, block_context) else {
+            return;
+        };
+
+        let Some(holder_type) =
+            block_context.locals.get(&holder_id).or_else(|| artifacts.get_rc_expression_type(holder_access.array))
+        else {
+            return;
+        };
+
+        let mut holder_type = (**holder_type).clone();
+        let mut updated = false;
+        for atomic in holder_type.types.to_mut() {
+            let item = match atomic {
+                TAtomic::Array(TArray::Keyed(keyed)) => {
+                    keyed.known_items.as_mut().and_then(|items| Arc::make_mut(items).get_mut(&key))
+                }
+                TAtomic::Array(TArray::List(list)) => match key {
+                    ArrayKey::Integer(index) => usize::try_from(index).ok().and_then(|index| {
+                        list.known_elements.as_mut().and_then(|elements| Arc::make_mut(elements).get_mut(&index))
+                    }),
+                    _ => None,
+                },
+                _ => None,
+            };
+
+            if let Some((_, item_type)) = item {
+                *item_type = (*array_type).clone();
+                updated = true;
+            }
+        }
+
+        if !updated {
+            return;
+        }
+
+        array_type = Rc::new(holder_type);
+        block_context.locals.insert(holder_id, Rc::clone(&array_type));
+        array = holder_access.array;
     }
 }
 
