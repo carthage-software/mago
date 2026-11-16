@@ -96,11 +96,23 @@ pub fn is_contained_by(
 
     atomic_comparator::is_contained_by(
         codebase,
-        fake_input_type.as_ref(),
-        fake_container_type.as_ref(),
+        without_type_parameters(fake_input_type).as_ref(),
+        without_type_parameters(fake_container_type).as_ref(),
         inside_assertion,
         atomic_comparison_result,
     )
+}
+
+fn without_type_parameters(object: Cow<'_, TAtomic>) -> Cow<'_, TAtomic> {
+    match object.as_ref() {
+        TAtomic::Object(TObject::Named(named)) if named.type_parameters.is_some() => {
+            let mut named = named.clone();
+            named.type_parameters = None;
+
+            Cow::Owned(TAtomic::Object(TObject::Named(named)))
+        }
+        _ => object,
+    }
 }
 
 fn class_like_kind(codebase: &CodebaseMetadata, name: &[u8]) -> Option<TClassLikeStringKind> {
