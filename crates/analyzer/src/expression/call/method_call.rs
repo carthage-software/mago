@@ -1,6 +1,7 @@
 use mago_allocator::Arena;
 use mago_word::Word;
 use mago_word::WordMap;
+use std::rc::Rc;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
@@ -318,6 +319,20 @@ where
         return Ok(());
     }
 
+    // The arguments of a nullsafe call only run when the receiver is not null.
+    let narrowed_receiver = if is_null_safe
+        && let Some(object_id) = get_block_expression_id(object, context, block_context)
+        && let Some(object_type) = block_context.locals.get(&object_id).cloned()
+        && object_type.can_be_null()
+    {
+        let narrowed = Rc::new(object_type.to_non_nullable());
+        block_context.locals.insert(object_id, Rc::clone(&narrowed));
+
+        Some((object_id, object_type, narrowed))
+    } else {
+        None
+    };
+
     let undocumented_template_result =
         (!method_resolution.undocumented_methods.is_empty()).then(|| method_resolution.template_result.clone());
 
@@ -428,6 +443,12 @@ where
             MethodInvocationKind::Instance,
             !has_resolved_methods,
         )?;
+    }
+
+    if let Some((object_id, object_type, narrowed)) = narrowed_receiver
+        && block_context.locals.get(&object_id).is_some_and(|current| Rc::ptr_eq(current, &narrowed))
+    {
+        block_context.locals.insert(object_id, object_type);
     }
 
     Ok(())
