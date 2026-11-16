@@ -9,9 +9,29 @@ use mago_php_version::PHPVersion;
 
 use crate::utils::php_emulation::numeric_string_equals_int;
 
+/// A template's value lies within its constraint, so the bounds of `T of int<0, 3>` are those of `int<0, 3>`.
+fn int_bound(union: &TUnion, bound: fn(&TAtomic) -> Option<i64>, pick: fn(i64, i64) -> i64) -> Option<i64> {
+    union
+        .types
+        .iter()
+        .map(|atomic| match atomic {
+            TAtomic::GenericParameter(parameter) => int_bound(&parameter.constraint, bound, pick),
+            _ => bound(atomic),
+        })
+        .reduce(|first, second| Some(pick(first?, second?)))?
+}
+
+fn maximum_int(union: &TUnion) -> Option<i64> {
+    int_bound(union, TAtomic::get_maximum_int_value, i64::max)
+}
+
+fn minimum_int(union: &TUnion) -> Option<i64> {
+    int_bound(union, TAtomic::get_minimum_int_value, i64::min)
+}
+
 #[inline]
 pub fn is_always_less_than_or_equal(lhs: &TUnion, rhs: &TUnion) -> bool {
-    if let (Some(max_lhs), Some(min_rhs)) = (lhs.get_maximum_int_value(), rhs.get_minimum_int_value()) {
+    if let (Some(max_lhs), Some(min_rhs)) = (maximum_int(lhs), minimum_int(rhs)) {
         return max_lhs <= min_rhs;
     }
 
@@ -20,7 +40,7 @@ pub fn is_always_less_than_or_equal(lhs: &TUnion, rhs: &TUnion) -> bool {
 
 #[inline]
 pub fn is_always_greater_than_or_equal(lhs: &TUnion, rhs: &TUnion) -> bool {
-    if let (Some(min_lhs), Some(max_rhs)) = (lhs.get_minimum_int_value(), rhs.get_maximum_int_value()) {
+    if let (Some(min_lhs), Some(max_rhs)) = (minimum_int(lhs), maximum_int(rhs)) {
         return min_lhs >= max_rhs;
     }
 
@@ -42,7 +62,7 @@ pub fn is_always_less_than(lhs: &TUnion, rhs: &TUnion) -> bool {
         return true;
     }
 
-    if let (Some(max_lhs), Some(min_rhs)) = (lhs.get_maximum_int_value(), rhs.get_minimum_int_value()) {
+    if let (Some(max_lhs), Some(min_rhs)) = (maximum_int(lhs), minimum_int(rhs)) {
         return max_lhs < min_rhs;
     }
 
@@ -79,7 +99,7 @@ pub fn is_always_greater_than(lhs: &TUnion, rhs: &TUnion) -> bool {
         return true;
     }
 
-    if let (Some(min_lhs), Some(max_rhs)) = (lhs.get_minimum_int_value(), rhs.get_maximum_int_value()) {
+    if let (Some(min_lhs), Some(max_rhs)) = (minimum_int(lhs), maximum_int(rhs)) {
         return min_lhs > max_rhs;
     }
 

@@ -2021,46 +2021,63 @@ where
             existing_var_type.remove_type(atomic);
         }
 
-        let TAtomic::Scalar(TScalar::Integer(integer)) = atomic else {
-            redundant = false;
-            continue;
+        let narrow = |integer: &TInteger, redundant: &mut bool| {
+            let new_integer = if integer.is_unspecified() {
+                let bound = match (is_less_than, or_equal) {
+                    (_, true) => Some(value),
+                    (true, false) => value.checked_sub(1),
+                    (false, false) => value.checked_add(1),
+                };
+
+                bound.map(|bound| if is_less_than { TInteger::To(bound) } else { TInteger::From(bound) })
+            } else {
+                match (is_less_than, or_equal) {
+                    (true, false) => integer.to_less_than(value),
+                    (true, true) => integer.to_less_than_or_equal(value),
+                    (false, false) => integer.to_greater_than(value),
+                    (false, true) => integer.to_greater_than_or_equal(value),
+                }
+            };
+
+            if new_integer.is_none_or(|new_integer| new_integer != *integer) {
+                *redundant = false;
+            }
+
+            new_integer.map(|new_integer| TAtomic::Scalar(TScalar::Integer(new_integer)))
         };
 
-        existing_var_type.remove_type(atomic);
-
-        if integer.is_unspecified() {
-            redundant = false;
-
-            let bound = match (is_less_than, or_equal) {
-                (_, true) => Some(value),
-                (true, false) => value.checked_sub(1),
-                (false, false) => value.checked_add(1),
-            };
-
-            if let Some(bound) = bound {
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::Integer(if is_less_than {
-                    TInteger::To(bound)
-                } else {
-                    TInteger::From(bound)
-                })));
-            }
-        } else {
-            let new_integer = match (is_less_than, or_equal) {
-                (true, false) => integer.to_less_than(value),
-                (true, true) => integer.to_less_than_or_equal(value),
-                (false, false) => integer.to_greater_than(value),
-                (false, true) => integer.to_greater_than_or_equal(value),
-            };
-
-            if let Some(new_integer) = new_integer {
-                if new_integer != *integer {
-                    redundant = false;
+        match atomic {
+            TAtomic::Scalar(TScalar::Integer(integer)) => {
+                existing_var_type.remove_type(atomic);
+                if let Some(new_atomic) = narrow(integer, &mut redundant) {
+                    existing_var_type.types.to_mut().push(new_atomic);
                 }
-
-                existing_var_type.types.to_mut().push(TAtomic::Scalar(TScalar::Integer(new_integer)));
-            } else {
-                redundant = false;
             }
+            TAtomic::GenericParameter(generic_parameter)
+                if generic_parameter
+                    .constraint
+                    .types
+                    .iter()
+                    .all(|constraint| matches!(constraint, TAtomic::Scalar(TScalar::Integer(_)))) =>
+            {
+                existing_var_type.remove_type(atomic);
+                let constraint_types: Vec<TAtomic> = generic_parameter
+                    .constraint
+                    .types
+                    .iter()
+                    .filter_map(|constraint| match constraint {
+                        TAtomic::Scalar(TScalar::Integer(integer)) => narrow(integer, &mut redundant),
+                        _ => None,
+                    })
+                    .collect();
+
+                if !constraint_types.is_empty() {
+                    let mut generic_parameter = generic_parameter.clone();
+                    generic_parameter.constraint = Arc::new(TUnion::from_vec(constraint_types));
+                    existing_var_type.types.to_mut().push(TAtomic::GenericParameter(generic_parameter));
+                }
+            }
+            _ => redundant = false,
         }
     }
 
