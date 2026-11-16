@@ -62,7 +62,10 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
 
         let mut merged_items: BTreeMap<ArrayKey, (bool, TUnion)> = BTreeMap::new();
         let mut merged_list_elements: BTreeMap<usize, (bool, TUnion)> = BTreeMap::new();
-        let mut next_list_index: usize = 0;
+        // The exact number of elements before the next argument, while it is known.
+        let mut next_list_index: Option<usize> = Some(0);
+        let mut all_keys_are_int = true;
+        let last_argument_index = arguments.len() - 1;
         let mut has_parameters = false;
         let mut merged_key_type: Option<TUnion> = None;
         let mut merged_value_type: Option<TUnion> = None;
@@ -71,7 +74,7 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
         let mut all_lists_are_closed = true;
         let mut next_int_key: Option<i64> = Some(0);
 
-        for invocation_argument in arguments {
+        for (argument_index, invocation_argument) in arguments.iter().enumerate() {
             let argument_expr = invocation_argument.value()?;
             let argument_type = context.get_expression_type(argument_expr)?;
 
@@ -109,6 +112,12 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
                         if keyed.non_empty {
                             any_argument_non_empty = true;
                         }
+
+                        all_keys_are_int &= keyed
+                            .known_items
+                            .as_deref()
+                            .is_none_or(|items| items.keys().all(|key| matches!(key, ArrayKey::Integer(_))))
+                            && keyed.parameters.as_ref().is_none_or(|(key_type, _)| key_type.is_int());
 
                         if let Some(items) = keyed.known_items.as_deref() {
                             for (key, (optional, value)) in items {
@@ -211,17 +220,34 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
                             all_lists_are_closed = false;
                         }
 
+                        // Elements keep their positions only behind a prefix of known length, and an optional
+                        // element is only placed when nothing follows it.
+                        let mut placed_every_element = true;
                         if let Some(known_elements) = list.known_elements.as_deref() {
                             for (idx, (optional, element_type)) in known_elements {
-                                let new_idx = next_list_index + idx;
-                                merged_list_elements.insert(new_idx, (*optional, element_type.clone()));
+                                match next_list_index {
+                                    Some(start) if !*optional || argument_index == last_argument_index => {
+                                        merged_list_elements.insert(start + idx, (*optional, element_type.clone()));
+                                    }
+                                    _ => placed_every_element = false,
+                                }
                             }
-                            if let Some(max_idx) = known_elements.keys().max() {
-                                next_list_index += max_idx + 1;
-                            }
-                        } else if list.non_empty {
-                            next_list_index += 1; // At least one element
                         }
+
+                        // Elements without a fixed position live in the rest of the merged list.
+                        if !placed_every_element {
+                            all_lists_are_closed = false;
+                        }
+
+                        next_list_index = match (next_list_index, list.known_elements.as_deref()) {
+                            (Some(start), Some(known_elements))
+                                if is_list_closed && known_elements.values().all(|(optional, _)| !optional) =>
+                            {
+                                Some(start + known_elements.len())
+                            }
+                            (Some(start), None) if is_list_closed => Some(start),
+                            _ => None,
+                        };
 
                         let (_, list_value_type) = get_array_parameters(&TArray::List(list.clone()), codebase);
 
@@ -246,6 +272,7 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
                 }
             } else if let Some((iterable_key, iterable_value)) = get_iterable_parameters(iterable, codebase) {
                 all_arguments_are_lists = false;
+                all_keys_are_int = false;
                 has_parameters = true;
                 merged_key_type = Some(match merged_key_type {
                     Some(existing) => {
@@ -274,6 +301,19 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
             if !merged_list_elements.is_empty() {
                 result_list.known_elements = Some(merged_list_elements.into());
             }
+
+            Some(TUnion::from_atomic(TAtomic::Array(TArray::List(result_list))))
+        } else if all_keys_are_int {
+            // PHP renumbers integer keys, so merging arrays with only integer keys gives a list.
+            let element_type = merged_items
+                .into_values()
+                .map(|(_, value)| value)
+                .chain(merged_value_type)
+                .reduce(|first, second| combine_union_types(&first, &second, codebase, CombinerOptions::default()))
+                .unwrap_or_else(get_never);
+
+            let mut result_list = TList::new(Arc::new(element_type));
+            result_list.non_empty = any_argument_non_empty;
 
             Some(TUnion::from_atomic(TAtomic::Array(TArray::List(result_list))))
         } else {

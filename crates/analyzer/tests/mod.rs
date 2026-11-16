@@ -3397,6 +3397,7 @@ test_case!(for_loop_without_false_condition_is_infinite);
 test_case!(conditional_operand_call_forgets_property_narrowing);
 test_case!(loop_read_before_later_target_assignment_is_possibly_undefined);
 test_case!(hooked_property_writes_are_not_read_back);
+test_case!(array_merge_places_elements_only_after_known_prefix);
 
 #[test]
 #[cfg_attr(miri, ignore)]
