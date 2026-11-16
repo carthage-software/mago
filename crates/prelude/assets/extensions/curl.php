@@ -120,7 +120,7 @@ function curl_multi_getcontent(CurlHandle $handle): ?string {}
  * @return array{
  *   msg: int,
  *   result: int,
- *   handle: resource
+ *   handle: CurlHandle
  * }
  */
 function curl_multi_info_read(CurlMultiHandle $multi_handle, &$queued_messages = null): array|false {}
