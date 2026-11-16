@@ -1818,38 +1818,32 @@ where
                 return get_never();
             }
             TAtomic::Never => return get_never(),
-            TAtomic::Callable(callable)
-                if callable
-                    .get_signature()
-                    .is_none_or(mago_codex::ttype::atomic::callable::TCallableSignature::is_closure) =>
-            {
+            _ if t.is_object_type() => {
                 possibilities.push(t.clone());
             }
-            TAtomic::Object(_) => {
-                possibilities.push(t.clone());
-            }
-            TAtomic::Array(TArray::Keyed(keyed_array)) => {
+            TAtomic::Array(TArray::Keyed(keyed_array)) if keyed_array.known_items.is_some() => {
                 let mut known_properties = BTreeMap::new();
-                if let Some(known_items) = &keyed_array.known_items {
-                    for (key, item) in known_items.iter() {
-                        let property_name = key.to_atom();
-
-                        known_properties.insert(property_name, item.clone());
-                    }
-
-                    // Casting an array to an object produces a `stdClass` instance in PHP,
-                    // so intersect the shape with `stdClass` to preserve both the shape
-                    // information and the nominal `stdClass` type.
-                    let mut named = TNamedObject::new(word("stdClass"));
-                    named.intersection_types = Some(Box::new(vec![TAtomic::Object(TObject::new_with_properties(
-                        keyed_array.parameters.is_none(),
-                        known_properties,
-                    ))]));
-
-                    possibilities.push(TAtomic::Object(TObject::Named(named)));
+                for (key, item) in keyed_array.known_items.iter().flat_map(|items| items.iter()) {
+                    known_properties.insert(key.to_atom(), item.clone());
                 }
+
+                // Casting an array to an object produces a `stdClass` instance in PHP,
+                // so intersect the shape with `stdClass` to preserve both the shape
+                // information and the nominal `stdClass` type.
+                let mut named = TNamedObject::new(word("stdClass"));
+                named.intersection_types = Some(Box::new(vec![TAtomic::Object(TObject::new_with_properties(
+                    keyed_array.parameters.is_none(),
+                    known_properties,
+                ))]));
+
+                possibilities.push(TAtomic::Object(TObject::Named(named)));
             }
-            _ => {}
+            TAtomic::Scalar(_) | TAtomic::Array(_) | TAtomic::Null | TAtomic::Void => {
+                possibilities.push(TAtomic::Object(TObject::Named(TNamedObject::new(word("stdClass")))));
+            }
+            _ => {
+                possibilities.push(TAtomic::Object(TObject::Any));
+            }
         }
     }
 
