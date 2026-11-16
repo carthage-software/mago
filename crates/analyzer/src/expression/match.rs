@@ -846,6 +846,40 @@ where
             }
         }
 
+        let mut new_variables = WordSet::default();
+        for ctx in &reachable_contexts {
+            new_variables.extend(ctx.locals.keys().copied().filter(|variable_id| {
+                !self.block_context.locals.contains_key(variable_id)
+                    && !variable_id.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':'))
+            }));
+        }
+
+        for variable_id in new_variables {
+            let mut final_type: Option<TUnion> = None;
+            let mut possibly_undefined = false;
+            for arm_context in &reachable_contexts {
+                match arm_context.locals.get(&variable_id) {
+                    Some(arm_type) => {
+                        final_type = Some(combine_optional_union_types(
+                            final_type.as_ref(),
+                            Some(arm_type),
+                            self.context.codebase,
+                        ));
+                    }
+                    None => possibly_undefined = true,
+                }
+            }
+
+            if let Some(mut final_type) = final_type {
+                if possibly_undefined {
+                    final_type.set_possibly_undefined(true, None);
+                    self.block_context.possibly_undefined_variable_ids.insert(variable_id);
+                }
+
+                self.block_context.locals.insert(variable_id, Rc::new(final_type));
+            }
+        }
+
         for ctx in &reachable_contexts {
             self.block_context.variables_possibly_in_scope.extend(ctx.variables_possibly_in_scope.iter().copied());
         }

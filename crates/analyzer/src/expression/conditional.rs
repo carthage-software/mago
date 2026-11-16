@@ -304,6 +304,31 @@ where
             }
         }
 
+        for (assigned_variable, branch_context) in if_assigned_variables
+            .difference(&else_assigned_variables)
+            .map(|variable| (variable, &if_block_context))
+            .chain(
+                else_assigned_variables
+                    .difference(&if_assigned_variables)
+                    .map(|variable| (variable, &else_block_context)),
+            )
+        {
+            if block_context.locals.contains_key(assigned_variable)
+                || assigned_variable.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':'))
+            {
+                continue;
+            }
+
+            let Some(branch_type) = branch_context.locals.get(assigned_variable) else {
+                continue;
+            };
+
+            let mut possibly_undefined_type = (**branch_type).clone();
+            possibly_undefined_type.set_possibly_undefined(true, None);
+            block_context.locals.insert(*assigned_variable, Rc::new(possibly_undefined_type));
+            block_context.possibly_undefined_variable_ids.insert(*assigned_variable);
+        }
+
         let if_redefined_variables = if_block_context
             .get_redefined_locals(&block_context.locals, false, &mut WordSet::default())
             .keys()
