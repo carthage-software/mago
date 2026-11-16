@@ -533,7 +533,9 @@ where
         name: metadata.original_name,
         type_parameters: type_parameters.map(Vec::into_boxed_slice),
         variances: None,
-        is_static: classname.is_static() || (classname.is_self() && metadata.flags.is_final()),
+        is_static: classname.is_static()
+            || matches!(classname.origin, ResolutionOrigin::Object { is_this: true })
+            || (classname.is_self() && metadata.flags.is_final()),
         is_this: false,
         intersection_types: None,
         remapped_parameters: false,
