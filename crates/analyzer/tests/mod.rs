@@ -3413,6 +3413,7 @@ test_case!(simple_xml_element_child_properties);
 test_case!(explode_negative_limit_may_be_empty);
 test_case!(spl_array_sort_methods_return_true);
 test_case!(curl_share_init_persistent_signature);
+test_case!(native_return_type_disjoint_from_parent_docblock);
 
 #[test]
 #[cfg_attr(miri, ignore)]

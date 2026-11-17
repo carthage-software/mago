@@ -87,7 +87,7 @@ abstract class BaseEntity
 
 final class Entity extends BaseEntity
 {
-    public function getMetadata(): Metadata
+    public function getMetadata(): Metadata // @mago-expect analysis:incompatible-return-type
     {
         return new Metadata([]);
     }

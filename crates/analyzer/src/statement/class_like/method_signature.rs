@@ -384,7 +384,7 @@ pub fn validate_method_signature_compatibility(
 
     if let (Some(parent_return), Some(child_return)) =
         (&parent_method.return_type_metadata, &child_method.return_type_metadata)
-        && child_return.from_docblock
+        && (child_return.from_docblock || (parent_return.from_docblock && !parent_method.flags.is_magic_method()))
     {
         let mut expanded_parent_return_type = parent_return.type_union.clone();
         let mut expanded_child_return_type = child_return.type_union.clone();
@@ -417,7 +417,16 @@ pub fn validate_method_signature_compatibility(
                 &mut comparison_result,
             );
 
-            if !is_compatible {
+            if !is_compatible
+                && (child_return.from_docblock
+                    || !union_comparator::can_expression_types_be_identical(
+                        codebase,
+                        &expanded_child_return_type,
+                        &expanded_parent_return_type,
+                        false,
+                        false,
+                    ))
+            {
                 issues.push(SignatureCompatibilityIssue::IncompatibleReturnType {
                     child_type: expanded_child_return_type.get_id(),
                     parent_type: expanded_parent_return_type.get_id(),
