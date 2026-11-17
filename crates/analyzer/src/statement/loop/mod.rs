@@ -374,9 +374,25 @@ fn inherit_loop_block_context<'ctx, A>(
 
         if !always_enters_loop {
             for (variable, variable_type) in inner_loop_block_context.locals {
-                if block_context.locals.contains_key(&variable)
-                    || variable.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':'))
-                {
+                if variable.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':')) {
+                    continue;
+                }
+
+                if let Some(break_type) = block_context.locals.get(&variable) {
+                    if has_break
+                        && !loop_scope.parent_context_variables.contains_key(&variable)
+                        && !loop_scope.variables_defined_by_condition.contains(&variable)
+                    {
+                        let mut combined = ttype::combine_union_types(
+                            break_type,
+                            &variable_type,
+                            context.codebase,
+                            CombinerOptions::default(),
+                        );
+                        combined.set_possibly_undefined(true, None);
+                        block_context.locals.insert(variable, Rc::new(combined));
+                    }
+
                     continue;
                 }
 
