@@ -114,46 +114,46 @@ final class Worker
     private readonly array $rules;
 
     /** @var list<RegisteredPlugin> */
-    private readonly array $analyzerPlugins;
+    private array $analyzerPlugins = [];
 
     /** @var list<int<0, max>> */
     private readonly array $workerReducerIndices;
 
     /** @var list<RegisteredTargetedCallback<FunctionReturnTypeProvider, FunctionTarget>> */
-    private readonly array $functionReturnTypeProviders;
+    private array $functionReturnTypeProviders = [];
 
     /** @var list<RegisteredTargetedCallback<MethodReturnTypeProvider, MethodTarget>> */
-    private readonly array $methodReturnTypeProviders;
+    private array $methodReturnTypeProviders = [];
 
     /** @var list<RegisteredTargetedCallback<FunctionThrowTypeProvider, FunctionTarget>> */
-    private readonly array $functionThrowTypeProviders;
+    private array $functionThrowTypeProviders = [];
 
     /** @var list<RegisteredTargetedCallback<MethodThrowTypeProvider, MethodTarget>> */
-    private readonly array $methodThrowTypeProviders;
+    private array $methodThrowTypeProviders = [];
 
     /** @var list<RegisteredExpressionThrowTypeProvider> */
-    private readonly array $expressionThrowTypeProviders;
+    private array $expressionThrowTypeProviders = [];
 
     /** @var list<RegisteredTargetedCallback<FunctionAssertionProvider, FunctionTarget>> */
-    private readonly array $functionAssertionProviders;
+    private array $functionAssertionProviders = [];
 
     /** @var list<RegisteredTargetedCallback<MethodAssertionProvider, MethodTarget>> */
-    private readonly array $methodAssertionProviders;
+    private array $methodAssertionProviders = [];
 
     /** @var list<RegisteredTargetedCallback<PropertyTypeProvider, PropertyTarget>> */
-    private readonly array $propertyTypeProviders;
+    private array $propertyTypeProviders = [];
 
     /** @var list<RegisteredTargetedCallback<PropertyInitializationProvider, PropertyTarget>> */
-    private readonly array $propertyInitializationProviders;
+    private array $propertyInitializationProviders = [];
 
     /** @var list<RegisteredTargetedCallback<ClassInitializerProvider, ClassTarget>> */
-    private readonly array $classInitializerProviders;
+    private array $classInitializerProviders = [];
 
     /** @var list<RegisteredTargetedCallback<IssueFilterHook, string>> */
-    private readonly array $issueFilterHooks;
+    private array $issueFilterHooks = [];
 
     /** @var list<RegisteredTargetedCallback<CodebaseScanHook, string>> */
-    private readonly array $codebaseScanHooks;
+    private array $codebaseScanHooks = [];
 
     /**
      * @var list<int<0, 65535>>
@@ -174,9 +174,8 @@ final class Worker
 
     private ?MetadataCache $metadataCache = null;
 
-    /**
-     * @mago-expect lint:halstead
-     */
+    private bool $analyzerPluginsRegistered = false;
+
     public function __construct(Extension $extension, Extension ...$additionalExtensions)
     {
         $extensions = [$extension, ...array_values($additionalExtensions)];
@@ -184,22 +183,6 @@ final class Worker
         $ruleCodes = [];
         $rules = [];
         $pluginSelectors = [];
-        $registeredPlugins = [];
-        $functionProviders = [];
-        $methodProviders = [];
-        $functionThrowTypeProviders = [];
-        $methodThrowTypeProviders = [];
-        $expressionThrowTypeProviders = [];
-        $functionAssertionProviders = [];
-        $methodAssertionProviders = [];
-        $propertyProviders = [];
-        $propertyInitializationProviders = [];
-        $classInitializerProviders = [];
-        $issueFilterHooks = [];
-        $codebaseScanHooks = [];
-        $nodeAnalysisHooks = [];
-        $methodCallAnalysisHooks = [];
-        $classLikeAnalysisHooks = [];
         $workerReducerIndices = [];
         foreach ($extensions as $extensionIndex => $registeredExtension) {
             $normalizedExtensionIdentifier = strtolower($registeredExtension->identifier);
@@ -244,8 +227,53 @@ final class Worker
 
                     $pluginSelectors[$normalizedSelector] = $definition->identifier;
                 }
+            }
+        }
+
+        $this->extensions = $extensions;
+        $this->rules = $rules;
+        $this->workerReducerIndices = $workerReducerIndices;
+    }
+
+    /**
+     * Runs each analyzer plugin's `register()` and indexes its providers and hooks.
+     *
+     * It runs on the first analyzer request, so workers that serve only linter
+     * requests skip it.
+     *
+     * @mago-expect lint:halstead
+     */
+    private function registerAnalyzerPlugins(): void
+    {
+        $registeredPlugins = [];
+        $functionProviders = [];
+        $methodProviders = [];
+        $functionThrowTypeProviders = [];
+        $methodThrowTypeProviders = [];
+        $expressionThrowTypeProviders = [];
+        $functionAssertionProviders = [];
+        $methodAssertionProviders = [];
+        $propertyProviders = [];
+        $propertyInitializationProviders = [];
+        $classInitializerProviders = [];
+        $issueFilterHooks = [];
+        $codebaseScanHooks = [];
+        $nodeAnalysisHooks = [];
+        $methodCallAnalysisHooks = [];
+        $classLikeAnalysisHooks = [];
+        foreach ($this->extensions as $registeredExtension) {
+            foreach ($registeredExtension->analyzerPlugins as $plugin) {
+                $definition = $plugin->getDefinition();
                 $registry = new AnalyzerPluginRegistry();
-                $plugin->register($registry);
+                try {
+                    $plugin->register($registry);
+                } catch (Throwable $throwable) {
+                    throw new ProtocolException(
+                        "Analyzer plugin `{$definition->identifier}` failed to register: {$throwable->getMessage()}",
+                        0,
+                        $throwable,
+                    );
+                }
                 $registeredFunctionProviders = self::registerTargetedCallbacks(
                     $registry->getFunctionReturnTypeProviders(),
                     $functionProviders,
@@ -444,10 +472,7 @@ final class Worker
             }
         }
 
-        $this->extensions = $extensions;
-        $this->rules = $rules;
         $this->analyzerPlugins = $registeredPlugins;
-        $this->workerReducerIndices = $workerReducerIndices;
         $this->functionReturnTypeProviders = $functionProviders;
         $this->methodReturnTypeProviders = $methodProviders;
         $this->functionThrowTypeProviders = $functionThrowTypeProviders;
@@ -460,6 +485,7 @@ final class Worker
         $this->classInitializerProviders = $classInitializerProviders;
         $this->issueFilterHooks = $issueFilterHooks;
         $this->codebaseScanHooks = $codebaseScanHooks;
+        $this->analyzerPluginsRegistered = true;
     }
 
     /**
@@ -768,6 +794,10 @@ final class Worker
         HostClient $host,
         CancellationTokenInterface $cancellation,
     ): string {
+        if (!$this->analyzerPluginsRegistered) {
+            $this->registerAnalyzerPlugins();
+        }
+
         [$kind, $reader] = AnalyzerProtocol::readRequest($payload);
         if ($kind === AnalyzerProtocol::DESCRIBE_REQUEST) {
             [$this->phpVersion, $this->nodeKinds] = AnalyzerProtocol::readDescribeRequest($reader);

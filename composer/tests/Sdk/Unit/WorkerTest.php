@@ -34,6 +34,27 @@ final class WorkerTest extends TestCase
         ]));
     }
 
+    public function testConstructionDoesNotRegisterAnalyzerPlugins(): void
+    {
+        $plugin = new class implements Plugin {
+            public int $registrations = 0;
+
+            public function getDefinition(): PluginDefinition
+            {
+                return new PluginDefinition('counted', 'Counted', 'Counts its registrations.');
+            }
+
+            public function register(PluginRegistry $registry): void
+            {
+                ++$this->registrations;
+            }
+        };
+
+        new Worker(new Extension('acme/counted', 'Counted', '1.0.0', analyzerPlugins: [$plugin]));
+
+        self::assertSame(0, $plugin->registrations);
+    }
+
     private static function plugin(PluginDefinition $definition): Plugin
     {
         return new class($definition) implements Plugin {
