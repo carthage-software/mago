@@ -223,38 +223,40 @@ pub fn check_method<'ast, 'arena>(
     {
         if method_name_bytes.eq_ignore_ascii_case(magic_method) {
             if let Some(count) = parameter_count {
-                let mut found_count = 0;
-                let mut found_variadic = false;
-                for param in &method.parameter_list.parameters {
-                    found_count += 1;
+                let found_count =
+                    method.parameter_list.parameters.iter().filter(|param| param.ellipsis.is_none()).count();
 
-                    if param.ellipsis.is_some() {
-                        found_variadic = true;
-                    }
-                }
-
-                if found_variadic || found_count.ne(count) {
-                    let message = if found_variadic {
-                        format!(
-                            "Magic method `{class_like_name}::{method_name}` must have exactly {count} parameters, found more than {found_count} due to variadic parameter."
-                        )
-                    } else {
-                        format!(
-                            "Magic method `{class_like_name}::{method_name}` must have exactly {count} parameters, found {found_count}."
-                        )
-                    };
-
+                if found_count.ne(count) {
                     context.report(
-                        Issue::error(message)
-                            .with_annotation(Annotation::primary(method.parameter_list.span()))
-                            .with_annotation(
-                                Annotation::secondary(method.span())
-                                    .with_message(format!("Method `{class_like_name}::{method_name}` defined here.",)),
-                            )
-                            .with_annotation(
-                                Annotation::secondary(class_like_span)
-                                    .with_message(format!("{class_like_kind} `{class_like_fqcn}` is defined here.")),
-                            ),
+                        Issue::error(format!(
+                            "Magic method `{class_like_name}::{method_name}` must have exactly {count} parameters, found {found_count}."
+                        ))
+                        .with_annotation(Annotation::primary(method.parameter_list.span()))
+                        .with_annotation(
+                            Annotation::secondary(method.span())
+                                .with_message(format!("Method `{class_like_name}::{method_name}` defined here.",)),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(class_like_span)
+                                .with_message(format!("{class_like_kind} `{class_like_fqcn}` is defined here.")),
+                        ),
+                    );
+                } else if let Some(param) =
+                    method.parameter_list.parameters.iter().take(*count).find(|param| param.ampersand.is_some())
+                {
+                    context.report(
+                        Issue::error(format!(
+                            "Magic method `{class_like_name}::{method_name}` cannot take parameters by reference."
+                        ))
+                        .with_annotation(Annotation::primary(param.span()))
+                        .with_annotation(
+                            Annotation::secondary(method.span())
+                                .with_message(format!("Method `{class_like_name}::{method_name}` defined here.",)),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(class_like_span)
+                                .with_message(format!("{class_like_kind} `{class_like_fqcn}` is defined here.")),
+                        ),
                     );
                 }
             }

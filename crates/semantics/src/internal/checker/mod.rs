@@ -52,8 +52,8 @@ type MagicMethodSemantic = (&'static [u8], Option<usize>, bool, bool, bool);
 
 const MAGIC_METHOD_SEMANTICS: &[MagicMethodSemantic] = &[
     (CONSTRUCTOR_MAGIC_METHOD, None, false, false, false),
-    (DESTRUCTOR_MAGIC_METHOD, None, false, false, false),
-    (CLONE_MAGIC_METHOD, None, false, false, true),
+    (DESTRUCTOR_MAGIC_METHOD, Some(0), false, false, false),
+    (CLONE_MAGIC_METHOD, Some(0), false, false, true),
     (CALL_MAGIC_METHOD, Some(2), true, false, true),
     (CALL_STATIC_MAGIC_METHOD, Some(2), true, true, true),
     (GET_MAGIC_METHOD, Some(1), true, false, true),
