@@ -62,6 +62,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Global<'arena> {
             // reported by the generic `@var` pass, which sees them in scope before this point.
             let variable_type = match (&docblock_type, known_type) {
                 (Some((docblock_type, _)), _) => Rc::clone(docblock_type),
+                (None, Some(known_type)) if known_type.possibly_undefined() => {
+                    let mut known_type = Rc::unwrap_or_clone(known_type).as_nullable();
+                    known_type.set_possibly_undefined(false, None);
+                    Rc::new(known_type)
+                }
                 (None, Some(known_type)) => known_type,
                 (None, None) => Rc::new(get_mixed()),
             };

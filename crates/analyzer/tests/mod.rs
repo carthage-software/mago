@@ -3435,6 +3435,7 @@ test_case!(static_iterable_parameter_resolves_to_receiver);
 test_case!(static_template_argument_resolves_to_subclass);
 test_case!(unsealed_shape_unknown_key_uses_fallback);
 test_case!(loop_counter_literals_are_widened);
+test_case!(global_import_of_unset_variable_is_nullable);
 
 #[test]
 #[cfg_attr(miri, ignore)]
