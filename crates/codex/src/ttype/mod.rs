@@ -356,6 +356,24 @@ pub fn get_int() -> TUnion {
     TUnion::from_single(Cow::Borrowed(INT_ATOMIC))
 }
 
+/// PHP stores a decimal integer string key such as `'12'` as the integer `12`, so a
+/// non-literal `numeric-string` key may also be an `int`.
+#[must_use]
+pub fn widen_numeric_string_key(key: &TUnion) -> Option<TUnion> {
+    let has_numeric_string = key.types.iter().any(|atomic| {
+        matches!(atomic, TAtomic::Scalar(TScalar::String(string)) if string.is_numeric && string.literal.is_none())
+    });
+
+    if !has_numeric_string || key.types.contains(INT_ATOMIC) {
+        return None;
+    }
+
+    let mut types = key.types.to_vec();
+    types.push(INT_ATOMIC.clone());
+
+    Some(key.clone_with_types(types))
+}
+
 #[inline]
 #[must_use]
 pub fn get_positive_int() -> TUnion {

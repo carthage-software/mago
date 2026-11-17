@@ -31,6 +31,7 @@ use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::union::TUnion;
+use mago_codex::ttype::widen_numeric_string_key;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -252,7 +253,7 @@ where
 
                             get_arraykey()
                         } else {
-                            item_key_type.into_owned()
+                            widen_numeric_string_key(&item_key_type).unwrap_or_else(|| item_key_type.into_owned())
                         };
 
                         let item_key_value =

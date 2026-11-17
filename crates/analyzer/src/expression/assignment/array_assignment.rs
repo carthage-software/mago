@@ -26,6 +26,7 @@ use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_non_negative_int;
 use mago_codex::ttype::union::TUnion;
+use mago_codex::ttype::widen_numeric_string_key;
 use mago_codex::ttype::wrap_atomic;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -278,7 +279,7 @@ fn normalize_key_type(key_type: &Rc<TUnion>) -> Rc<TUnion> {
 
         Rc::new(if types.is_empty() { get_arraykey() } else { TUnion::from_vec(types) })
     } else {
-        Rc::clone(key_type)
+        widen_numeric_string_key(key_type).map_or_else(|| Rc::clone(key_type), Rc::new)
     }
 }
 
