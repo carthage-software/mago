@@ -3410,6 +3410,7 @@ test_case!(issue_2734);
 test_case!(issue_2742);
 test_case!(issue_2749);
 test_case!(simple_xml_element_child_properties);
+test_case!(explode_negative_limit_may_be_empty);
 
 #[test]
 #[cfg_attr(miri, ignore)]

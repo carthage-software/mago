@@ -1536,7 +1536,7 @@ function strip_tags(string $string, string|array|null $allowed_tags = null): str
 function similar_text(string $string1, string $string2, &$percent = null): int {}
 
 /**
- * @return non-empty-list<string>
+ * @return ($limit is int<0, max> ? non-empty-list<string> : list<string>)
  *
  * @pure
  */
