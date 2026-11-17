@@ -62,7 +62,14 @@ fn merge_short_circuited_assignments<'ctx, A>(
 
         let Some(left_type) = left_locals.get(var_id) else {
             if block_context.if_body_context.is_none() {
-                block_context.locals.insert(*var_id, Rc::clone(right_type));
+                if block_context.flags.inside_conditional() || block_context.flags.inside_loop_expressions() {
+                    block_context.locals.insert(*var_id, Rc::clone(right_type));
+                } else {
+                    let mut right_type = (**right_type).clone();
+                    right_type.set_possibly_undefined(true, None);
+                    block_context.locals.insert(*var_id, Rc::new(right_type));
+                    block_context.possibly_undefined_variable_ids.insert(*var_id);
+                }
             }
 
             continue;

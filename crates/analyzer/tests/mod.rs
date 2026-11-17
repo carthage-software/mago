@@ -3430,6 +3430,7 @@ test_case!(stored_condition_survives_base_narrowing);
 test_case!(numeric_string_array_key_may_be_int);
 test_case!(unpacking_into_fixed_parameters_is_checked);
 test_case!(prefix_increment_in_condition_narrows);
+test_case!(short_circuit_assignment_is_possibly_undefined);
 
 #[test]
 #[cfg_attr(miri, ignore)]
