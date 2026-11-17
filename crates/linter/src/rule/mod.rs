@@ -400,6 +400,7 @@ define_rules! {
     PreferPreIncrement(prefer_pre_increment @ PreferPreIncrementRule),
     PreferSelfReturnType(prefer_self_return_type @ PreferSelfReturnTypeRule),
     PreferSelf(prefer_self @ PreferSelfRule),
+    PreferNullCoalescing(prefer_null_coalescing @ PreferNullCoalescingRule),
     PreferNullCoalescingAssignment(prefer_null_coalescing_assignment @ PreferNullCoalescingAssignmentRule),
     SwitchContinueToBreak(switch_continue_to_break @ SwitchContinueToBreakRule),
     MissingDocs(missing_docs @ MissingDocsRule),

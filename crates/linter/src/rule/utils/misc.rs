@@ -2,6 +2,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::Access;
 use mago_syntax::cst::Block;
+use mago_syntax::cst::ClassLikeMemberSelector;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Method;
 use mago_syntax::cst::MethodBody;
@@ -150,4 +151,25 @@ pub fn statement_list_of<'ast, 'arena>(node: Node<'ast, 'arena>) -> Option<&'ast
         Node::IfColonDelimitedBodyElseClause(node) => node.statements.as_slice(),
         _ => return None,
     })
+}
+
+/// Whether evaluating the expression twice reads the same target without side effects.
+pub fn is_plain_reference(expression: &Expression<'_>) -> bool {
+    match expression {
+        Expression::Variable(Variable::Direct(_)) => true,
+        Expression::Access(Access::Property(access)) => {
+            matches!(access.property, ClassLikeMemberSelector::Identifier(_)) && is_plain_reference(access.object)
+        }
+        Expression::Access(Access::StaticProperty(access)) => {
+            matches!(
+                access.class,
+                Expression::Identifier(_) | Expression::Self_(_) | Expression::Static(_) | Expression::Parent(_)
+            ) && matches!(access.property, Variable::Direct(_))
+        }
+        Expression::ArrayAccess(access) => {
+            matches!(access.index, Expression::Literal(_) | Expression::Variable(Variable::Direct(_)))
+                && is_plain_reference(access.array)
+        }
+        _ => false,
+    }
 }
