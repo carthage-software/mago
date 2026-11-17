@@ -878,42 +878,40 @@ class ArrayObject implements IteratorAggregate, ArrayAccess, Serializable, Count
     public function setFlags($flags) {}
 
     /**
-     * @return void
-     */
-    /**
      * @param int $flags
+     *
+     * @return true
      */
     public function asort($flags = 0) {}
 
     /**
-     * @return void
-     */
-    /**
      * @param int $flags
+     *
+     * @return true
      */
     public function ksort($flags = 0) {}
 
     /**
      * @param (callable(V, V): int) $callback
      *
-     * @return void
+     * @return true
      */
     public function uasort($callback) {}
 
     /**
      * @param (callable(K, K):int) $callback
      *
-     * @return void
+     * @return true
      */
     public function uksort($callback) {}
 
     /**
-     * @return void
+     * @return true
      */
     public function natsort() {}
 
     /**
-     * @return void
+     * @return true
      */
     public function natcasesort() {}
 
@@ -1038,42 +1036,40 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
     public function setFlags($flags) {}
 
     /**
-     * @return void
-     */
-    /**
      * @param int $flags
+     *
+     * @return true
      */
     public function asort($flags = 0) {}
 
     /**
-     * @return void
-     */
-    /**
      * @param int $flags
+     *
+     * @return true
      */
     public function ksort($flags = 0) {}
 
     /**
      * @param (callable(V,V): int) $callback
      *
-     * @return void
+     * @return true
      */
     public function uasort($callback) {}
 
     /**
      * @param (callable(K,K): int) $callback
      *
-     * @return void
+     * @return true
      */
     public function uksort($callback) {}
 
     /**
-     * @return void
+     * @return true
      */
     public function natsort() {}
 
     /**
-     * @return void
+     * @return true
      */
     public function natcasesort() {}
 
