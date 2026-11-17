@@ -3438,6 +3438,7 @@ test_case!(loop_counter_literals_are_widened);
 test_case!(global_import_of_unset_variable_is_nullable);
 test_case!(reference_to_typed_property_is_constrained);
 test_case!(stored_type_flag_survives_loop_array_writes);
+test_case!(excluded_offset_value_is_not_rechecked);
 
 #[test]
 #[cfg_attr(miri, ignore)]

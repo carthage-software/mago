@@ -427,11 +427,18 @@ impl<'ctx> BlockContext<'ctx> {
         (included_clauses, rejected_clauses)
     }
 
+    /// Like [`Self::remove_reconciled_clause_refs`], but keeps the clauses that link several
+    /// variables, such as a flag stored from a condition: the new types do not express them.
     pub(crate) fn partition_unreconciled_clauses(
-        clauses: &[Rc<Clause>],
+        clauses: &Vec<Rc<Clause>>,
         changed_var_ids: &WordSet,
     ) -> (Vec<Rc<Clause>>, Vec<Rc<Clause>>) {
-        clauses.iter().cloned().partition(|clause| !Self::is_reconciled_clause(clause, changed_var_ids))
+        let (mut included, rejected) = Self::remove_reconciled_clause_refs(clauses, changed_var_ids);
+        let (linked, rejected): (Vec<_>, Vec<_>) =
+            rejected.into_iter().partition(|clause| clause.possibilities.len() > 1);
+        included.extend(linked);
+
+        (included, rejected)
     }
 
     pub(crate) fn retain_unreconciled_clauses(clauses: &mut Vec<Rc<Clause>>, changed_var_ids: &WordSet) {
