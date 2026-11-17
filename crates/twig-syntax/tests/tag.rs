@@ -149,6 +149,11 @@ fn tag_block_closing_name_must_match() {
 }
 
 #[test]
+fn tag_block_keyword_closing_name() {
+    parses("{% block not %}body{% endblock not %}");
+}
+
+#[test]
 fn tag_block_mismatched_closing_name_rejected() {
     crate::common::rejects("{% block main %}body{% endblock other %}");
 }
@@ -271,6 +276,11 @@ fn tag_macro_default_args() {
 #[test]
 fn tag_macro_endmacro_with_name() {
     parses("{% macro foo(a) %}x{% endmacro foo %}");
+}
+
+#[test]
+fn tag_macro_keyword_closing_name() {
+    parses("{% macro in() %}x{% endmacro in %}");
 }
 
 #[test]

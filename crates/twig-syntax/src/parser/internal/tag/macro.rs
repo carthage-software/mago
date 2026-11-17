@@ -40,18 +40,12 @@ where
             });
         }
         let end_keyword = self.keyword_from(&end_kw_tok);
-        let end_name = if let Some(closing_tok) = self.stream.try_consume(TwigTokenKind::Name)? {
-            if closing_tok.value != name.value {
-                return Err(ParseError::MismatchedEndTag {
-                    expected: name.value,
-                    got: closing_tok.value,
-                    span: self.stream.span_of(&closing_tok),
-                });
-            }
-            Some(self.identifier_from(&closing_tok))
-        } else {
-            None
-        };
+        let end_name = self.try_flexible_identifier()?;
+        if let Some(closing) = end_name
+            && closing.value != name.value
+        {
+            return Err(ParseError::MismatchedEndTag { expected: name.value, got: closing.value, span: closing.span });
+        }
         let end_close_tag = self.stream.expect_block_end()?;
 
         Ok(Statement::Macro(Macro {

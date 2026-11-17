@@ -99,9 +99,15 @@ impl LintRule for EndBlockNameRule {
 
         let end = BytesDisplay(end_keyword.value);
         let named = BytesDisplay(name.value);
-        let mut replacement = Vec::with_capacity(name.value.len() + 1);
+        let offset = end_keyword.span.end_offset();
+        let mut replacement = Vec::with_capacity(name.value.len() + 2);
         replacement.push(b' ');
         replacement.extend_from_slice(name.value);
+        if name.value.iter().any(|byte| !(byte.is_ascii_alphanumeric() || *byte == b'_' || *byte >= 0x80))
+            && !ctx.source_file.contents.get(offset as usize).is_some_and(u8::is_ascii_whitespace)
+        {
+            replacement.push(b' ');
+        }
 
         ctx.collector.propose(
             Issue::new(self.cfg.level, format!("Add the {kind} name to this `{end}` tag."))
@@ -112,7 +118,7 @@ impl LintRule for EndBlockNameRule {
                     "A named closing tag shows which {kind} it closes, so long templates read without scrolling back up.",
                 ))
                 .with_help(format!("Write `{{% {end} {named} %}}` instead of `{{% {end} %}}`.")),
-            |edits| edits.push(TextEdit::insert(end_keyword.span.end_offset(), replacement)),
+            |edits| edits.push(TextEdit::insert(offset, replacement)),
         );
     }
 }
@@ -168,5 +174,12 @@ mod tests {
         rule = EndBlockNameRule,
         code = r"{% macro input() %}{% endmacro %}",
         fixed = r"{% macro input() %}{% endmacro input %}",
+    }
+
+    test_lint_fix! {
+        name = operator_block_name_is_added,
+        rule = EndBlockNameRule,
+        code = r"{%block ends with %}x{%endblock%}{%block b-and %}y{%endblock-%}",
+        fixed = r"{%block ends with %}x{%endblock ends with %}{%block b-and %}y{%endblock b-and -%}",
     }
 }

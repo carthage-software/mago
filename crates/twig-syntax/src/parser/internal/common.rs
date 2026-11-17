@@ -49,6 +49,18 @@ where
         }
     }
 
+    /// Optionally consume a token [`Self::expect_flexible_identifier`] accepts.
+    #[inline]
+    pub(crate) fn try_flexible_identifier(&mut self) -> Result<Option<Identifier<'arena>>, ParseError<'arena>> {
+        match self.stream.lookahead(0)? {
+            Some(token) if token.kind == TwigTokenKind::Name || is_keyword_usable_as_name(token.kind) => {
+                self.stream.consume()?;
+                Ok(Some(self.identifier_from(&token)))
+            }
+            _ => Ok(None),
+        }
+    }
+
     /// Optionally consume a `Name` token with a specific literal value
     /// (e.g. `"with"`, `"only"`, `"as"`) and return it as a keyword.
     #[inline]
