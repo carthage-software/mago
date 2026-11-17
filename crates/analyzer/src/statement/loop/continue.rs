@@ -153,6 +153,24 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
 
             loop_scope.final_actions.insert(ControlAction::Continue);
 
+            if loop_scope.iteration_count == 0 {
+                let defined_here = block_context
+                    .locals
+                    .iter()
+                    .filter(|(var_id, var_type)| {
+                        !loop_scope.parent_context_variables.contains_key(*var_id) && !var_type.possibly_undefined()
+                    })
+                    .map(|(var_id, _)| *var_id)
+                    .collect::<WordSet>();
+
+                match loop_scope.variables_defined_at_every_continue.as_mut() {
+                    Some(defined_at_every_continue) => {
+                        defined_at_every_continue.retain(|var_id| defined_here.contains(var_id))
+                    }
+                    None => loop_scope.variables_defined_at_every_continue = Some(defined_here),
+                }
+            }
+
             for (variable_id, variable_type) in &block_context.locals {
                 if loop_scope.parent_context_variables.contains_key(variable_id)
                     || variable_id.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':'))

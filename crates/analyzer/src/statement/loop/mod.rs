@@ -318,6 +318,29 @@ fn inherit_loop_block_context<'ctx, A>(
                             ))
                         },
                     );
+                } else if !has_break && !loop_scope.parent_context_variables.contains_key(&variable) {
+                    let variable_type = match loop_scope.possibly_defined_loop_variables.get(&variable) {
+                        Some(continue_type) => Rc::new(ttype::combine_union_types(
+                            &variable_type,
+                            continue_type,
+                            context.codebase,
+                            CombinerOptions::default(),
+                        )),
+                        None => variable_type,
+                    };
+
+                    if loop_scope
+                        .variables_defined_at_every_continue
+                        .as_ref()
+                        .is_some_and(|defined_at_every_continue| defined_at_every_continue.contains(&variable))
+                    {
+                        block_context.locals.insert(variable, variable_type);
+                    } else {
+                        let mut variable_type = Rc::unwrap_or_clone(variable_type);
+                        variable_type.set_possibly_undefined(true, None);
+                        block_context.locals.insert(variable, Rc::new(variable_type));
+                        block_context.possibly_undefined_variable_ids.insert(variable);
+                    }
                 }
             }
         }
