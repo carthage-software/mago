@@ -25,6 +25,7 @@ use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
 use mago_codex::ttype::combiner::CombinerOptions;
+use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
@@ -1826,14 +1827,24 @@ fn validate_unpacked_argument_elements<'ctx, 'arena, A>(
                                 base_parameter_type,
                             );
 
-                            verify_argument_type(
-                                context,
-                                element_type,
-                                &final_parameter_type,
-                                parameter_position,
-                                argument_expression,
-                                invocation_target,
-                            );
+                            if list.known_count.is_some()
+                                || !union_comparator::can_expression_types_be_identical(
+                                    context.codebase,
+                                    element_type,
+                                    &final_parameter_type,
+                                    false,
+                                    false,
+                                )
+                            {
+                                verify_argument_type(
+                                    context,
+                                    element_type,
+                                    &final_parameter_type,
+                                    parameter_position,
+                                    argument_expression,
+                                    invocation_target,
+                                );
+                            }
                         }
                     }
                 }

@@ -34,3 +34,11 @@ function unpack_int_list(array $values): void
 {
     take_two_ints(...$values);
 }
+
+/**
+ * @param list<int|string> $values
+ */
+function unpack_mixed_list(array $values): void
+{
+    take_two_ints(...$values);
+}
