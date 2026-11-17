@@ -3416,6 +3416,7 @@ test_case!(curl_share_init_persistent_signature);
 test_case!(native_return_type_disjoint_from_parent_docblock);
 test_case!(property_hook_bodies_are_checked);
 test_case!(parent_property_hook_call);
+test_case!(int_cast_keeps_int_range);
 
 #[test]
 #[cfg_attr(miri, ignore)]

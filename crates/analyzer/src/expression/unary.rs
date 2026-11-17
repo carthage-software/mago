@@ -1750,12 +1750,7 @@ where
                         TAtomic::Scalar(TScalar::literal_int(1))
                     }
                 },
-                TScalar::Integer(int_scalar) => match int_scalar.get_literal_value() {
-                    Some(i) => TAtomic::Scalar(TScalar::literal_int(i)),
-                    None => {
-                        return get_int();
-                    }
-                },
+                TScalar::Integer(int_scalar) => TAtomic::Scalar(TScalar::Integer(*int_scalar)),
                 TScalar::Float(float_scalar) => match float_scalar {
                     TFloat::Literal(f) => {
                         if f.is_nan() {
