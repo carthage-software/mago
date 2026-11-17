@@ -776,6 +776,7 @@ where
             variables.always.into_iter().chain(variables.sometimes).collect()
         };
         let unseeded_variables = get_unseeded_variables(statements, pre_conditions, &post_expressions);
+        let mut previous_pass_types: WordMap<Rc<TUnion>> = WordMap::default();
         while i <= assignment_depth {
             let previous_output = previous_input
                 .as_ref()
@@ -851,6 +852,24 @@ where
 
                         // if there's a change, invalidate related clauses
                         pre_loop_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
+                    }
+
+                    if let Some(current_type) = continue_context.locals.get(&variable_id).cloned() {
+                        let current_type = match previous_pass_types.get(&variable_id) {
+                            Some(previous_type) if !Rc::ptr_eq(previous_type, &current_type) => {
+                                match widen_growing_integers(&current_type, previous_type) {
+                                    Some(widened) => {
+                                        let widened = Rc::new(widened);
+                                        continue_context.locals.insert(variable_id, Rc::clone(&widened));
+                                        widened
+                                    }
+                                    None => current_type,
+                                }
+                            }
+                            _ => current_type,
+                        };
+
+                        previous_pass_types.insert(variable_id, current_type);
                     }
 
                     // Include widened types from by-reference mutations so they
@@ -2534,6 +2553,78 @@ where
     // every atomic in the iterator type is iterable; no diagnostic needed
 
     Ok((always_enters_loop, key_type.unwrap_or_else(get_mixed), value_type.unwrap_or_else(get_mixed)))
+}
+
+/// Opens an integer bound that grew between two loop passes, so a counter does not end up as a
+/// finite set of literals. Array values are widened the same way.
+fn widen_growing_integers(current: &TUnion, previous: &TUnion) -> Option<TUnion> {
+    fn bounds<'union>(atomics: impl Iterator<Item = &'union TAtomic>) -> Option<(Option<i64>, Option<i64>)> {
+        let mut result: Option<(Option<i64>, Option<i64>)> = None;
+        for atomic in atomics {
+            let TAtomic::Scalar(TScalar::Integer(integer)) = atomic else {
+                continue;
+            };
+
+            let (lower, upper) = integer.get_bounds();
+            result = Some(match result {
+                None => (lower, upper),
+                Some((previous_lower, previous_upper)) => {
+                    (previous_lower.zip(lower).map(|(a, b)| a.min(b)), previous_upper.zip(upper).map(|(a, b)| a.max(b)))
+                }
+            });
+        }
+
+        result
+    }
+
+    let mut changed = false;
+    let mut types = Vec::with_capacity(current.types.len());
+
+    if let (Some((lower, upper)), Some((previous_lower, previous_upper))) =
+        (bounds(current.types.iter()), bounds(previous.types.iter()))
+        && current.types.iter().filter(|atomic| atomic.is_int()).count() > 1
+    {
+        let new_lower = if previous_lower.zip(lower).is_some_and(|(p, c)| c < p) { None } else { lower };
+        let new_upper = if previous_upper.zip(upper).is_some_and(|(p, c)| c > p) { None } else { upper };
+        if new_lower != lower || new_upper != upper {
+            changed = true;
+            types.push(TAtomic::Scalar(TScalar::Integer(TInteger::from_bounds(new_lower, new_upper))));
+        }
+    }
+
+    let previous_value = previous.types.iter().find_map(|atomic| match atomic {
+        TAtomic::Array(TArray::Keyed(keyed)) => keyed.parameters.as_ref().map(|(_, value)| value.as_ref()),
+        TAtomic::Array(TArray::List(list)) => Some(list.element_type.as_ref()),
+        _ => None,
+    });
+
+    for atomic in current.types.iter() {
+        if changed && atomic.is_int() {
+            continue;
+        }
+
+        let widened = previous_value.and_then(|previous_value| match atomic {
+            TAtomic::Array(TArray::Keyed(keyed)) => {
+                let (key, value) = keyed.parameters.as_ref()?;
+                let widened_value = widen_growing_integers(value, previous_value)?;
+                let mut keyed = keyed.clone();
+                keyed.parameters = Some((Arc::clone(key), Arc::new(widened_value)));
+                Some(TAtomic::Array(TArray::Keyed(keyed)))
+            }
+            TAtomic::Array(TArray::List(list)) => {
+                let widened_value = widen_growing_integers(&list.element_type, previous_value)?;
+                let mut list = list.clone();
+                list.element_type = Arc::new(widened_value);
+                Some(TAtomic::Array(TArray::List(list)))
+            }
+            _ => None,
+        });
+
+        changed |= widened.is_some();
+        types.push(widened.unwrap_or_else(|| atomic.clone()));
+    }
+
+    changed.then(|| current.clone_with_types(types))
 }
 
 fn combine_loop_types(
