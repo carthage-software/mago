@@ -1104,6 +1104,10 @@ where
                             })
                             .unwrap_or(0);
                         number_of_provided_parameters += unpacked_count;
+                        if !argument_value_type.types.iter().all(TAtomic::is_array) {
+                            get_unpacked_argument_type(context, &argument_value_type, argument_expression.span());
+                        }
+
                         let target_name_str = invocation.target.guess_name(context);
 
                         validate_unpacked_argument_elements(
@@ -1795,7 +1799,7 @@ fn validate_unpacked_argument_elements<'ctx, 'arena, A>(
                     }
                 } else {
                     let element_type = list.get_element_type();
-                    let min_size = list.known_count.unwrap_or(0);
+                    let min_size = list.known_count.unwrap_or(usize::MAX);
                     let max_parameters_to_check = std::cmp::min(
                         min_size,
                         invocation_target.parameter_count().saturating_sub(starting_parameter_position),

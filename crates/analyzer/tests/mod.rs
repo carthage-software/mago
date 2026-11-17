@@ -3428,6 +3428,7 @@ test_case!(always_entered_loop_with_continue_keeps_variables);
 test_case!(always_entered_loop_that_returns_needs_no_return);
 test_case!(stored_condition_survives_base_narrowing);
 test_case!(numeric_string_array_key_may_be_int);
+test_case!(unpacking_into_fixed_parameters_is_checked);
 
 #[test]
 #[cfg_attr(miri, ignore)]
