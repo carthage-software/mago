@@ -3440,6 +3440,7 @@ test_case!(reference_to_typed_property_is_constrained);
 test_case!(stored_type_flag_survives_loop_array_writes);
 test_case!(excluded_offset_value_is_not_rechecked);
 test_case!(array_merge_with_mixed_argument);
+test_case!(reference_to_property_of_mixed_reports_once);
 
 #[test]
 #[cfg_attr(miri, ignore)]

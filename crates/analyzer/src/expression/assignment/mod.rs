@@ -524,7 +524,10 @@ where
         Expression::ArrayAccess(array_access) => {
             artifacts.get_expression_type(array_access.array).is_some_and(|ty| !ty.has_object_type())
         }
-        Expression::Access(Access::Property(_) | Access::StaticProperty(_)) => true,
+        Expression::Access(Access::Property(property_access)) => artifacts
+            .get_expression_type(property_access.object)
+            .is_some_and(|object_type| object_type.types.iter().all(TAtomic::is_object_type)),
+        Expression::Access(Access::StaticProperty(_)) => true,
         _ => false,
     };
 
