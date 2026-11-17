@@ -45,3 +45,36 @@ function literal_union_counter(bool $odd): void
         echo 'twelve';
     }
 }
+
+/**
+ * @param list<string> $words
+ */
+function built_string(array $words): void
+{
+    $built = '';
+    foreach ($words as $_) {
+        $built .= 'x';
+    }
+
+    if ($built === 'xxxx') {
+        echo 'four words';
+    }
+}
+
+/**
+ * @param list<string> $words
+ */
+function string_state(array $words): void
+{
+    $state = 'a';
+    foreach ($words as $word) {
+        if ($word === 'go') {
+            $state = 'b';
+        }
+    }
+
+    /** @mago-expect analysis:redundant-comparison,impossible-condition */
+    if ($state === 'c') {
+        echo 'never';
+    }
+}

@@ -28,6 +28,7 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
+use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combine_union_types_preserving_array_shapes;
 use mago_codex::ttype::combine_union_types_rc;
@@ -2555,8 +2556,9 @@ where
     Ok((always_enters_loop, key_type.unwrap_or_else(get_mixed), value_type.unwrap_or_else(get_mixed)))
 }
 
-/// Opens an integer bound that grew between two loop passes, so a counter does not end up as a
-/// finite set of literals. Array values are widened the same way.
+/// Opens an integer bound that grew between two loop passes, and generalises string literals that
+/// keep growing, so a counter or a built string does not end up as a finite set of literals.
+/// Array values are widened the same way.
 fn widen_growing_integers(current: &TUnion, previous: &TUnion) -> Option<TUnion> {
     fn bounds<'union>(atomics: impl Iterator<Item = &'union TAtomic>) -> Option<(Option<i64>, Option<i64>)> {
         let mut result: Option<(Option<i64>, Option<i64>)> = None;
@@ -2578,6 +2580,7 @@ fn widen_growing_integers(current: &TUnion, previous: &TUnion) -> Option<TUnion>
     }
 
     let mut changed = false;
+    let mut widen_ints = false;
     let mut types = Vec::with_capacity(current.types.len());
 
     if let (Some((lower, upper)), Some((previous_lower, previous_upper))) =
@@ -2588,8 +2591,30 @@ fn widen_growing_integers(current: &TUnion, previous: &TUnion) -> Option<TUnion>
         let new_upper = if previous_upper.zip(upper).is_some_and(|(p, c)| c > p) { None } else { upper };
         if new_lower != lower || new_upper != upper {
             changed = true;
+            widen_ints = true;
             types.push(TAtomic::Scalar(TScalar::Integer(TInteger::from_bounds(new_lower, new_upper))));
         }
+    }
+
+    let literal_strings = |union: &TUnion| -> Vec<Word> {
+        union
+            .types
+            .iter()
+            .filter_map(|atomic| match atomic {
+                TAtomic::Scalar(TScalar::String(string)) => string.get_known_literal_value().map(word),
+                _ => None,
+            })
+            .collect()
+    };
+
+    let current_strings = literal_strings(current);
+    let previous_strings = literal_strings(previous);
+    let widen_strings = current_strings.len() > 1
+        && !previous_strings.is_empty()
+        && current_strings.iter().any(|literal| !previous_strings.contains(literal));
+    if widen_strings {
+        changed = true;
+        types.push(TAtomic::Scalar(TScalar::String(TString::general())));
     }
 
     let previous_value = previous.types.iter().find_map(|atomic| match atomic {
@@ -2599,7 +2624,10 @@ fn widen_growing_integers(current: &TUnion, previous: &TUnion) -> Option<TUnion>
     });
 
     for atomic in current.types.iter() {
-        if changed && atomic.is_int() {
+        if (widen_ints && atomic.is_int())
+            || (widen_strings
+                && matches!(atomic, TAtomic::Scalar(TScalar::String(string)) if string.get_known_literal_value().is_some()))
+        {
             continue;
         }
 
