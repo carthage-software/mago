@@ -98,7 +98,16 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
                 Cow::Borrowed(argument_type)
             };
 
-            let iterable = argument_type.get_single();
+            let mixed_array;
+            let iterable = if argument_type.get_single().is_mixed() {
+                mixed_array = TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
+                    Arc::new(get_arraykey()),
+                    Arc::new(get_mixed()),
+                )));
+                &mixed_array
+            } else {
+                argument_type.get_single()
+            };
 
             if let TAtomic::Array(array) = iterable {
                 match array {
