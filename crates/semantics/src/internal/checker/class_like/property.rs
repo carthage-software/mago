@@ -8,6 +8,7 @@ use mago_syntax::cst::Modifier;
 use mago_syntax::cst::ModifierSequenceExt;
 use mago_syntax::cst::Property;
 use mago_syntax::cst::PropertyHookBody;
+use mago_syntax::cst::PropertyHookConcreteBody;
 use mago_syntax::cst::PropertyItem;
 use mago_syntax::cst::Sequence;
 
@@ -833,6 +834,35 @@ pub fn check_property(
                                     .with_message(format!("{class_like_kind} `{class_like_fqcn}` defined here.")),
                             ),
                     );
+                }
+
+                if let PropertyHookBody::Concrete(PropertyHookConcreteBody::Block(block)) = &hook.body
+                    && (lowered_name == b"set" || (lowered_name == b"get" && hooked_property.hint.is_some()))
+                {
+                    let is_set = lowered_name == b"set";
+                    for r#return in mago_syntax::utils::find_returns_in_block(block) {
+                        if is_set != r#return.value.is_some() {
+                            continue;
+                        }
+
+                        let (message, help) = if is_set {
+                            ("must not return a value", "Remove the return value.")
+                        } else {
+                            ("must return a value", "Return a value of the property type.")
+                        };
+
+                        context.report(
+                            Issue::error(format!(
+                                "Hook `{name}` of property `{class_like_name}::{item_name}` {message}."
+                            ))
+                            .with_annotation(Annotation::primary(r#return.span()))
+                            .with_annotation(
+                                Annotation::secondary(hook.name.span())
+                                    .with_message(format!("Hook `{name}` is declared here.")),
+                            )
+                            .with_help(help),
+                        );
+                    }
                 }
 
                 if let Some(parameter_list) = &hook.parameter_list {
