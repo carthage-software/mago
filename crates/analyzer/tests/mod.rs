@@ -3420,6 +3420,7 @@ test_case!(int_cast_keeps_int_range);
 test_case!(strlen_equality_narrows_non_empty_string);
 test_case!(ldap_free_result_returns_true);
 test_case!(by_reference_out_type_survives_call);
+test_case!(closure_implicit_null_return);
 
 #[test]
 #[cfg_attr(miri, ignore)]

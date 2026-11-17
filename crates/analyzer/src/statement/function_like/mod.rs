@@ -167,7 +167,13 @@ where
                 ));
             }
 
-            if let Some(inferred_return_type) = inferred_return_type {
+            if let Some(mut inferred_return_type) = inferred_return_type {
+                if function_metadata.return_type_metadata.is_none()
+                    && (!inner_has_returned || inner_artifacts.has_bare_return)
+                {
+                    inferred_return_type = inferred_return_type.as_nullable();
+                }
+
                 let fits_declared = function_metadata.return_type_metadata.is_none()
                     || signature.return_type.as_deref().is_none_or(|declared| {
                         union_comparator::is_contained_by(
