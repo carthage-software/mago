@@ -1886,7 +1886,14 @@ pub fn get_specialized_template_type(
         }
     }
 
-    expander::expand_union(codebase, &mut template_type, &TypeExpansionOptions::default());
+    expander::expand_union(
+        codebase,
+        &mut template_type,
+        &TypeExpansionOptions {
+            static_class_type: StaticClassType::Name(instantiated_class_metadata.original_name),
+            ..Default::default()
+        },
+    );
 
     Some(template_type)
 }
