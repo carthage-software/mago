@@ -3421,6 +3421,7 @@ test_case!(strlen_equality_narrows_non_empty_string);
 test_case!(ldap_free_result_returns_true);
 test_case!(by_reference_out_type_survives_call);
 test_case!(closure_implicit_null_return);
+test_case!(array_key_exists_narrows_the_array);
 
 #[test]
 #[cfg_attr(miri, ignore)]

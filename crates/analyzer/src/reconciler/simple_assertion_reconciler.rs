@@ -2150,6 +2150,14 @@ where
         return get_never();
     }
 
+    for atomic in new_var_type.types.to_mut() {
+        match atomic {
+            TAtomic::Array(TArray::Keyed(array)) => array.non_empty = true,
+            TAtomic::Array(TArray::List(list)) => list.non_empty = true,
+            _ => {}
+        }
+    }
+
     new_var_type
 }
 
@@ -2297,7 +2305,10 @@ where
             }
             TAtomic::Mixed(_) => {
                 did_remove_type = true;
-                acceptable_types.push(atomic);
+                let mut array = TKeyedArray::new_with_parameters(Arc::new(get_arraykey()), Arc::new(get_mixed()));
+                array.non_empty = true;
+                array.known_items = Some(BTreeMap::from([(key_name, (false, get_mixed()))]).into());
+                acceptable_types.push(TAtomic::Array(TArray::Keyed(array)));
             }
             TAtomic::Object(TObject::Named(_)) => {
                 did_remove_type = true;

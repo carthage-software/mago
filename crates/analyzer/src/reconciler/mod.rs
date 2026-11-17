@@ -977,7 +977,7 @@ fn add_nested_assertions(
         .filter(|(key, assertions)| {
             let bytes = key.as_bytes();
             (bytes.contains(&b'[') || memchr::memmem::find(bytes, b"->").is_some())
-                && matches!(assertions[0][0], Assertion::IsEqualIsset | Assertion::IsIsset)
+                && matches!(assertions[0][0], Assertion::IsEqualIsset | Assertion::IsIsset | Assertion::ArrayKeyExists)
         })
         .map(|(key, assertions)| {
             let only_isset_assertions = assertions.iter().all(|clause| {
