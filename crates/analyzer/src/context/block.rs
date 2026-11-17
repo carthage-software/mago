@@ -45,6 +45,7 @@ pub enum ReferenceConstraintSource {
     Static,
     Parameter,
     Argument,
+    Property,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -840,6 +841,7 @@ impl std::fmt::Display for ReferenceConstraintSource {
             ReferenceConstraintSource::Static => write!(f, "static"),
             ReferenceConstraintSource::Parameter => write!(f, "parameter"),
             ReferenceConstraintSource::Argument => write!(f, "argument"),
+            ReferenceConstraintSource::Property => write!(f, "property"),
         }
     }
 }

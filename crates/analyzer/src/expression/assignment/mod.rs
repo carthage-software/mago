@@ -13,6 +13,7 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner::CombinerOptions;
@@ -36,8 +37,10 @@ use mago_syntax::cst::AssignmentOperator;
 use mago_syntax::cst::Binary;
 use mago_syntax::cst::BinaryOperator;
 use mago_syntax::cst::Call;
+use mago_syntax::cst::ClassLikeMemberSelector;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::List;
+use mago_syntax::cst::StaticPropertyAccess;
 use mago_syntax::cst::UnaryPrefix;
 use mago_syntax::cst::UnaryPrefixOperator;
 use mago_syntax::cst::Variable;
@@ -51,6 +54,7 @@ use crate::artifacts::CheckpointAction;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::context::block::ReferenceConstraint;
 use crate::context::block::ReferenceConstraintSource;
 use crate::context::scope::var_has_root;
 use crate::context::scope::var_references_dynamic;
@@ -553,6 +557,18 @@ where
 
     block_context.locals.entry(referenced_variable_id).or_insert_with(|| Rc::clone(source_type));
 
+    block_context.by_reference_constraints.remove(&target_variable_id);
+    if let Some(property_type) = get_referenced_property_native_type(context, artifacts, referenced_expression) {
+        block_context.by_reference_constraints.insert(
+            target_variable_id,
+            ReferenceConstraint::new(
+                referenced_expression.span(),
+                ReferenceConstraintSource::Property,
+                Some(Rc::new(property_type)),
+            ),
+        );
+    }
+
     if block_context.references_in_scope.contains_key(&target_variable_id) {
         block_context.decrement_reference_count(target_variable_id.as_bytes());
     }
@@ -568,6 +584,57 @@ where
     }
 
     Ok(())
+}
+
+/// The native type PHP enforces on a property a reference is bound to, when every class the
+/// object may be declares the same one.
+fn get_referenced_property_native_type<A>(
+    context: &Context<'_, '_, A>,
+    artifacts: &AnalysisArtifacts,
+    referenced_expression: &Expression<'_>,
+) -> Option<TUnion>
+where
+    A: Arena,
+{
+    let (class_names, property_name): (Vec<Word>, &[u8]) = match referenced_expression {
+        Expression::Access(Access::Property(property_access)) => {
+            let ClassLikeMemberSelector::Identifier(property) = &property_access.property else {
+                return None;
+            };
+
+            let object_type = artifacts.get_expression_type(property_access.object)?;
+            let class_names = object_type
+                .types
+                .iter()
+                .map(|atomic| match atomic {
+                    TAtomic::Object(TObject::Named(named)) => Some(named.name),
+                    _ => None,
+                })
+                .collect::<Option<Vec<_>>>()?;
+
+            (class_names, property.value)
+        }
+        Expression::Access(Access::StaticProperty(StaticPropertyAccess {
+            class: Expression::Identifier(class),
+            property: Variable::Direct(property),
+            ..
+        })) => (vec![Word::from(context.resolved_names.get(class))], &property.name[1..]),
+        _ => return None,
+    };
+
+    let mut property_type: Option<TUnion> = None;
+    for class_name in class_names {
+        let property =
+            context.codebase.get_declaring_property(class_name.as_bytes(), &[b"$", property_name].concat())?;
+        let declared = &property.type_declaration_metadata.as_ref()?.type_union;
+        match &property_type {
+            Some(existing) if existing != declared => return None,
+            Some(_) => {}
+            None => property_type = Some(declared.clone()),
+        }
+    }
+
+    property_type.filter(|property_type| !property_type.is_mixed())
 }
 
 pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(
@@ -650,6 +717,21 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(
                     .with_note(
                         "Static variables maintain their state across function calls. Violating the type constraint can cause errors in subsequent calls.",
                     )
+                    .with_help(format!(
+                        "Ensure the assigned value is compatible with the `{constraint_type_str}` type.",
+                    ))
+                },
+                ReferenceConstraintSource::Property => {
+                    Issue::error(format!(
+                        "Invalid assignment to `{variable_id}`, a reference to a typed property.",
+                    ))
+                    .with_annotation(Annotation::primary(primary_error_span).with_message(format!(
+                        "This value of type `{assigned_type_str}` is not compatible with the property type `{constraint_type_str}`.",
+                    )))
+                    .with_annotation(Annotation::secondary(constraint.constraint_span).with_message(
+                        "The reference is bound to this property here.",
+                    ))
+                    .with_note("PHP checks every write through the reference against the property type and throws a `TypeError`.")
                     .with_help(format!(
                         "Ensure the assigned value is compatible with the `{constraint_type_str}` type.",
                     ))
