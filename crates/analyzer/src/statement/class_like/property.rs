@@ -300,9 +300,91 @@ where
     match body {
         PropertyHookConcreteBody::Block(block) => {
             analyze_statements(block.statements.as_slice(), context, &mut hook_block_context, artifacts)?;
+
+            if hook.name.value == b"get"
+                && !hook_block_context.flags.has_returned()
+                && let Some(class_like) = parent_block_context.scope.get_class_like()
+                && let Some(property) = class_like.properties.get(&property_name)
+                && let Some(declaration) = &property.type_declaration_metadata
+            {
+                let property_type = declaration.type_union.get_id();
+
+                context.collector.report_with_code(
+                    IssueCode::MissingReturnStatement,
+                    Issue::error(format!(
+                        "Missing return statement in property hook `{}::{property_name}::get`",
+                        class_like.original_name
+                    ))
+                    .with_annotation(
+                        Annotation::primary(hook.name.span())
+                            .with_message(format!("This hook must return '{property_type}'...")),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(block.span())
+                            .with_message("...but this path can exit without returning a value."),
+                    )
+                    .with_note("PHP throws a `TypeError` when a typed get hook returns nothing.")
+                    .with_help(format!("Return a value of type '{property_type}' on every path.")),
+                );
+            }
         }
         PropertyHookConcreteBody::Expression(expr_body) => {
             expr_body.expression.analyze(context, &mut hook_block_context, artifacts)?;
+
+            if hook.name.value == b"set"
+                && let Some(class_like) = parent_block_context.scope.get_class_like()
+                && let Some(type_metadata) =
+                    class_like.properties.get(&property_name).and_then(|property| property.type_metadata.as_ref())
+                && !type_metadata.type_union.is_mixed()
+                && !type_metadata.type_union.has_template_types()
+                && let Some(value_type) = artifacts.get_expression_type(&expr_body.expression)
+                && !value_type.is_mixed()
+                && !value_type.is_never()
+            {
+                let mut property_type = type_metadata.type_union.clone();
+                expand_union(
+                    context.codebase,
+                    &mut property_type,
+                    &TypeExpansionOptions {
+                        self_class: Some(class_like.original_name),
+                        static_class_type: StaticClassType::Name(class_like.original_name),
+                        ..Default::default()
+                    },
+                );
+
+                let mut comparison_result = ComparisonResult::new();
+                if !union_comparator::is_contained_by(
+                    context.codebase,
+                    value_type,
+                    &property_type,
+                    false,
+                    false,
+                    false,
+                    &mut comparison_result,
+                ) && comparison_result.type_coerced != Some(true)
+                {
+                    let value_type_str = value_type.get_id();
+                    let property_type_str = property_type.get_id();
+
+                    context.collector.report_with_code(
+                        IssueCode::InvalidPropertyAssignmentValue,
+                        Issue::error(format!(
+                            "Invalid type for property `{}::{property_name}`: expected `{property_type_str}`, but got `{value_type_str}`.",
+                            class_like.original_name
+                        ))
+                        .with_annotation(
+                            Annotation::primary(expr_body.expression.span())
+                                .with_message(format!("This expression has type `{value_type_str}`")),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(type_metadata.span)
+                                .with_message(format!("The property is declared with type `{property_type_str}`")),
+                        )
+                        .with_note("The short `set => expression;` form assigns the expression to the property.")
+                        .with_help("Change the expression to match the property's type, or update the property's type."),
+                    );
+                }
+            }
 
             if hook.name.value == b"get" {
                 let value_type = artifacts
