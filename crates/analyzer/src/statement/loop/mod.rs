@@ -1763,7 +1763,15 @@ fn collect_condition_assignments<'ast, 'arena>(
         Expression::Parenthesized(parenthesized) => {
             collect_condition_assignments(parenthesized.expression, assignments)
         }
-        Expression::UnaryPrefix(unary) => collect_condition_assignments(unary.operand, assignments),
+        Expression::UnaryPrefix(unary) => {
+            if matches!(unary.operator, UnaryPrefixOperator::PreIncrement(_) | UnaryPrefixOperator::PreDecrement(_))
+                && let Expression::Variable(Variable::Direct(variable)) = unary.operand
+            {
+                assignments.push((variable, expression));
+            }
+
+            collect_condition_assignments(unary.operand, assignments);
+        }
         Expression::Binary(binary) => {
             collect_condition_assignments(binary.lhs, assignments);
             collect_condition_assignments(binary.rhs, assignments);

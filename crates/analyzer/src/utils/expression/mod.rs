@@ -310,7 +310,13 @@ fn get_extended_expression_id<'ast, 'arena>(
     }
 
     Some(match expression {
-        Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Reference(_), operand }) => {
+        Expression::UnaryPrefix(UnaryPrefix {
+            operator:
+                UnaryPrefixOperator::Reference(_)
+                | UnaryPrefixOperator::PreIncrement(_)
+                | UnaryPrefixOperator::PreDecrement(_),
+            operand,
+        }) => {
             return get_expression_id(operand, this_class_name, resolved_names, codebase);
         }
         Expression::Variable(variable) => word(get_variable_id(variable)?),
