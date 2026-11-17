@@ -89,8 +89,8 @@ pub fn post_invocation_process<'ctx, 'arena, A>(
 where
     A: Arena,
 {
-    update_by_reference_argument_types(context, block_context, artifacts, invoication, template_result, parameters)?;
     clear_object_property_narrowings(context, block_context, invoication, this_variable);
+    update_by_reference_argument_types(context, block_context, artifacts, invoication, template_result, parameters)?;
 
     let Some(identifier) = invoication.target.get_function_like_identifier() else {
         return Ok(());
