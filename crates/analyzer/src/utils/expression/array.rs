@@ -1115,7 +1115,10 @@ where
 
                 if key_exists_in_other_variant {
                     *has_possibly_undefined = true;
-                    if !key_may_exist_in_generic_params {
+                    if !key_may_exist_in_generic_params
+                        || context.settings.strict_array_index_existence
+                        || !context.settings.allow_possibly_undefined_array_keys
+                    {
                         *key_in_other_variant = true;
                     }
                 } else {
@@ -1277,7 +1280,11 @@ where
 
         *has_possibly_undefined = true;
 
-        if (context.settings.strict_array_index_existence || (key_possibly_missing && !has_value_parameter))
+        if (context.settings.strict_array_index_existence
+            || (key_possibly_missing
+                && (!has_value_parameter
+                    || (!context.settings.allow_possibly_undefined_array_keys
+                        && index_type.get_single_array_key().is_some()))))
             && !in_assignment
             && !block_context.flags.inside_isset()
             && !block_context.flags.inside_unset()

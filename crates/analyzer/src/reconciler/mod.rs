@@ -1322,7 +1322,9 @@ where
 
                     let mut new_base_type_candidate;
 
-                    if let TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) = existing_key_type_part {
+                    if let TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, parameters, .. })) =
+                        existing_key_type_part
+                    {
                         if has_empty {
                             return None;
                         }
@@ -1346,8 +1348,10 @@ where
                                 return None;
                             }
 
-                            new_base_type_candidate =
-                                get_iterable_value_parameter(existing_key_type_part, context.codebase)?;
+                            new_base_type_candidate = match parameters {
+                                Some((_, fallback_value)) if resolved_key.is_some() => (**fallback_value).clone(),
+                                _ => get_iterable_value_parameter(existing_key_type_part, context.codebase)?,
+                            };
 
                             if new_base_type_candidate.is_mixed()
                                 && !has_isset

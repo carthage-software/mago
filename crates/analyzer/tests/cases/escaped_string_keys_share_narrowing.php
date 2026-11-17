@@ -24,7 +24,7 @@ function same_key_written_differently(array $values): int
 function different_keys(array $values): int
 {
     if ($values["a\tb"] !== null) { // @mago-expect analysis:possibly-undefined-string-array-index
-        return $values['a\tb']; // @mago-expect analysis:nullable-return-statement,invalid-return-statement
+        return $values['a\tb']; // @mago-expect analysis:nullable-return-statement,invalid-return-statement,possibly-undefined-string-array-index
     }
 
     return 0;

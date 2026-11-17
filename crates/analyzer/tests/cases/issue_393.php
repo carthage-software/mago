@@ -7,6 +7,7 @@
 function x(array $asdf): void
 {
     if (isset($asdf['ayy'])) {
+        /** @mago-expect analysis:possibly-undefined-string-array-index */
         echo $asdf['qwer']; // error
     }
 }

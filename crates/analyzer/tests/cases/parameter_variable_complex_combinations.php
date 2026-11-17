@@ -321,6 +321,7 @@ function exercise_parameter_variable_nested_utilities(
 
     $shape = $types->openShape('foo');
     take_complex_foo($shape['required']);
+    /** @mago-expect analysis:possibly-undefined-string-array-index */
     take_complex_foo($shape['anything']);
 
     take_complex_generic_collection($types->genericIntersection('foo'));
