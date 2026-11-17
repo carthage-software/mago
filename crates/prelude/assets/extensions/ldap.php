@@ -149,6 +149,9 @@ namespace {
         ?array $controls = null,
     ): LDAP\Result|array|false {}
 
+    /**
+     * @return true
+     */
     function ldap_free_result(Result $result): bool {}
 
     function ldap_count_entries(LDAP\Connection $ldap, LDAP\Result $result): int {}

@@ -3418,6 +3418,7 @@ test_case!(property_hook_bodies_are_checked);
 test_case!(parent_property_hook_call);
 test_case!(int_cast_keeps_int_range);
 test_case!(strlen_equality_narrows_non_empty_string);
+test_case!(ldap_free_result_returns_true);
 
 #[test]
 #[cfg_attr(miri, ignore)]
