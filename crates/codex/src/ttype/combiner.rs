@@ -947,20 +947,19 @@ fn scrape_type_properties(
                                         combine_union_types(existing_type, &candidate_item_type, codebase, options);
                                 }
                             } else {
-                                let new_item_value_type = if let Some((existing_key_param, existing_value_param)) =
-                                    &combination.keyed_array_parameters
-                                {
-                                    let earlier_may_hold_key = union_comparator::can_expression_types_be_identical(
-                                        codebase,
-                                        &TUnion::from_atomic(candidate_item_name.to_atomic()),
-                                        existing_key_param,
-                                        false,
-                                        false,
-                                    );
+                                let new_item_value_type =
+                                    if let Some((ref mut existing_key_param, ref mut existing_value_param)) =
+                                        combination.keyed_array_parameters
+                                    {
+                                        let earlier_may_hold_key = union_comparator::can_expression_types_be_identical(
+                                            codebase,
+                                            &TUnion::from_atomic(candidate_item_name.to_atomic()),
+                                            existing_key_param,
+                                            false,
+                                            false,
+                                        );
 
-                                    (
-                                        true,
-                                        if earlier_may_hold_key {
+                                        let item_type = if earlier_may_hold_key {
                                             combine_union_types(
                                                 existing_value_param,
                                                 &candidate_item_type,
@@ -969,11 +968,25 @@ fn scrape_type_properties(
                                             )
                                         } else {
                                             candidate_item_type
-                                        },
-                                    )
-                                } else {
-                                    (has_existing_entries || cu, candidate_item_type)
-                                };
+                                        };
+
+                                        if &item_type == existing_value_param {
+                                            adjust_keyed_array_parameters(
+                                                existing_value_param,
+                                                &item_type,
+                                                codebase,
+                                                options,
+                                                &candidate_item_name,
+                                                existing_key_param,
+                                            );
+
+                                            continue;
+                                        }
+
+                                        (true, item_type)
+                                    } else {
+                                        (has_existing_entries || cu, candidate_item_type)
+                                    };
 
                                 combination.keyed_array_entries.insert(candidate_item_name, new_item_value_type);
                             }
