@@ -3422,6 +3422,7 @@ test_case!(ldap_free_result_returns_true);
 test_case!(by_reference_out_type_survives_call);
 test_case!(closure_implicit_null_return);
 test_case!(array_key_exists_narrows_the_array);
+test_case!(reference_to_property_is_a_write);
 
 #[test]
 #[cfg_attr(miri, ignore)]

@@ -516,10 +516,28 @@ where
         return Ok(());
     };
 
-    if let Expression::ArrayAccess(array_access) = referenced_expression
-        && get_root_expression_id(referenced_expression) != Some(target_variable_id)
-        && artifacts.get_expression_type(array_access.array).is_some_and(|ty| !ty.has_object_type())
-    {
+    let is_writable_access = match referenced_expression {
+        Expression::ArrayAccess(array_access) => {
+            artifacts.get_expression_type(array_access.array).is_some_and(|ty| !ty.has_object_type())
+        }
+        Expression::Access(Access::Property(_) | Access::StaticProperty(_)) => true,
+        _ => false,
+    };
+
+    if is_writable_access && get_root_expression_id(referenced_expression) != Some(target_variable_id) {
+        let created_null = source_type.is_nullable()
+            && match referenced_expression {
+                Expression::ArrayAccess(array_access) => {
+                    artifacts.get_expression_type(array_access.array).is_some_and(|container| {
+                        container.types.iter().all(|atomic| match atomic {
+                            TAtomic::Array(array) => !get_array_value_parameter(array, context.codebase).has_null(),
+                            _ => false,
+                        })
+                    })
+                }
+                _ => false,
+            };
+
         assign_to_expression(
             context,
             block_context,
@@ -527,7 +545,7 @@ where
             referenced_expression,
             Some(referenced_variable_id),
             None,
-            Rc::clone(source_type),
+            if created_null { Rc::new(source_type.to_non_nullable()) } else { Rc::clone(source_type) },
             false,
             PropertyWriteKind::Mutation,
         )?;
