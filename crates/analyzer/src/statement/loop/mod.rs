@@ -272,7 +272,9 @@ fn inherit_loop_block_context<'ctx, A>(
     let has_break = loop_scope.final_actions.contains(ControlAction::Break);
     let has_continue = loop_scope.final_actions.contains(ControlAction::Continue);
     let has_break_or_continue = has_break || has_continue;
-    let can_leave_loop = !known_infinite_loop || has_break;
+    let body_always_ends =
+        always_enters_loop && !has_break_or_continue && inner_loop_block_context.flags.has_returned();
+    let can_leave_loop = (!known_infinite_loop || has_break) && !body_always_ends;
 
     inherit_branch_context_properties(context, block_context, &inner_loop_block_context);
 
