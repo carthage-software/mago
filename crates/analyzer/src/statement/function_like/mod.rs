@@ -377,7 +377,7 @@ where
 
             context.collector.report_with_code(
                 IssueCode::MissingReturnStatement,
-                Issue::error(format!("Missing return statement in function `{}`", function_metadata.name))
+                Issue::error(format!("Missing return statement in function `{}`", function_metadata.original_name))
                     .with_annotation(
                         Annotation::primary(function_metadata.name_span.unwrap_or(function_metadata.span))
                             .with_message(format!(
@@ -1132,7 +1132,7 @@ fn check_return_type_metadata_width<'ctx, A>(
 
     let declared_str = expanded_declared.get_id();
     let return_span = return_type_metadata.span;
-    let function_label = function_like_metadata.name;
+    let function_label = function_like_metadata.original_name;
 
     let narrowed_type_text = get_narrowed_return_type_text(context, return_span, &unused_atomics);
 
