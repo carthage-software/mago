@@ -1,9 +1,13 @@
 use mago_allocator::Arena;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::ttype::get_mixed;
+use mago_codex::ttype::get_void;
 use mago_span::HasSpan;
+use mago_syntax::cst::Access;
 use mago_syntax::cst::ClassLikeMemberSelector;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::StaticMethodCall;
+use mago_syntax::cst::Variable;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -52,6 +56,28 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
                     return Ok(());
                 }
             }
+        }
+
+        if let Expression::Access(Access::StaticProperty(access)) = self.class
+            && let (Expression::Parent(_), Variable::Direct(property)) = (access.class, &access.property)
+            && let ClassLikeMemberSelector::Identifier(hook) = &self.method
+            && block_context.scope.get_property_hook().is_some()
+            && let Some(parent) = block_context.scope.get_class_like().and_then(|class| class.direct_parent_class)
+            && let Some(parent_property) = context.codebase.get_declaring_property(parent.as_bytes(), property.name)
+        {
+            for argument in &self.argument_list.arguments {
+                argument.value().analyze(context, block_context, artifacts)?;
+            }
+
+            let result = if hook.value.eq_ignore_ascii_case(b"get") {
+                parent_property.type_metadata.as_ref().map_or_else(get_mixed, |metadata| metadata.type_union.clone())
+            } else {
+                get_void()
+            };
+
+            artifacts.set_expression_type(&self.span(), result);
+
+            return Ok(());
         }
 
         if block_context.flags.collect_initializations()
