@@ -1412,7 +1412,25 @@ fn intersect_atomic_types(
 
 #[must_use]
 pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) -> Option<(TUnion, TUnion)> {
-    get_iterable_parameters_impl(atomic, codebase, &[])
+    let (mut key, mut value) = get_iterable_parameters_impl(atomic, codebase, &[])?;
+    if let TAtomic::Object(object @ TObject::Named(_)) = atomic {
+        let has_static = |union: &TUnion| {
+            union.types.iter().any(
+                |atomic| matches!(atomic, TAtomic::Object(TObject::Named(named)) if named.is_static || named.is_this),
+            )
+        };
+
+        if has_static(&key) || has_static(&value) {
+            let options = TypeExpansionOptions {
+                static_class_type: StaticClassType::Object(object.clone()),
+                ..Default::default()
+            };
+            expander::expand_union(codebase, &mut key, &options);
+            expander::expand_union(codebase, &mut value, &options);
+        }
+    }
+
+    Some((key, value))
 }
 
 fn get_iterable_parameters_impl(

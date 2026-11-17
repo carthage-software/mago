@@ -3431,6 +3431,7 @@ test_case!(numeric_string_array_key_may_be_int);
 test_case!(unpacking_into_fixed_parameters_is_checked);
 test_case!(prefix_increment_in_condition_narrows);
 test_case!(short_circuit_assignment_is_possibly_undefined);
+test_case!(static_iterable_parameter_resolves_to_receiver);
 
 #[test]
 #[cfg_attr(miri, ignore)]
