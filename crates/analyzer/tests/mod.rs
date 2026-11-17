@@ -3409,6 +3409,7 @@ test_case!(issue_2735);
 test_case!(issue_2734);
 test_case!(issue_2742);
 test_case!(issue_2749);
+test_case!(simple_xml_element_child_properties);
 
 #[test]
 #[cfg_attr(miri, ignore)]

@@ -1057,10 +1057,19 @@ where
             .filter(|magic_type| !magic_type.has_template_types() && !magic_type.is_void())
             .unwrap_or_else(get_mixed);
 
+            expander::expand_union(
+                context.codebase,
+                &mut magic_type,
+                &TypeExpansionOptions {
+                    self_class: Some(class_id),
+                    static_class_type: StaticClassType::Object(object.clone()),
+                    ..Default::default()
+                },
+            );
+
             if !for_assignment
                 && block_context.flags.inside_isset()
-                && !block_context.flags.inside_coalesce()
-                && magic_method(b"__isset").is_none()
+                && (!block_context.flags.inside_coalesce() || magic_method(b"__isset").is_some())
             {
                 magic_type = magic_type.as_nullable();
             }
@@ -1742,8 +1751,11 @@ pub(super) fn report_non_documented_property<A>(
 ) where
     A: Arena,
 {
-    if context.codebase.is_instance_of(classname.as_bytes(), b"stdClass") {
-        // Special case: we don't report undocumented properties on stdClass
+    if context
+        .codebase
+        .get_class_like(classname.as_bytes())
+        .is_some_and(|class| class.flags.allows_dynamic_properties())
+    {
         return;
     }
 

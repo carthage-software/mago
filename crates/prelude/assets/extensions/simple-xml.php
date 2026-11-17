@@ -1,5 +1,6 @@
 <?php
 
+#[AllowDynamicProperties]
 class SimpleXMLElement implements Traversable, ArrayAccess, Countable, Iterator, Stringable, RecursiveIterator
 {
     /**
@@ -13,12 +14,13 @@ class SimpleXMLElement implements Traversable, ArrayAccess, Countable, Iterator,
         bool $isPrefix = false,
     ) {}
 
-    /**
-     * @param string $name child name
-     *
-     * @return static
-     */
-    private function __get($name) {}
+    public function __get(string $name): static {}
+
+    public function __set(string $name, string|int|float|bool|null|SimpleXMLElement $value): void {}
+
+    public function __isset(string $name): bool {}
+
+    public function __unset(string $name): void {}
 
     public function asXML(?string $filename = null): string|bool {}
 
