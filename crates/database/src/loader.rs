@@ -4,6 +4,7 @@ use std::borrow::Cow;
 use std::collections::hash_map::Entry;
 use std::ffi::OsString;
 use std::io::ErrorKind;
+use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -430,15 +431,35 @@ impl<'config> DatabaseLoader<'config> {
                     }
                 }
             } else {
-                let canonical_root = resolved_path.canonicalize().unwrap_or(resolved_path);
-
                 // A path that resolves to a regular file was named explicitly rather than
                 // discovered by walking a directory. Honor it verbatim, bypassing the extension
                 // filter so extensionless PHP files (e.g. `bin/console`) can be loaded.
-                if canonical_root.is_file() {
-                    paths_to_process.push((canonical_root, specificity, true));
+                //
+                // It keeps the name it was given: a relative path is joined to
+                // `canonical_workspace` instead of being canonicalized, and otherwise only its
+                // directory is canonicalized, so the path shares the canonical workspace prefix
+                // while symlinks below the workspace are not resolved, as for files found by
+                // walking a directory. Resolving them would replace a symlink with its target,
+                // which may lie outside the workspace (e.g. build systems such as Bazel stage
+                // inputs as symlinks), and baselines and path-scoped ignores would then no longer
+                // match the file's workspace-relative name.
+                if resolved_path.is_file() {
+                    let path = if root_path.is_relative()
+                        && !root_path.components().any(|component| matches!(component, Component::ParentDir))
+                    {
+                        canonical_workspace.join(root_path.as_ref())
+                    } else {
+                        resolved_path
+                            .parent()
+                            .zip(resolved_path.file_name())
+                            .and_then(|(parent, name)| parent.canonicalize().ok().map(|parent| parent.join(name)))
+                            .unwrap_or_else(|| resolved_path.canonicalize().unwrap_or(resolved_path))
+                    };
+                    paths_to_process.push((path, specificity, true));
                     continue;
                 }
+
+                let canonical_root = resolved_path.canonicalize().unwrap_or(resolved_path);
 
                 for entry in WalkDir::new(&canonical_root).follow_links(true).max_depth(1) {
                     match entry {
@@ -1276,6 +1297,43 @@ mod tests {
 
         let bar = db.files().find(|f| name_str(&f.name).contains("Bar.php"));
         assert!(bar.is_some(), "symlinked Bar.php should be loaded via include = ['vendor/']");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_explicit_symlinked_file_keeps_workspace_relative_name() {
+        let temp_dir = TempDir::new().unwrap();
+        let external = TempDir::new().unwrap();
+
+        create_test_file(&external, "Foo.php", "<?php class Foo {}\n");
+        std::fs::create_dir_all(temp_dir.path().join("src")).unwrap();
+        std::os::unix::fs::symlink(external.path().join("Foo.php"), temp_dir.path().join("src/Foo.php")).unwrap();
+
+        let config = create_test_config(&temp_dir, vec!["src/Foo.php"], vec![]);
+        let db = DatabaseLoader::new(config).load().unwrap();
+
+        let names: Vec<_> = db.files().map(|f| name_str(&f.name).into_owned()).collect();
+        assert_eq!(names, ["src/Foo.php"], "an explicitly named symlink should keep its workspace-relative name");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_explicit_file_under_symlinked_directory_keeps_workspace_relative_name() {
+        let temp_dir = TempDir::new().unwrap();
+        let external = TempDir::new().unwrap();
+
+        create_test_file(&external, "Foo.php", "<?php class Foo {}\n");
+        std::os::unix::fs::symlink(external.path(), temp_dir.path().join("src")).unwrap();
+
+        let config = create_test_config(&temp_dir, vec!["src/Foo.php"], vec![]);
+        let db = DatabaseLoader::new(config).load().unwrap();
+
+        let names: Vec<_> = db.files().map(|f| name_str(&f.name).into_owned()).collect();
+        assert_eq!(
+            names,
+            ["src/Foo.php"],
+            "a file below a symlinked directory should keep its workspace-relative name"
+        );
     }
 
     #[cfg(unix)]
