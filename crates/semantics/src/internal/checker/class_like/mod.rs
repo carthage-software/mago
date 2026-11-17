@@ -78,6 +78,9 @@ pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Conte
     let class_fqcn_bytes: &[u8] = context.get_name(class.name.span.start);
     let class_name = BytesDisplay(class_name_bytes);
     let class_fqcn = BytesDisplay(class_fqcn_bytes);
+    if class.extends.is_none() {
+        check_parent_type_hints(&class.members, context);
+    }
 
     check_deprecated_attribute(&class.attribute_lists, class.span(), "class", class_fqcn_bytes, context);
 
@@ -351,6 +354,7 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
     let interface_fqcn_bytes: &[u8] = context.get_name(interface.name.span.start);
     let interface_name = BytesDisplay(interface_name_bytes);
     let interface_fqcn = BytesDisplay(interface_fqcn_bytes);
+    check_parent_type_hints(&interface.members, context);
 
     check_deprecated_attribute(
         &interface.attribute_lists,
@@ -836,6 +840,8 @@ pub fn check_enum<'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Contex
     let enum_fqcn_bytes: &[u8] = context.get_name(r#enum.name.span.start);
     let enum_name = BytesDisplay(enum_name_bytes);
     let enum_fqcn = BytesDisplay(enum_fqcn_bytes);
+    check_parent_type_hints(&r#enum.members, context);
+
     let enum_is_backed = r#enum.backing_type_hint.is_some();
 
     check_deprecated_attribute(&r#enum.attribute_lists, r#enum.span(), "enum", enum_fqcn_bytes, context);
@@ -1030,6 +1036,9 @@ pub fn check_anonymous_class<'ast, 'arena>(
     context: &mut Context<'_, 'ast, 'arena>,
 ) {
     let anonymous_class_name = BytesDisplay(ANONYMOUS_CLASS_NAME);
+    if anonymous_class.extends.is_none() {
+        check_parent_type_hints(&anonymous_class.members, context);
+    }
 
     check_deprecated_attribute(
         &anonymous_class.attribute_lists,
@@ -1508,5 +1517,46 @@ fn check_deprecated_attribute(
                     "Remove the attribute, or mark the {class_like_kind} with a `@deprecated` docblock tag."
                 )),
         );
+    }
+}
+
+fn check_parent_type_hints<'ast, 'arena>(
+    members: &'ast Sequence<ClassLikeMember<'arena>>,
+    context: &mut Context<'_, 'ast, 'arena>,
+) {
+    for member in members {
+        let hints: Vec<&Hint<'arena>> = match member {
+            ClassLikeMember::Method(method) => method
+                .parameter_list
+                .parameters
+                .iter()
+                .filter_map(|parameter| parameter.hint.as_ref())
+                .chain(method.return_type_hint.as_ref().map(|return_type| &return_type.hint))
+                .collect(),
+            ClassLikeMember::Property(Property::Plain(property)) => property.hint.iter().collect(),
+            ClassLikeMember::Property(Property::Hooked(property)) => property.hint.iter().collect(),
+            _ => continue,
+        };
+
+        for span in hints.into_iter().filter_map(parent_hint_span) {
+            context.report(
+                Issue::error("Cannot use `parent` as a type when the current class scope has no parent.")
+                    .with_annotation(Annotation::primary(span).with_message("`parent` used here."))
+                    .with_help("Add an `extends` clause, or use another type."),
+            );
+        }
+    }
+}
+
+fn parent_hint_span(hint: &Hint<'_>) -> Option<Span> {
+    match hint {
+        Hint::Parent(keyword) => Some(keyword.span),
+        Hint::Nullable(nullable) => parent_hint_span(nullable.hint),
+        Hint::Parenthesized(parenthesized) => parent_hint_span(parenthesized.hint),
+        Hint::Union(union) => parent_hint_span(union.left).or_else(|| parent_hint_span(union.right)),
+        Hint::Intersection(intersection) => {
+            parent_hint_span(intersection.left).or_else(|| parent_hint_span(intersection.right))
+        }
+        _ => None,
     }
 }
