@@ -356,7 +356,7 @@ where
         );
     }
 
-    let partitioned_clauses = BlockContext::remove_reconciled_clause_refs(
+    let partitioned_clauses = BlockContext::partition_unreconciled_clauses(
         &{
             let mut c = left_block_context.clauses.clone();
             c.extend(left_clauses.into_iter().map(Rc::new));

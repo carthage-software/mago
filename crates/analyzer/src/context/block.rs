@@ -426,6 +426,13 @@ impl<'ctx> BlockContext<'ctx> {
         (included_clauses, rejected_clauses)
     }
 
+    pub(crate) fn partition_unreconciled_clauses(
+        clauses: &[Rc<Clause>],
+        changed_var_ids: &WordSet,
+    ) -> (Vec<Rc<Clause>>, Vec<Rc<Clause>>) {
+        clauses.iter().cloned().partition(|clause| !Self::is_reconciled_clause(clause, changed_var_ids))
+    }
+
     pub(crate) fn retain_unreconciled_clauses(clauses: &mut Vec<Rc<Clause>>, changed_var_ids: &WordSet) {
         clauses.retain(|clause| !Self::is_reconciled_clause(clause, changed_var_ids));
     }

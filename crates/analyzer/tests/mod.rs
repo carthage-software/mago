@@ -3426,6 +3426,7 @@ test_case!(reference_to_property_is_a_write);
 test_case!(loop_variable_keeps_normal_exit_type_with_break);
 test_case!(always_entered_loop_with_continue_keeps_variables);
 test_case!(always_entered_loop_that_returns_needs_no_return);
+test_case!(stored_condition_survives_base_narrowing);
 
 #[test]
 #[cfg_attr(miri, ignore)]

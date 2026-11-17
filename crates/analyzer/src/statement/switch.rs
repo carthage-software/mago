@@ -701,7 +701,7 @@ where
 
             if !changed_var_ids.is_empty() {
                 case_block_context.clauses =
-                    BlockContext::remove_reconciled_clause_refs(&case_block_context.clauses, &changed_var_ids).0;
+                    BlockContext::partition_unreconciled_clauses(&case_block_context.clauses, &changed_var_ids).0;
             }
         }
 
