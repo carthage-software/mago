@@ -64,8 +64,11 @@ function curl_share_close(CurlShareHandle $share_handle): void {}
 
 function curl_share_init(): CurlShareHandle {}
 
+/**
+ * @param non-empty-array<int> $share_options
+ */
 #[Mago\AvailableSince(80500)]
-function curl_share_init_persistent(): CurlShareHandle {}
+function curl_share_init_persistent(array $share_options): CurlSharePersistentHandle {}
 
 function curl_share_setopt(CurlShareHandle $share_handle, int $option, mixed $value): bool {}
 
