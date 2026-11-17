@@ -50,6 +50,7 @@ use crate::context::block::BlockContext;
 use crate::context::scope::var_has_root;
 use crate::resolver::class_name::get_class_name_from_atomic;
 use crate::resolver::property::resolve_declared_property;
+use crate::utils::expression::array::get_primary_array_access_parameters;
 
 pub mod assertion_reconciler;
 pub mod negated_assertion_reconciler;
@@ -119,7 +120,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
         }
     }
 
-    add_nested_assertions(&mut new_types, &mut active_new_types, block_context);
+    add_nested_assertions(&mut new_types, &mut active_new_types, block_context, context.codebase);
     if new_types.len() > 1 {
         new_types
             .to_mut()
@@ -969,6 +970,7 @@ fn add_nested_assertions(
     new_types: &mut Cow<'_, AssertionMap<Word, AssertionSet>>,
     active_new_types: &mut AssertionMap<Word, HashSet<usize>>,
     context: &BlockContext<'_>,
+    codebase: &CodebaseMetadata,
 ) {
     let nested_assertions = new_types
         .iter()
@@ -1062,7 +1064,13 @@ fn add_nested_assertions(
                     if key_parts.is_empty() {
                         // Only remove the nested key if it contains ONLY isset-related assertions
                         // If it has other assertions (e.g., IsType from is_string()), keep them
-                        if only_isset_assertions {
+                        if only_isset_assertions
+                            && !context.locals.get(&base_key_atom).is_some_and(|base| {
+                                base.types.iter().any(|atomic| {
+                                    matches!(atomic, TAtomic::Object(TObject::Named(named)) if codebase.is_instance_of(named.name.as_bytes(), b"ArrayAccess"))
+                                })
+                            })
+                        {
                             keys_to_remove.push(nk);
 
                             if nesting == 0 && base_key_set && active_new_types.swap_remove(&nk).is_some() {
@@ -1406,15 +1414,20 @@ where
                         new_base_type_candidate = get_string();
                     } else if existing_key_type_part.is_never() || existing_key_type_part.is_mixed_isset_from_loop() {
                         return Some(get_mixed_maybe_from_loop(inside_loop));
-                    } else if let TAtomic::Object(TObject::Named(_named_object)) = existing_key_type_part {
-                        if has_isset || has_inverted_isset || has_inverted_key_exists {
+                    } else if let TAtomic::Object(TObject::Named(_)) = existing_key_type_part {
+                        if let Some(value) = get_primary_array_access_parameters(context, existing_key_type_part, false)
+                            .map(|(_, value)| value)
+                            .filter(|value| !value.is_mixed() && !value.has_template_types())
+                        {
+                            new_base_type_candidate = value;
+                        } else if has_isset || has_inverted_isset || has_inverted_key_exists {
                             *has_object_array_access = true;
                             block_context.locals.remove(&new_base_key_atom);
 
                             return None;
+                        } else {
+                            new_base_type_candidate = get_mixed();
                         }
-
-                        new_base_type_candidate = get_mixed();
                     } else {
                         continue;
                     }

@@ -1399,6 +1399,52 @@ where
     }
 }
 
+pub(crate) fn get_primary_array_access_parameters<A>(
+    context: &Context<'_, '_, A>,
+    atomic: &TAtomic,
+    for_assignment: bool,
+) -> Option<(TUnion, TUnion)>
+where
+    A: Arena,
+{
+    let TAtomic::Object(TObject::Named(named_object)) = atomic else {
+        return None;
+    };
+
+    let array_access = word(b"ArrayAccess");
+    if !context.codebase.is_instance_of(named_object.name.as_bytes(), array_access.as_bytes()) {
+        return None;
+    }
+
+    let metadata = context.codebase.get_class_like(named_object.name.as_bytes())?;
+    let array_access_metadata = context.codebase.get_class_like(array_access.as_bytes())?;
+    let key_template = array_access_metadata.template_types.first().map(|(name, _)| *name)?;
+    let value_template = array_access_metadata.template_types.get_index(1).map(|(name, _)| *name)?;
+    let key = get_specialized_template_type(
+        context.codebase,
+        key_template,
+        array_access,
+        metadata,
+        named_object.get_type_parameters(),
+    )
+    .unwrap_or_else(get_mixed);
+
+    let value = get_array_access_method_value_type(context, metadata, named_object, for_assignment)
+        .filter(|value| for_assignment || !value.is_mixed())
+        .unwrap_or_else(|| {
+            get_specialized_template_type(
+                context.codebase,
+                value_template,
+                array_access,
+                metadata,
+                named_object.get_type_parameters(),
+            )
+            .unwrap_or_else(get_mixed)
+        });
+
+    Some((key, value))
+}
+
 pub(crate) fn handle_array_access_on_named_object<A>(
     context: &mut Context<'_, '_, A>,
     span: Span,
@@ -1411,52 +1457,6 @@ pub(crate) fn handle_array_access_on_named_object<A>(
 where
     A: Arena,
 {
-    fn get_primary_array_access_parameters<A>(
-        context: &Context<'_, '_, A>,
-        atomic: &TAtomic,
-        for_assignment: bool,
-    ) -> Option<(TUnion, TUnion)>
-    where
-        A: Arena,
-    {
-        let TAtomic::Object(TObject::Named(named_object)) = atomic else {
-            return None;
-        };
-
-        let array_access = word(b"ArrayAccess");
-        if !context.codebase.is_instance_of(named_object.name.as_bytes(), array_access.as_bytes()) {
-            return None;
-        }
-
-        let metadata = context.codebase.get_class_like(named_object.name.as_bytes())?;
-        let array_access_metadata = context.codebase.get_class_like(array_access.as_bytes())?;
-        let key_template = array_access_metadata.template_types.first().map(|(name, _)| *name)?;
-        let value_template = array_access_metadata.template_types.get_index(1).map(|(name, _)| *name)?;
-        let key = get_specialized_template_type(
-            context.codebase,
-            key_template,
-            array_access,
-            metadata,
-            named_object.get_type_parameters(),
-        )
-        .unwrap_or_else(get_mixed);
-
-        let value = get_array_access_method_value_type(context, metadata, named_object, for_assignment)
-            .filter(|value| for_assignment || !value.is_mixed())
-            .unwrap_or_else(|| {
-                get_specialized_template_type(
-                    context.codebase,
-                    value_template,
-                    array_access,
-                    metadata,
-                    named_object.get_type_parameters(),
-                )
-                .unwrap_or_else(get_mixed)
-            });
-
-        Some((key, value))
-    }
-
     fn visit_array_access_parameters<A>(
         context: &Context<'_, '_, A>,
         atomic: &TAtomic,

@@ -68,7 +68,7 @@ class SimpleXMLElement implements Traversable, ArrayAccess, Countable, Iterator,
     /**
      * @param string|int $offset
      *
-     * @return static
+     * @return static|null
      */
     public function offsetGet($offset) {}
 

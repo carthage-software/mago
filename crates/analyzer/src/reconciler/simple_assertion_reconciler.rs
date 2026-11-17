@@ -2134,6 +2134,7 @@ where
     new_var_type.types.to_mut().retain(|atomic| {
         (allow_int_key && atomic.is_array_accessible_with_int_or_string_key())
             || (!allow_int_key && atomic.is_array_accessible_with_string_key())
+            || matches!(atomic, TAtomic::Object(TObject::Named(named)) if context.codebase.is_instance_of(named.name.as_bytes(), b"ArrayAccess"))
     });
 
     if new_var_type.types.is_empty() {
