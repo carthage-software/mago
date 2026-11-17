@@ -2461,15 +2461,24 @@ where
         _ => return None,
     };
 
-    let assertion = match (length, negated) {
-        (0, false) => Assertion::StringLengthLessThan(1),
-        (0, true) => Assertion::StringLengthGreaterThanOrEqual(1),
+    let argument_id =
+        get_strlen_argument_expression_id(assertion_context, call, &Assertion::StringLengthGreaterThanOrEqual(1))?;
+    let lower = if is_function_call_to(call, assertion_context, b"strlen") { length } else { length.min(1) };
+    let upper = length.saturating_add(1);
+    let assertions = match (length, negated) {
+        (0, false) => vec![vec![Assertion::StringLengthLessThan(1)]],
+        (0, true) => vec![vec![Assertion::StringLengthGreaterThanOrEqual(1)]],
+        (1.., false) => {
+            vec![vec![Assertion::StringLengthGreaterThanOrEqual(lower)], vec![Assertion::StringLengthLessThan(upper)]]
+        }
+        (1.., true) => {
+            vec![vec![Assertion::StringLengthLessThan(lower), Assertion::StringLengthGreaterThanOrEqual(upper)]]
+        }
         _ => return None,
     };
 
-    let argument_id = get_strlen_argument_expression_id(assertion_context, call, &assertion)?;
     let mut if_types = WordMap::default();
-    if_types.insert(argument_id, vec![vec![assertion]]);
+    if_types.insert(argument_id, assertions);
 
     Some(vec![if_types])
 }
@@ -2519,13 +2528,11 @@ where
         return false;
     };
 
-    if functions.iter().any(|name| function_identifier.value().eq_ignore_ascii_case(name)) {
-        return true;
-    }
-
     let resolved_function_name = assertion_context.resolved_names.get(function_identifier);
 
     functions.iter().any(|name| resolved_function_name.eq_ignore_ascii_case(name))
+        || (!assertion_context.codebase.function_exists(resolved_function_name)
+            && functions.iter().any(|name| function_identifier.value().eq_ignore_ascii_case(name)))
 }
 
 fn get_true_equality_assertions<A>(
