@@ -781,29 +781,34 @@ where
     let next = AtomicUsize::new(0);
     let cancelled = AtomicBool::new(false);
     let worker_count = items.len().min(rayon::current_num_threads());
-    let batches = (0..worker_count)
-        .into_par_iter()
-        .with_max_len(1)
-        .map(|_| {
-            let mut state = initialize();
-            let mut results = Vec::new();
-            while !cancelled.load(Ordering::Relaxed) {
-                let index = next.fetch_add(1, Ordering::Relaxed);
-                let Some(item) = items.get(index) else {
-                    break;
-                };
+    // With one worker, Rayon runs the range on the calling thread, not on the pool.
+    // The main thread doesn't have the configured stack size, so a deep file can overflow it.
+    // `rayon::scope()` always runs its closure on a pool thread.
+    let batches = rayon::scope(|_| {
+        (0..worker_count)
+            .into_par_iter()
+            .with_max_len(1)
+            .map(|_| {
+                let mut state = initialize();
+                let mut results = Vec::new();
+                while !cancelled.load(Ordering::Relaxed) {
+                    let index = next.fetch_add(1, Ordering::Relaxed);
+                    let Some(item) = items.get(index) else {
+                        break;
+                    };
 
-                match map(&mut state, item) {
-                    Ok(result) => results.push(result),
-                    Err(error) => {
-                        cancelled.store(true, Ordering::Relaxed);
-                        return Err(error);
+                    match map(&mut state, item) {
+                        Ok(result) => results.push(result),
+                        Err(error) => {
+                            cancelled.store(true, Ordering::Relaxed);
+                            return Err(error);
+                        }
                     }
                 }
-            }
-            Ok(results)
-        })
-        .collect::<Result<Vec<_>, E>>()?;
+                Ok(results)
+            })
+            .collect::<Result<Vec<_>, E>>()
+    })?;
 
     let mut results = Vec::with_capacity(batches.iter().map(Vec::len).sum());
     for batch in batches {
@@ -937,6 +942,13 @@ mod tests {
         assert!(visits.iter().all(|count| count.load(Ordering::Relaxed) == 1));
         results.sort_unstable();
         assert_eq!(results, (0..32).collect::<Vec<_>>());
+        Ok(())
+    }
+
+    #[test]
+    fn single_worker_runs_on_the_thread_pool() -> Result<(), std::convert::Infallible> {
+        let on_pool = map_with_priority_queue(&[0], || (), |(), _| Ok(rayon::current_thread_index().is_some()))?;
+        assert_eq!(on_pool, [true]);
         Ok(())
     }
 
