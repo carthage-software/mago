@@ -669,6 +669,7 @@ ignore = [
 <tr><td style="text-align: left"><code>find-unused-expressions</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Signale les expressions dont le résultat est ignoré, comme <code>$a + $b;</code>.</td></tr>
 <tr><td style="text-align: left"><code>find-unused-definitions</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Signale les définitions privées qui ne sont jamais référencées.</td></tr>
 <tr><td style="text-align: left"><code>find-overly-wide-return-types</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Avertit lorsqu'un type de retour déclaré contient une branche que le corps ne produit jamais, comme <code>: string|false</code> sur une fonction qui retourne toujours une chaîne. Disponible depuis 1.20.0.</td></tr>
+<tr><td style="text-align: left"><code>find-overly-wide-throw-types</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Avertit lorsqu'un type <code>@throws</code> documenté ne peut pas s'échapper de la fonction ou de la méthode.</td></tr>
 <tr><td style="text-align: left"><code>analyze-dead-code</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Analyse le code qui semble inaccessible.</td></tr>
 <tr><td style="text-align: left"><code>memoize-properties</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Suit les valeurs littérales de propriété pour une inférence plus précise, au prix d'un peu de mémoire.</td></tr>
 <tr><td style="text-align: left"><code>allow-possibly-undefined-array-keys</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left"><strong>Déprécié.</strong> Autorise l'accès aux clés qui peuvent manquer sans le signaler. Le passer à <code>false</code> signale uniquement les lectures de <code>array&lt;K, V&gt;</code> avec une clé littérale unique et n'élargit pas le type à <code>T|null</code>. Préférez <code>strict-array-index-existence</code>.</td></tr>
@@ -729,7 +730,7 @@ class-initializers = [
 </code></pre>
 <p>Une entrée simple comme <code>boot</code> accepte une méthode correspondante sur n'importe quelle classe, tandis que <code>PHPUnit\Framework\TestCase::setUp</code> n'est honorée que pour les classes qui descendent de <code>TestCase</code>. Une classe sans rapport avec sa propre méthode <code>setUp()</code> continue à signaler <code>missing-constructor</code> comme avant.</p>
 <h2 id="exception-filtering">Filtrage d'exceptions</h2>
-<p>Lorsque <code>check-throws</code> est activé, deux options vous permettent d'ignorer des exceptions spécifiques.</p>
+<p>Lorsque <code>check-throws</code> ou <code>find-overly-wide-throw-types</code> est activé, deux options vous permettent d'ignorer des exceptions spécifiques.</p>
 <table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Défaut</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>unchecked-exceptions</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Exceptions à ignorer, y compris toutes les sous-classes (conscient de la hiérarchie).</td></tr>
 <tr><td style="text-align: left"><code>unchecked-exception-classes</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Exceptions à ignorer comme correspondances exactes de classe uniquement. Les sous-classes et parents sont toujours vérifiés.</td></tr>
@@ -813,6 +814,7 @@ plugins = ["psl"]
 find-unused-expressions = true
 find-unused-definitions = true
 find-overly-wide-return-types = true
+find-overly-wide-throw-types = true
 analyze-dead-code = true
 check-throws = true
 check-dead-catch = true

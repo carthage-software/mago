@@ -1016,6 +1016,7 @@
         "find-unused-expressions": true,
         "find-unused-definitions": true,
         "find-overly-wide-return-types": false,
+        "find-overly-wide-throw-types": false,
         "analyze-dead-code": false,
         "memoize-properties": true,
         "allow-possibly-undefined-array-keys": true,
@@ -9819,6 +9820,11 @@
         },
         "find-overly-wide-return-types": {
           "description": "Whether to warn when a function's declared return type contains a branch the body never\nactually returns (e.g. `: string|false` on a function that always returns a string).",
+          "type": "boolean",
+          "default": false
+        },
+        "find-overly-wide-throw-types": {
+          "description": "Whether to warn when a documented `@throws` type cannot escape a function or method.",
           "type": "boolean",
           "default": false
         },

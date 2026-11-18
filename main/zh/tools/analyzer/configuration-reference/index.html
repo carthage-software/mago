@@ -685,6 +685,7 @@ ignore = [
 <tr><td style="text-align: left"><code>find-unused-expressions</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">报告其结果被丢弃的表达式,例如 <code>$a + $b;</code>。</td></tr>
 <tr><td style="text-align: left"><code>find-unused-definitions</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">报告从未被引用的私有定义。</td></tr>
 <tr><td style="text-align: left"><code>find-overly-wide-return-types</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">当声明的返回类型包含主体永远不会产生的分支时发出警告,例如总是返回字符串的函数声明为 <code>: string|false</code>。自 1.20.0 起可用。</td></tr>
+<tr><td style="text-align: left"><code>find-overly-wide-throw-types</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">当文档中的 <code>@throws</code> 类型无法从函数或方法中逸出时发出警告。</td></tr>
 <tr><td style="text-align: left"><code>analyze-dead-code</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">分析看似不可达的代码。</td></tr>
 <tr><td style="text-align: left"><code>memoize-properties</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">跟踪字面量属性值以获得更精准的推断,代价是占用一些额外内存。</td></tr>
 <tr><td style="text-align: left"><code>allow-possibly-undefined-array-keys</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">**已弃用。**允许访问可能不存在的键,而不报告。设为 <code>false</code> 时仅对带有单个字面量键的 <code>array&lt;K, V&gt;</code> 读取发出警告,且不会将类型扩展为 <code>T|null</code>。请改用 <code>strict-array-index-existence</code>。</td></tr>
@@ -738,7 +739,7 @@ class-initializers = ["setUp", "initialize", "boot"]
 }
 </code></pre>
 <h2 id="property-initialization">异常过滤</h2>
-<p>启用 <code>check-throws</code> 时,有两个选项可以让你跳过特定异常。</p>
+<p>启用 <code>check-throws</code> 或 <code>find-overly-wide-throw-types</code> 时,有两个选项可以让你跳过特定异常。</p>
 <table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>unchecked-exceptions</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">要忽略的异常,包括其所有子类(感知继承层级)。</td></tr>
 <tr><td style="text-align: left"><code>unchecked-exception-classes</code></td><td style="text-align: left"><code>string[]</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">仅按精确类匹配忽略的异常。其子类和父类仍会被检查。</td></tr>
@@ -822,6 +823,7 @@ plugins = ["psl"]
 find-unused-expressions = true
 find-unused-definitions = true
 find-overly-wide-return-types = true
+find-overly-wide-throw-types = true
 analyze-dead-code = true
 check-throws = true
 check-dead-catch = true
