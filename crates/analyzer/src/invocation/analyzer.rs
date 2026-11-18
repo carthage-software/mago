@@ -297,6 +297,7 @@ where
                 calling_class_like_metadata,
                 calling_instance_type,
                 method_class_type,
+                false,
             );
 
             if parameter_type.has_template_types() {
@@ -361,6 +362,7 @@ where
                 calling_class_like_metadata,
                 calling_instance_type,
                 method_class_type,
+                true,
             );
 
             let has_parameter_variable = contains_parameter_variable(&base_parameter_type);
@@ -428,6 +430,7 @@ where
                     calling_class_like_metadata,
                     calling_instance_type,
                     method_class_type,
+                    false,
                 );
 
                 if resolved.has_template_types() {
@@ -671,6 +674,7 @@ where
                 calling_class_like_metadata,
                 calling_instance_type,
                 method_class_type,
+                true,
             );
 
             let final_parameter_type = resolve_parameter_type_for_invocation(
@@ -720,6 +724,7 @@ where
                     calling_class_like_metadata,
                     calling_instance_type,
                     method_class_type,
+                    true,
                 );
 
                 let final_parameter_type = resolve_parameter_type_for_invocation(
@@ -848,6 +853,7 @@ where
                     calling_class_like_metadata,
                     calling_instance_type,
                     method_class_type,
+                    false,
                 );
 
                 infer_parameter_templates_from_default(context, &parameter_type, &default_type, template_result);
@@ -877,6 +883,7 @@ where
             calling_class_like_metadata,
             calling_instance_type,
             method_class_type,
+            false,
         );
 
         if base_variadic_parameter_type.has_template_types() {
@@ -974,6 +981,7 @@ where
                     calling_class_like_metadata,
                     calling_instance_type,
                     method_class_type,
+                    false,
                 );
 
                 let final_variadic_parameter_type =
@@ -1370,6 +1378,7 @@ fn infer_generic_callable_arguments<'ctx, 'arena, A>(
             calling_class_like_metadata,
             calling_instance_type,
             method_class_type,
+            true,
         );
 
         let mut result_without_callback_bounds = template_result.clone();
@@ -1481,6 +1490,7 @@ fn get_parameter_type<'ctx, A>(
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_instance_type: Option<&TAtomic>,
     method_class_type: Option<&StaticClassType>,
+    preserve_template_conditionals: bool,
 ) -> TUnion
 where
     A: Arena,
@@ -1498,6 +1508,7 @@ where
         calling_class_like_metadata,
         calling_instance_type,
         method_class_type,
+        preserve_template_conditionals,
     )
 }
 
@@ -1510,6 +1521,7 @@ fn resolve_type_in_class_context<'ctx, A>(
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_instance_type: Option<&TAtomic>,
     method_class_type: Option<&StaticClassType>,
+    preserve_template_conditionals: bool,
 ) -> TUnion
 where
     A: Arena,
@@ -1542,6 +1554,7 @@ where
             self_class: base_class_metadata.map(|meta| meta.name),
             static_class_type,
             function_is_final: calling_class_like_metadata.is_some_and(|meta| meta.flags.is_final()),
+            preserve_template_conditionals,
             ..Default::default()
         },
     );
@@ -1587,7 +1600,7 @@ where
         return resolve_invocation_type(context, invocation, template_result, parameter_types, parameter_type);
     }
 
-    if has_template_bindings {
+    if has_template_bindings || parameter_type.has_template_types() {
         expander::expand_union(
             context.codebase,
             &mut parameter_type,
@@ -1777,6 +1790,7 @@ fn validate_unpacked_argument_elements<'ctx, 'arena, A>(
                                 calling_class_like_metadata,
                                 calling_instance_type,
                                 method_class_type,
+                                true,
                             );
 
                             let final_parameter_type = resolve_parameter_type_for_invocation(
@@ -1816,6 +1830,7 @@ fn validate_unpacked_argument_elements<'ctx, 'arena, A>(
                                 calling_class_like_metadata,
                                 calling_instance_type,
                                 method_class_type,
+                                true,
                             );
 
                             let final_parameter_type = resolve_parameter_type_for_invocation(
@@ -1928,6 +1943,7 @@ fn validate_keyed_array_elements<'ctx, 'arena, A>(
                 calling_class_like_metadata,
                 calling_instance_type,
                 method_class_type,
+                true,
             );
 
             let final_parameter_type = resolve_parameter_type_for_invocation(

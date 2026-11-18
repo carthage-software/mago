@@ -24,6 +24,7 @@ use crate::ttype::atomic::array::key::ArrayKey;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::callable::TCallableSignature;
 use crate::ttype::atomic::callable::parameter::TCallableParameter;
+use crate::ttype::atomic::conditional::TConditional;
 use crate::ttype::atomic::derived::TDerived;
 use crate::ttype::atomic::derived::index_access::TIndexAccess;
 use crate::ttype::atomic::derived::int_mask::TIntMask;
@@ -47,6 +48,8 @@ use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::combiner;
+use crate::ttype::comparator::ComparisonResult;
+use crate::ttype::comparator::union_comparator;
 use crate::ttype::template::TemplateResult;
 use crate::ttype::template::inferred_type_replacer;
 use crate::ttype::union::TUnion;
@@ -169,6 +172,8 @@ pub struct TypeExpansionOptions {
     pub allow_mixin_static_rebind: bool,
     /// Keep operators that depend on call arguments while binding their class-relative types.
     pub preserve_parameter_dependencies: bool,
+    /// Keep conditional types whose subject is a template, so they can be evaluated once it is bound.
+    pub preserve_template_conditionals: bool,
 }
 
 /// Expands a type union, resolving special types like `self`, `static`, `parent`,
@@ -343,7 +348,9 @@ pub(crate) fn expand_atomic(
             }
         }
         TAtomic::Conditional(conditional) => {
-            if options.preserve_parameter_dependencies && contains_parameter_variable(conditional) {
+            if (options.preserve_parameter_dependencies && contains_parameter_variable(conditional))
+                || (options.preserve_template_conditionals && conditional.subject.has_template_types())
+            {
                 expand_shared_union(codebase, &mut conditional.subject, options);
                 expand_shared_union(codebase, &mut conditional.target, options);
                 expand_shared_union(codebase, &mut conditional.then, options);
@@ -353,14 +360,19 @@ pub(crate) fn expand_atomic(
 
             *skip_key = true;
 
-            let mut then = (*conditional.then).clone();
-            let mut otherwise = (*conditional.otherwise).clone();
+            let (holds, fails) = evaluate_conditional(conditional, codebase, options);
 
-            expand_union(codebase, &mut then, options);
-            expand_union(codebase, &mut otherwise, options);
+            if holds {
+                let mut then = (*conditional.then).clone();
+                expand_union(codebase, &mut then, options);
+                new_return_type_parts.extend(then.types.into_owned());
+            }
 
-            new_return_type_parts.extend(then.types.into_owned());
-            new_return_type_parts.extend(otherwise.types.into_owned());
+            if fails {
+                let mut otherwise = (*conditional.otherwise).clone();
+                expand_union(codebase, &mut otherwise, options);
+                new_return_type_parts.extend(otherwise.types.into_owned());
+            }
         }
         TAtomic::Alias(alias) => {
             *skip_key = true;
@@ -390,6 +402,35 @@ pub(crate) fn expand_atomic(
             expand_shared_union(codebase, &mut iterable.value_type, options);
         }
         _ => {}
+    }
+}
+
+fn evaluate_conditional(
+    conditional: &TConditional,
+    codebase: &CodebaseMetadata,
+    options: &TypeExpansionOptions,
+) -> (bool, bool) {
+    let is_unresolved = |union: &TUnion| union.has_template_types() || contains_parameter_variable(union);
+    if conditional.subject.is_never() || is_unresolved(&conditional.subject) {
+        return (true, true);
+    }
+
+    let mut subject = (*conditional.subject).clone();
+    let mut target = (*conditional.target).clone();
+    expand_union(codebase, &mut subject, options);
+    expand_union(codebase, &mut target, options);
+
+    if subject.is_never() || is_unresolved(&subject) || is_unresolved(&target) {
+        return (true, true);
+    }
+
+    if union_comparator::is_contained_by(codebase, &subject, &target, false, false, true, &mut ComparisonResult::new())
+    {
+        (!conditional.negated, conditional.negated)
+    } else if union_comparator::can_expression_types_be_identical(codebase, &subject, &target, false, false) {
+        (true, true)
+    } else {
+        (conditional.negated, !conditional.negated)
     }
 }
 
@@ -3280,6 +3321,7 @@ mod tests {
             function_is_final: false,
             allow_mixin_static_rebind: false,
             preserve_parameter_dependencies: false,
+            preserve_template_conditionals: false,
         };
 
         let mut actual = input;
