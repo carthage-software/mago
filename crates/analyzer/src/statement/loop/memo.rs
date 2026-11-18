@@ -169,7 +169,6 @@ where
     artifacts.loop_scope.is_some()
         && context.plugin_registry.allows_loop_convergence()
         && context.external_analysis_session.is_none()
-        && context.type_resolution_context.is_empty()
         && artifacts.static_local_types.is_none()
         && artifacts.pending_readonly_property_writes.is_empty()
         && artifacts.editor.is_none()
