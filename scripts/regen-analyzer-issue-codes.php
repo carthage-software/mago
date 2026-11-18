@@ -126,6 +126,7 @@ final class AnalyzerCodeModuleGenerator
         'redundant-docblock-type',
         'too-few-arguments',
         'too-many-arguments',
+        'too-wide-throw-type',
         'undefined-int-array-index',
         'undefined-string-array-index',
         'undefined-variable',

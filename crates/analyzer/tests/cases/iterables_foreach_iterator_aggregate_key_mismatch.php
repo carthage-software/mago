@@ -8,6 +8,7 @@ function take_int(int $_n): void
 
 /**
  * @param IteratorAggregate<string, int> $agg
+ * @throws Exception
  */
 function bad(IteratorAggregate $agg): void
 {

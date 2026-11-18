@@ -12,6 +12,7 @@ function take_string(string $_s): void
 
 /**
  * @param IteratorAggregate<int, string> $agg
+ * @throws Exception
  */
 function iterate_aggregate(IteratorAggregate $agg): void
 {

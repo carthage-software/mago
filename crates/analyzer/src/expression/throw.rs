@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use std::rc::Rc;
 
 use mago_codex::ttype::TType;
+use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::get_never;
 use mago_reporting::Annotation;
@@ -14,7 +15,10 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::context::block::PossiblyThrownGenericException;
 use crate::error::AnalysisError;
+use crate::utils::exception::get_throw_type_atomics;
+use crate::utils::exception::get_throw_type_object_names;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Throw<'arena> {
     fn analyze<'ctx, A>(
@@ -55,29 +59,45 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Throw<'arena> {
 
         if let Some(exception_type) = artifacts.get_expression_type(self.exception) {
             for exception_atomic in exception_type.types.as_ref() {
-                if exception_atomic.extends_or_implements(context.codebase, b"Throwable") {
-                    for object_name in exception_atomic.get_all_object_names() {
-                        block_context.possibly_thrown_exceptions.entry(object_name).or_default().insert(self.span());
-                    }
-                } else {
-                    let exception_atomic_str = exception_atomic.get_id();
+                for thrown_atomic in get_throw_type_atomics(exception_atomic) {
+                    if thrown_atomic.extends_or_implements(context.codebase, b"Throwable") {
+                        let object_names = get_throw_type_object_names(context.codebase, &thrown_atomic);
+                        if matches!(&thrown_atomic, TAtomic::GenericParameter(_)) {
+                            let thrown_generic = PossiblyThrownGenericException {
+                                atomic_type: thrown_atomic,
+                                span: self.span(),
+                                object_names,
+                            };
+                            block_context.possibly_thrown_generic_exceptions.insert(thrown_generic);
+                        } else {
+                            for object_name in object_names {
+                                block_context
+                                    .possibly_thrown_exceptions
+                                    .entry(object_name)
+                                    .or_default()
+                                    .insert(self.span());
+                            }
+                        }
+                    } else {
+                        let exception_atomic_str = thrown_atomic.get_id();
 
-                    context.collector.report_with_code(
-                        IssueCode::InvalidThrow,
-                        Issue::error(format!(
-                            "Cannot throw type `{exception_atomic_str}` because it is not an instance of Throwable."
-                        ))
-                        .with_annotation(
-                            Annotation::primary(self.span())
-                                .with_message(format!("This has type `{exception_atomic_str}`, not `Throwable`"))
-                        )
-                        .with_note(
-                            "Only objects that implement the `Throwable` interface (like `Exception` or `Error`) can be thrown."
-                        )
-                        .with_help(
-                            "Ensure the value being thrown is an instance of `Exception`, `Error`, or a subclass thereof."
-                        ),
-                    );
+                        context.collector.report_with_code(
+                            IssueCode::InvalidThrow,
+                            Issue::error(format!(
+                                "Cannot throw type `{exception_atomic_str}` because it is not an instance of Throwable."
+                            ))
+                            .with_annotation(
+                                Annotation::primary(self.span())
+                                    .with_message(format!("This has type `{exception_atomic_str}`, not `Throwable`"))
+                            )
+                            .with_note(
+                                "Only objects that implement the `Throwable` interface (like `Exception` or `Error`) can be thrown."
+                            )
+                            .with_help(
+                                "Ensure the value being thrown is an instance of `Exception`, `Error`, or a subclass thereof."
+                            ),
+                        );
+                    }
                 }
             }
         }

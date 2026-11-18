@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 /**
  * @param iterable<int, string> $iterable
+ * @throws Exception
  */
 function consume(iterable $iterable): void
 {
