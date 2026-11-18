@@ -1285,6 +1285,7 @@ where
     }
 
     if !does_always_break {
+        let footprint = memo::get_loop_footprint(artifacts, loop_scope.span);
         for (variable_id, variable_type) in loop_parent_context.locals.clone() {
             if let Some(continue_context_type) = continue_context.locals.get_mut(&variable_id) {
                 if continue_context_type.is_mixed() {
@@ -1300,7 +1301,12 @@ where
                     };
 
                     loop_parent_context.locals.insert(variable_id, exit_type);
-                    loop_parent_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
+                    if !footprint
+                        .as_ref()
+                        .is_some_and(|footprint| memo::is_untouched(variable_id, footprint, loop_parent_context))
+                    {
+                        loop_parent_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
+                    }
                 } else if continue_context_type != &variable_type {
                     loop_parent_context.locals.insert(
                         variable_id,

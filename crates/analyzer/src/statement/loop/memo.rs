@@ -6,6 +6,7 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::IssueCollection;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::cst::AnonymousClass;
 use mago_syntax::cst::Break;
 use mago_syntax::cst::Class;
@@ -177,6 +178,19 @@ where
         && block_context.if_body_context.is_none()
         && block_context.logical_and_true_context.is_none()
         && block_context.logical_or_false_context.is_none()
+}
+
+pub(super) fn get_loop_footprint(artifacts: &AnalysisArtifacts, span: Span) -> Option<Rc<WordSet>> {
+    artifacts.loop_memos.get(&(span.start.offset, span.end.offset))?.footprint.clone()?
+}
+
+pub(super) fn is_untouched(id: Word, footprint: &WordSet, block_context: &BlockContext<'_>) -> bool {
+    !block_context.scope.is_global()
+        && !is_kept(id, footprint, &block_context.locals)
+        && !block_context
+            .references_in_scope
+            .iter()
+            .any(|(reference, referenced)| *reference == id || *referenced == id)
 }
 
 fn is_kept(id: Word, footprint: &WordSet, locals: &WordMap<Rc<TUnion>>) -> bool {
