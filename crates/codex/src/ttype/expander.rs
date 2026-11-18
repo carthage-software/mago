@@ -931,7 +931,8 @@ fn resolve_static_type(
             if !check_compatibility || codebase.is_instance_of(static_class.as_bytes(), named.name.as_bytes()) =>
         {
             use_own_template_bounds(named, *static_class, codebase);
-            named.name = *static_class;
+            named.name =
+                codebase.get_class_like_by_name(*static_class).map_or(*static_class, |meta| meta.original_name);
             named.is_static = false;
             named.is_this = false;
         }
@@ -971,7 +972,7 @@ fn resolve_static_type(
             }
 
             named.name = static_obj.name;
-            let effectively_final = is_effectively_final(&static_obj.name, codebase, options);
+            let effectively_final = is_effectively_final(codebase.get_class_like_by_name(static_obj.name), options);
             named.is_static = !effectively_final && (static_obj.is_static || crosses_mixin);
             named.is_this = named.is_static && is_this_type;
         }
@@ -979,8 +980,9 @@ fn resolve_static_type(
             if (!check_compatibility || codebase.is_instance_of(static_class.as_bytes(), named.name.as_bytes())) =>
         {
             use_own_template_bounds(named, *static_class, codebase);
-            named.name = *static_class;
-            let effectively_final = is_effectively_final(static_class, codebase, options);
+            let class_metadata = codebase.get_class_like_by_name(*static_class);
+            named.name = class_metadata.map_or(*static_class, |meta| meta.original_name);
+            let effectively_final = is_effectively_final(class_metadata, options);
             named.is_static = !effectively_final;
             named.is_this = !effectively_final && is_this_type;
         }
@@ -1007,12 +1009,8 @@ fn use_own_template_bounds(named: &mut TNamedObject, static_class: Word, codebas
 /// - The class is declared `final`
 /// - The class is anonymous
 /// - The method is declared `final`
-fn is_effectively_final(class_name: &Word, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) -> bool {
-    if options.function_is_final {
-        return true;
-    }
-
-    codebase.get_class_like_by_name(*class_name).is_some_and(|meta| meta.name_span.is_none() || meta.flags.is_final())
+fn is_effectively_final(class_metadata: Option<&ClassLikeMetadata>, options: &TypeExpansionOptions) -> bool {
+    options.function_is_final || class_metadata.is_some_and(|meta| meta.name_span.is_none() || meta.flags.is_final())
 }
 
 /// Iterates the class names of an object's intersection types.
@@ -1931,11 +1929,7 @@ mod tests {
         expand_union(&codebase, &mut actual, &options);
 
         assert!(actual.types.iter().any(|t| {
-            if let TAtomic::Object(TObject::Named(named)) = t {
-                named.name == ascii_lowercase_word(b"foo")
-            } else {
-                false
-            }
+            if let TAtomic::Object(TObject::Named(named)) = t { named.name == word("Foo") } else { false }
         }));
     }
 
@@ -2054,11 +2048,7 @@ mod tests {
         expand_union(&codebase, &mut actual, &options);
 
         assert!(actual.types.iter().any(|t| {
-            if let TAtomic::Object(TObject::Named(named)) = t {
-                named.name == ascii_lowercase_word(b"foo")
-            } else {
-                false
-            }
+            if let TAtomic::Object(TObject::Named(named)) = t { named.name == word("Foo") } else { false }
         }));
     }
 
@@ -2079,7 +2069,7 @@ mod tests {
 
         assert!(actual.types.iter().any(|t| {
             if let TAtomic::Object(TObject::Named(named)) = t {
-                named.name == ascii_lowercase_word(b"foo") && !named.is_this
+                named.name == word("Foo") && !named.is_this
             } else {
                 false
             }
@@ -2512,7 +2502,7 @@ mod tests {
         if let TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) = &actual.types[0]
             && let TAtomic::Object(TObject::Named(named)) = constraint.as_ref()
         {
-            assert_eq!(named.name, ascii_lowercase_word(b"foo"));
+            assert_eq!(named.name, word("Foo"));
         }
     }
 
