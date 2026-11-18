@@ -763,11 +763,10 @@ final class Codebase
         }
 
         $bucketId = ($operation << 4) | ($classLikeKind ?? 0);
-        $bucket = $this->cache->values[$bucketId] ?? [];
         $missingRequests = [];
         $missingKeys = [];
         foreach ($keys as $index => $key) {
-            if (array_key_exists($key, $bucket)) {
+            if (array_key_exists($key, $this->cache->values[$bucketId] ?? [])) {
                 continue;
             }
 
@@ -796,18 +795,21 @@ final class Codebase
                 throw new ProtocolException('A codebase query response contains the wrong result count.');
             }
 
+            $resolved = [];
             foreach ($missingKeys as $key) {
-                $bucket[$key] = $reader->readBoolean() ? $decode($reader) : null;
+                $resolved[$key] = $reader->readBoolean() ? $decode($reader) : null;
             }
 
             $reader->finish();
-            $this->cache->values[$bucketId] = $bucket;
+            foreach ($resolved as $key => $value) {
+                $this->cache->values[$bucketId][$key] = $value;
+            }
         }
 
         $result = [];
         foreach ($keys as $key) {
             /** @var T|null $value */
-            $value = $bucket[$key] ?? null;
+            $value = $this->cache->values[$bucketId][$key] ?? null;
             $result[] = $value;
         }
 
@@ -841,7 +843,6 @@ final class Codebase
             return [];
         }
 
-        $bucket = $this->cache->existence[$predicate] ?? [];
         $keys = [];
         $missingNames = [];
         $missingKeys = [];
@@ -852,7 +853,7 @@ final class Codebase
 
             $key = $predicate === Protocol::EXISTS_CONSTANT ? $name : strtolower($name);
             $keys[] = $key;
-            if (!array_key_exists($key, $bucket)) {
+            if (!array_key_exists($key, $this->cache->existence[$predicate] ?? [])) {
                 $missingNames[] = $name;
                 $missingKeys[] = $key;
             }
@@ -867,18 +868,21 @@ final class Codebase
                 throw new ProtocolException('A codebase existence response contains the wrong result count.');
             }
 
+            $resolved = [];
             foreach ($missingKeys as $index => $key) {
-                $bucket[$key] = $results[$index] ?? throw new ProtocolException(
+                $resolved[$key] = $results[$index] ?? throw new ProtocolException(
                     'A codebase existence response is misaligned.',
                 );
             }
 
-            $this->cache->existence[$predicate] = $bucket;
+            foreach ($resolved as $key => $value) {
+                $this->cache->existence[$predicate][$key] = $value;
+            }
         }
 
         $result = [];
         foreach ($keys as $key) {
-            $result[] = $bucket[$key] ?? false;
+            $result[] = $this->cache->existence[$predicate][$key] ?? false;
         }
 
         return $result;
@@ -895,7 +899,6 @@ final class Codebase
         }
 
         $bucketId = 256 | $predicate;
-        $bucket = $this->cache->existence[$bucketId] ?? [];
         $keys = [];
         $missingMembers = [];
         $missingKeys = [];
@@ -903,7 +906,7 @@ final class Codebase
             $memberName = $predicate === Protocol::EXISTS_METHOD ? strtolower($member->member) : $member->member;
             $key = strtolower($member->class) . "\0" . $memberName;
             $keys[] = $key;
-            if (!array_key_exists($key, $bucket)) {
+            if (!array_key_exists($key, $this->cache->existence[$bucketId] ?? [])) {
                 $missingMembers[] = $member;
                 $missingKeys[] = $key;
             }
@@ -923,18 +926,21 @@ final class Codebase
                 throw new ProtocolException('A codebase member-existence response contains the wrong result count.');
             }
 
+            $resolved = [];
             foreach ($missingKeys as $index => $key) {
-                $bucket[$key] = $results[$index] ?? throw new ProtocolException(
+                $resolved[$key] = $results[$index] ?? throw new ProtocolException(
                     'A codebase member-existence response is misaligned.',
                 );
             }
 
-            $this->cache->existence[$bucketId] = $bucket;
+            foreach ($resolved as $key => $value) {
+                $this->cache->existence[$bucketId][$key] = $value;
+            }
         }
 
         $result = [];
         foreach ($keys as $key) {
-            $result[] = $bucket[$key] ?? false;
+            $result[] = $this->cache->existence[$bucketId][$key] ?? false;
         }
 
         return $result;
@@ -950,7 +956,6 @@ final class Codebase
             return [];
         }
 
-        $bucket = $this->cache->relations[$relation] ?? [];
         $keys = [];
         $missingNames = [];
         $missingKeys = [];
@@ -961,7 +966,7 @@ final class Codebase
 
             $key = strtolower($name);
             $keys[] = $key;
-            if (!array_key_exists($key, $bucket)) {
+            if (!array_key_exists($key, $this->cache->relations[$relation] ?? [])) {
                 $missingNames[] = $name;
                 $missingKeys[] = $key;
             }
@@ -976,18 +981,21 @@ final class Codebase
                 throw new ProtocolException('A codebase relation response contains the wrong result count.');
             }
 
+            $resolved = [];
             foreach ($missingKeys as $index => $key) {
-                $bucket[$key] = $results[$index] ?? throw new ProtocolException(
+                $resolved[$key] = $results[$index] ?? throw new ProtocolException(
                     'A codebase relation response is misaligned.',
                 );
             }
 
-            $this->cache->relations[$relation] = $bucket;
+            foreach ($resolved as $key => $value) {
+                $this->cache->relations[$relation][$key] = $value;
+            }
         }
 
         $result = [];
         foreach ($keys as $key) {
-            $result[] = $bucket[$key] ?? [];
+            $result[] = $this->cache->relations[$relation][$key] ?? [];
         }
 
         return $result;
