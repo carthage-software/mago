@@ -12,7 +12,9 @@ use mago_syntax::cst::PropertyHookConcreteBody;
 use mago_syntax::cst::PropertyItem;
 use mago_syntax::cst::Sequence;
 
+use crate::internal::checker::MAY_BE_CALLABLE;
 use crate::internal::checker::function_like::check_for_promoted_properties_outside_constructor;
+use crate::internal::checker::hint_type_mask;
 use crate::internal::context::Context;
 
 /// PHP rejects a set visibility wider than the read visibility, such as `protected public(set)`.
@@ -484,7 +486,7 @@ pub fn check_property(
             );
         }
 
-        if hint.is_bottom() {
+        if hint.is_bottom() || hint_type_mask(hint).0 & MAY_BE_CALLABLE != 0 {
             let hint_name = BytesDisplay(context.get_code_snippet(hint));
             context.report(
                 Issue::error(format!(

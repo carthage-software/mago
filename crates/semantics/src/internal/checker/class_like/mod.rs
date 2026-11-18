@@ -23,6 +23,8 @@ use mago_syntax::cst::Sequence;
 use mago_syntax::cst::Trait;
 use mago_syntax::cst::TraitUseAliasAdaptation;
 
+use crate::internal::checker::MAY_BE_CALLABLE;
+use crate::internal::checker::hint_type_mask;
 use crate::internal::checker::partial_application;
 use crate::internal::consts::ANONYMOUS_CLASS_NAME;
 use crate::internal::consts::CONSTRUCTOR_MAGIC_METHOD;
@@ -1396,6 +1398,31 @@ pub fn check_members<'ast, 'arena>(
                                 );
                             } else {
                                 property_names.push((true, item_name_bytes, parameter.variable.span()));
+                            }
+
+                            if let Some(hint) = &parameter.hint
+                                && hint_type_mask(hint).0 & MAY_BE_CALLABLE != 0
+                            {
+                                let hint_name = BytesDisplay(context.get_code_snippet(hint));
+
+                                context.report(
+                                    Issue::error(format!(
+                                        "Property `{class_like_name}::{item_name}` cannot have type `{hint_name}`."
+                                    ))
+                                    .with_annotation(
+                                        Annotation::primary(hint.span())
+                                            .with_message(format!("Type `{hint_name}` is not allowed on properties.")),
+                                    )
+                                    .with_annotation(
+                                        Annotation::secondary(parameter.variable.span())
+                                            .with_message(format!("Property `{item_name}` declared here.")),
+                                    )
+                                    .with_annotation(
+                                        Annotation::secondary(class_like_span).with_message(format!(
+                                            "{class_like_kind} `{class_like_fqcn}` defined here."
+                                        )),
+                                    ),
+                                );
                             }
                         }
                     }
