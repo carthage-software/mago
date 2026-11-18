@@ -16,6 +16,7 @@ use mago_syntax::cst::For;
 use mago_syntax::cst::Function;
 use mago_syntax::cst::FunctionLikeParameterList;
 use mago_syntax::cst::FunctionLikeReturnTypeHint;
+use mago_syntax::cst::Global;
 use mago_syntax::cst::Goto;
 use mago_syntax::cst::Hint;
 use mago_syntax::cst::Instantiation;
@@ -28,11 +29,13 @@ use mago_syntax::cst::PartialApplication;
 use mago_syntax::cst::Pipe;
 use mago_syntax::cst::Program;
 use mago_syntax::cst::Statement;
+use mago_syntax::cst::Static;
 use mago_syntax::cst::Switch;
 use mago_syntax::cst::Trait;
 use mago_syntax::cst::TraitUseAliasAdaptation;
 use mago_syntax::cst::Try;
 use mago_syntax::cst::UnaryPrefixOperator;
+use mago_syntax::cst::Unset;
 use mago_syntax::walker::Walker;
 
 use crate::internal::context::Context;
@@ -173,6 +176,21 @@ impl<'ast, 'arena> Walker<'ast, 'arena, Context<'_, 'ast, 'arena>> for CheckingW
         context: &mut Context<'_, 'ast, 'arena>,
     ) {
         checker::attribute::check_attribute_list(attribute_list, context);
+    }
+
+    #[inline]
+    fn walk_in_global(&self, global: &'ast Global<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
+        checker::statement::check_global(global, context);
+    }
+
+    #[inline]
+    fn walk_in_static(&self, r#static: &'ast Static<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
+        checker::statement::check_static(r#static, context);
+    }
+
+    #[inline]
+    fn walk_in_unset(&self, unset: &'ast Unset<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
+        checker::statement::check_unset(unset, context);
     }
 
     #[inline]

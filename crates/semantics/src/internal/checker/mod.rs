@@ -1,5 +1,8 @@
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::cst::Block;
+use mago_syntax::cst::DirectVariable;
 use mago_syntax::cst::Hint;
 
 use crate::internal::consts::CALL_MAGIC_METHOD;
@@ -182,4 +185,17 @@ fn hint_contains_generator(context: &mut Context<'_, '_, '_>, hint: &Hint) -> bo
         }
         _ => false,
     }
+}
+
+#[inline]
+fn check_this_variable(variable: &DirectVariable, message: &str, context: &mut Context<'_, '_, '_>) {
+    if variable.name != b"$this" {
+        return;
+    }
+
+    context.report(
+        Issue::error(message.to_string())
+            .with_annotation(Annotation::primary(variable.span()).with_message("`$this` used here."))
+            .with_note("`$this` always refers to the current object, and it cannot be bound to another value."),
+    );
 }

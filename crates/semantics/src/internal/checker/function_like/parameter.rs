@@ -7,6 +7,7 @@ use mago_span::Span;
 use mago_syntax::cst::FunctionLikeParameterList;
 use mago_syntax::cst::Modifier;
 
+use crate::internal::checker::check_this_variable;
 use crate::internal::checker::class_like::property::check_set_visibility_is_not_wider;
 use crate::internal::context::Context;
 
@@ -25,6 +26,8 @@ pub fn check_parameter_list(
                 ),
             );
         }
+
+        check_this_variable(&parameter.variable, "Cannot use `$this` as a parameter.", context);
 
         let name_bytes = parameter.variable.name;
         let name = BytesDisplay(name_bytes);

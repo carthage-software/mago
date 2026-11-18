@@ -5,6 +5,7 @@ use mago_span::HasSpan;
 use mago_syntax::cst::Hint;
 use mago_syntax::cst::Try;
 
+use crate::internal::checker::check_this_variable;
 use crate::internal::context::Context;
 
 #[inline]
@@ -18,6 +19,10 @@ pub fn check_try<'arena>(r#try: &Try<'arena>, context: &mut Context<'_, '_, 'are
                     .with_help("Add a variable to the `catch` clause to store the exception, or upgrade to PHP 8.0.")
                     .with_link("https://www.php.net/manual/en/language.exceptions.php"),
             );
+        }
+
+        if let Some(variable) = &catch.variable {
+            check_this_variable(variable, "Cannot re-assign `$this`.", context);
         }
 
         let union_supported = context.version.is_supported(Feature::CatchUnionType);
