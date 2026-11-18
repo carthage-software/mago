@@ -30,6 +30,7 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::context::utils::inherit_too_wide_thrown_exceptions;
 use crate::error::AnalysisError;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
@@ -269,6 +270,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
             inferred_parameter_types,
             inferred_return_type,
         )?;
+
+        if block_context.flags.inside_call() {
+            inherit_too_wide_thrown_exceptions(context, block_context, &inner_block_context);
+        }
 
         for referenced_variable in inner_block_context.references_to_external_scope {
             let Some(inner_type) = inner_block_context.locals.remove(&referenced_variable) else {

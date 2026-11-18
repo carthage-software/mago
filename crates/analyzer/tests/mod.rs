@@ -3132,12 +3132,8 @@ fn throw_context_in_terminating_branches_without_unhandled_check() {
     .run();
 }
 
-test_case!(too_wide_throws, expected_issue_counts = [("too-wide-throw-type", 11), ("unhandled-thrown-type", 1)]);
-test_case!(
-    array_map_callback_empty,
-    crate::framework::default_test_settings(),
-    expected_issue_counts = [("too-wide-throw-type", 2)]
-);
+test_case!(too_wide_throws, expected_issue_counts = [("too-wide-throw-type", 10), ("unhandled-thrown-type", 1)]);
+test_case!(array_map_callback_empty, crate::framework::default_test_settings());
 #[test]
 fn array_map_callback_empty_option_off() {
     let content = include_bytes!("cases/array_map_callback_empty.php");
@@ -3220,6 +3216,7 @@ test_case!(multilevel_inheritance_unbound_template_bound);
 test_case!(partial_union_method_call);
 test_case!(iterator_foreach_value_type);
 test_case!(inherited_too_wide_throw_type, expected_issue_counts = [("too-wide-throw-type", 1)]);
+test_case!(too_wide_closure_argument, expected_issue_counts = [("too-wide-throw-type", 2)]);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);

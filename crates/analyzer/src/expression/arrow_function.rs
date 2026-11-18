@@ -12,6 +12,7 @@ use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::context::utils::inherit_too_wide_thrown_exceptions;
 use crate::error::AnalysisError;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
@@ -152,6 +153,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
             inferred_parameter_types,
             inferred_return_type,
         )?;
+
+        if block_context.flags.inside_call() {
+            inherit_too_wide_thrown_exceptions(context, block_context, &inner_block_context);
+        }
 
         let resulting_closure = resolve_closure_like_type(
             context,
