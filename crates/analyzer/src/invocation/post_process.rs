@@ -108,6 +108,19 @@ where
         return Ok(());
     };
 
+    if metadata.flags.is_built_in()
+        && let FunctionLikeIdentifier::Function(name) = identifier
+        && name.as_bytes().eq_ignore_ascii_case(b"get_object_vars")
+        && let Some(object_type) = parameters.get(&word(b"$object"))
+    {
+        crate::plugin::libraries::stdlib::object::record_get_object_vars_property_reads(
+            context.codebase,
+            &block_context.scope,
+            &mut artifacts.symbol_references,
+            object_type,
+        );
+    }
+
     let callable_kind_str = match identifier {
         FunctionLikeIdentifier::Function(_) => "function",
         FunctionLikeIdentifier::Method(_, _) => "method",
