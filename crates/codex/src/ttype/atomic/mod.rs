@@ -833,7 +833,7 @@ pub(crate) fn append_intersection_ids(mut base: Word, intersection_types: &[TAto
 fn add_symbol_reference(reference_source: &ReferenceSource, symbol_references: &mut SymbolReferences, name: Word) {
     let name = name.to_ascii_lowercase();
     match reference_source {
-        ReferenceSource::Symbol(in_signature, a) => {
+        ReferenceSource::Symbol(in_signature, a) | ReferenceSource::ClassLike(in_signature, a) => {
             symbol_references.add_symbol_reference_to_symbol(*a, name, *in_signature);
         }
         ReferenceSource::ClassLikeMember(in_signature, a, b) => {
@@ -931,6 +931,7 @@ pub fn populate_atomic_type(
             }
 
             if let Some(reference_source) = reference_source {
+                symbol_references.add_class_like_reference(*reference_source, name.to_ascii_lowercase());
                 add_symbol_reference(reference_source, symbol_references, name);
             }
         }
@@ -959,6 +960,7 @@ pub fn populate_atomic_type(
                 }
 
                 if let Some(reference_source) = reference_source {
+                    symbol_references.add_class_like_reference(*reference_source, name.to_ascii_lowercase());
                     add_symbol_reference(reference_source, symbol_references, *name);
                 }
 
@@ -991,12 +993,20 @@ pub fn populate_atomic_type(
                 }
             }
             TReference::Member { class_like_name, member_selector } => {
+                if let Some(reference_source) = reference_source {
+                    symbol_references.add_class_like_reference(*reference_source, *class_like_name);
+                }
                 if let TReferenceMemberSelector::Identifier(member_name) = member_selector
                     && let Some(reference_source) = reference_source
                 {
                     match reference_source {
-                        ReferenceSource::Symbol(in_signature, a) => symbol_references
-                            .add_symbol_reference_to_class_member(*a, (*class_like_name, *member_name), *in_signature),
+                        ReferenceSource::Symbol(in_signature, a) | ReferenceSource::ClassLike(in_signature, a) => {
+                            symbol_references.add_symbol_reference_to_class_member(
+                                *a,
+                                (*class_like_name, *member_name),
+                                *in_signature,
+                            )
+                        }
                         ReferenceSource::ClassLikeMember(in_signature, a, b) => symbol_references
                             .add_class_member_reference_to_class_member(
                                 (*a, *b),

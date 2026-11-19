@@ -4,11 +4,63 @@ use std::time::Duration;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::SymbolReferences;
 use mago_collector::DeferredPragmas;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
+use mago_word::WordSet;
+use mago_word::word;
 
 use crate::code::IssueCode;
 use crate::statement::class_like::unused_members::UnusedMemberSpans;
 use crate::statement::class_like::unused_members::find_unused_member_spans;
+
+#[must_use]
+pub fn find_unused_classes(codebase: &CodebaseMetadata, references: &SymbolReferences) -> IssueCollection {
+    let referenced_classes: WordSet = references.referenced_class_likes().collect();
+    let phpunit_test_case = word(b"phpunit\\framework\\testcase");
+    let has_phpbench = codebase.class_like_exists(b"PhpBench\\Benchmark\\Metadata\\MetadataFactory");
+
+    codebase
+        .class_likes
+        .values()
+        .filter_map(|class| {
+            if !class.kind.is_class()
+                || !class.flags.is_user_defined()
+                || class.flags.is_unchecked()
+                || class.flags.is_public_api()
+                || referenced_classes.contains(&class.name)
+                || class.direct_parent_class == Some(phpunit_test_case)
+                || class.all_parent_classes.contains(&phpunit_test_case)
+            {
+                return None;
+            }
+            if has_phpbench
+                && class.declaring_method_ids.iter().any(|(name, identifier)| {
+                    codebase.get_method_by_id(identifier).is_some_and(|method| {
+                        codebase
+                            .get_method_visibility(class.name.as_bytes(), name.as_bytes())
+                            .is_some_and(|visibility| visibility.is_public())
+                            && (name.as_bytes().starts_with(b"bench")
+                                || method.attributes.iter().any(|attribute| {
+                                    attribute.name.as_bytes().eq_ignore_ascii_case(b"PhpBench\\Attributes\\Subject")
+                                }))
+                    })
+                })
+            {
+                return None;
+            }
+            let name_span = class.name_span?;
+            Some(
+                Issue::warning(format!("Class `{}` is never referenced.", class.original_name))
+                    .with_code(IssueCode::UnusedClass)
+                    .with_annotation(
+                        Annotation::primary(name_span).with_message("No references to this class were found"),
+                    )
+                    .with_help("Remove the class if it is unused, or mark it with `@api` if it is used externally."),
+            )
+        })
+        .collect()
+}
 
 #[derive(Clone, Debug)]
 pub struct AnalysisResult {

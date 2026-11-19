@@ -1,3 +1,16 @@
 variant = "strict"
 
-[entries]
+[[entries."src/InheritChild.php".issues]]
+code = "unused-class"
+start_line = 9
+end_line = 9
+
+[[entries."src/PassthroughChild.php".issues]]
+code = "unused-class"
+start_line = 9
+end_line = 9
+
+[[entries."src/SpecifyChild.php".issues]]
+code = "unused-class"
+start_line = 9
+end_line = 9

@@ -872,15 +872,24 @@ where
     }
 
     for parent_class in &class_like_metadata.all_parent_classes {
-        artifacts.symbol_references.add_symbol_reference_to_symbol(class_like_metadata.name, *parent_class, true);
+        artifacts.symbol_references.add_class_like_reference(
+            mago_codex::reference::ReferenceSource::ClassLike(true, class_like_metadata.name),
+            *parent_class,
+        );
     }
 
     for parent_interface in &class_like_metadata.all_parent_interfaces {
-        artifacts.symbol_references.add_symbol_reference_to_symbol(class_like_metadata.name, *parent_interface, true);
+        artifacts.symbol_references.add_class_like_reference(
+            mago_codex::reference::ReferenceSource::ClassLike(true, class_like_metadata.name),
+            *parent_interface,
+        );
     }
 
     for trait_name in &class_like_metadata.used_traits {
-        artifacts.symbol_references.add_symbol_reference_to_symbol(class_like_metadata.name, *trait_name, true);
+        artifacts.symbol_references.add_class_like_reference(
+            mago_codex::reference::ReferenceSource::ClassLike(true, class_like_metadata.name),
+            *trait_name,
+        );
     }
 
     if class_like_metadata.flags.is_unchecked() {

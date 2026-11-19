@@ -146,8 +146,9 @@ fn add_attribute_reference(
     name: Word,
     in_signature_override: Option<bool>,
 ) {
+    symbol_references.add_class_like_reference(*reference_source, name);
     match reference_source {
-        ReferenceSource::Symbol(in_signature, a) => {
+        ReferenceSource::Symbol(in_signature, a) | ReferenceSource::ClassLike(in_signature, a) => {
             symbol_references.add_symbol_reference_to_symbol(*a, name, in_signature_override.unwrap_or(*in_signature));
         }
         ReferenceSource::ClassLikeMember(in_signature, a, b) => {

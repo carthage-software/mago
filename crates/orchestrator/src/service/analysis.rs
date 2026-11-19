@@ -161,12 +161,13 @@ impl AnalysisService {
 
         // Run the analyzer
         let mut analysis_result = AnalysisResult::new(self.symbol_references);
+        let find_unused_definitions = self.settings.find_unused_definitions;
         let mut analyzer =
             Analyzer::new(&arena, &file, &resolved_names, &self.codebase, &self.plugin_registry, self.settings);
         if let Some(requirements) = node_analysis_requirements.as_ref() {
             analyzer = analyzer.with_node_analysis_requirements(requirements);
         }
-        if after_file || after_analysis {
+        if find_unused_definitions || after_file || after_analysis {
             analyzer = analyzer.with_deferred_pragmas();
         }
         if let Some(session) = external_session.as_ref() {
@@ -200,6 +201,12 @@ impl AnalysisService {
             }
         }
 
+        if find_unused_definitions {
+            analysis_result.issues.extend(mago_analyzer::analysis_result::find_unused_classes(
+                &self.codebase,
+                &analysis_result.symbol_references,
+            ));
+        }
         let mut pragma_reconciler =
             DeferredIssueReconciler::new(analysis_result.take_deferred_pragmas(), self.database.files());
         analysis_result.issues = pragma_reconciler.reconcile(std::mem::take(&mut analysis_result.issues))?;
@@ -258,8 +265,10 @@ impl AnalysisService {
             Duration::from_millis(u64::from(self.settings.slow_file_warning_threshold_ms));
         let external_session =
             self.plugin_registry.create_external_analysis_session(self.database.files()).map(Arc::new);
-        let retain_project_references =
-            retain_project_references || self.plugin_registry.has_custom_plugins() || external_session.is_some();
+        let retain_project_references = retain_project_references
+            || self.settings.find_unused_definitions
+            || self.plugin_registry.has_custom_plugins()
+            || external_session.is_some();
         let codebase_scan_plan =
             self.plugin_registry.external_codebase_scan_plan().map_err(AnalysisError::from)?.map(Arc::new);
         let parser_settings = ParserSettings {
@@ -273,7 +282,8 @@ impl AnalysisService {
         let reducer = AnalysisResultReducer {
             plugin_registry: Arc::clone(&self.plugin_registry),
             external_session: external_session.clone(),
-            files: if external_session.is_some() {
+            find_unused_definitions: self.settings.find_unused_definitions,
+            files: if self.settings.find_unused_definitions || external_session.is_some() {
                 self.database.files().collect::<Vec<_>>().into()
             } else {
                 Arc::from([])
@@ -394,12 +404,13 @@ impl AnalysisService {
 
                 #[cfg(not(target_arch = "wasm32"))]
                 let analyzer_new_start = trace_enabled.then(Instant::now);
+                let find_unused_definitions = settings.find_unused_definitions;
                 let mut analyzer =
                     Analyzer::new(arena, &source_file, &resolved_names, &codebase, &plugin_registry, settings);
                 if let Some(requirements) = node_analysis_requirements.as_ref() {
                     analyzer = analyzer.with_node_analysis_requirements(requirements);
                 }
-                if after_file || after_analysis {
+                if find_unused_definitions || after_file || after_analysis {
                     analyzer = analyzer.with_deferred_pragmas();
                 }
                 if let Some(session) = external_session.as_deref() {
@@ -506,6 +517,7 @@ struct AnalysisTaskResult {
 
 #[derive(Debug, Clone)]
 struct AnalysisResultReducer {
+    find_unused_definitions: bool,
     plugin_registry: Arc<PluginRegistry>,
     external_session: Option<Arc<mago_analyzer::external::ExternalAnalysisSession>>,
     files: Arc<[Arc<File>]>,
@@ -572,6 +584,12 @@ impl Reducer<AnalysisTaskResult, AnalysisResult> for AnalysisResultReducer {
             }
         }
 
+        if self.find_unused_definitions {
+            aggregated_result.issues.extend(mago_analyzer::analysis_result::find_unused_classes(
+                &codebase,
+                &aggregated_result.symbol_references,
+            ));
+        }
         let mut pragma_reconciler =
             DeferredIssueReconciler::new(aggregated_result.take_deferred_pragmas(), self.files.iter().cloned());
         aggregated_result.issues = pragma_reconciler.reconcile(std::mem::take(&mut aggregated_result.issues))?;

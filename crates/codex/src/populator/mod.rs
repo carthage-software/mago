@@ -254,7 +254,7 @@ fn populate_codebase_inner(
             return false;
         }
         match reference_source(name) {
-            ReferenceSource::Symbol(_, name) => safe_symbols.contains(&name),
+            ReferenceSource::Symbol(_, name) | ReferenceSource::ClassLike(_, name) => safe_symbols.contains(&name),
             ReferenceSource::ClassLikeMember(_, class, member) => {
                 safe_symbols.contains(&class) || safe_symbol_members.contains(&(class, member))
             }
@@ -632,7 +632,7 @@ fn populate_constant(
     force_repopulation: bool,
 ) {
     for attribute_metadata in &constant.attributes {
-        symbol_references.add_symbol_reference_to_symbol(name, attribute_metadata.name, true);
+        symbol_references.add_class_like_reference(ReferenceSource::Symbol(true, name), attribute_metadata.name);
     }
 
     if let Some(type_metadata) = &mut constant.type_metadata {

@@ -95,7 +95,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Binary<'arena> {
 
                 if let Expression::Identifier(identifier) = self.rhs {
                     let class_name = context.resolved_names.get(identifier);
-                    artifacts.symbol_references.add_reference_to_symbol(
+                    artifacts.symbol_references.add_reference_to_class_like(
                         &block_context.scope,
                         mago_word::ascii_lowercase_word(class_name),
                         false,

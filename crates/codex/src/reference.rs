@@ -23,6 +23,7 @@ pub enum ReferenceSource {
     /// The bool indicates if the reference occurs within a signature context (true) or body (false).
     /// The Word is the name (FQCN or FQN) of the referencing symbol.
     Symbol(bool, Word),
+    ClassLike(bool, Word),
     /// A reference from a member within a class-like structure (method, property, class constant, enum case).
     /// The bool indicates if the reference occurs within a signature context (true) or body (false).
     /// The first Word is the FQCN of the class-like structure.
@@ -31,6 +32,27 @@ pub enum ReferenceSource {
     /// A reference from top-level code in a source file.
     /// The bool indicates if the reference occurs within a signature context.
     File(bool, Word),
+}
+
+impl ReferenceSource {
+    fn origin(self) -> (ReferenceOrigin, bool) {
+        match self {
+            Self::Symbol(signature, name) | Self::ClassLike(signature, name) => {
+                (ReferenceOrigin::Symbol((name, empty_word())), signature)
+            }
+            Self::ClassLikeMember(signature, class, member) => (ReferenceOrigin::Symbol((class, member)), signature),
+            Self::File(signature, file) => (ReferenceOrigin::File(file), signature),
+        }
+    }
+
+    fn with_signature(self, signature: bool) -> Self {
+        match self {
+            Self::Symbol(_, name) => Self::Symbol(signature, name),
+            Self::ClassLike(_, name) => Self::ClassLike(signature, name),
+            Self::ClassLikeMember(_, class, member) => Self::ClassLikeMember(signature, class, member),
+            Self::File(_, file) => Self::File(signature, file),
+        }
+    }
 }
 
 /// Identifies where a recorded symbol reference originates.
@@ -68,6 +90,8 @@ pub enum SymbolReferenceKind {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::struct_field_names)]
 pub struct SymbolReferences {
+    #[cfg_attr(feature = "serde", serde(default))]
+    class_like_references: HashMap<ReferenceSource, HashSet<Word>>,
     /// Maps a referencing symbol/member `(RefSymbol, RefMember)` to a set of referenced symbols/members `(Symbol, Member)`
     /// found within the *body* of the referencing context.
     /// `RefMember` or `Member` being empty usually signifies the symbol itself.
@@ -123,7 +147,8 @@ impl SymbolReferences {
     #[inline]
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.symbol_references_to_symbols.is_empty()
+        self.class_like_references.is_empty()
+            && self.symbol_references_to_symbols.is_empty()
             && self.symbol_references_to_symbols_in_signature.is_empty()
             && self.symbol_references_to_overridden_members.is_empty()
             && self.functionlike_references_to_functionlike_returns.is_empty()
@@ -155,7 +180,8 @@ impl SymbolReferences {
     #[inline]
     #[must_use]
     pub fn total_map_entries(&self) -> usize {
-        self.symbol_references_to_symbols.len()
+        self.class_like_references.len()
+            + self.symbol_references_to_symbols.len()
             + self.symbol_references_to_symbols_in_signature.len()
             + self.symbol_references_to_overridden_members.len()
             + self.functionlike_references_to_functionlike_returns.len()
@@ -262,6 +288,7 @@ impl SymbolReferences {
         class_member: SymbolIdentifier,
         in_signature: bool,
     ) {
+        self.record_class_like_reference(ReferenceSource::ClassLike(in_signature, referencing_symbol), class_member.0);
         // Reference the class itself implicitly (in body context)
         self.add_symbol_reference_to_symbol(referencing_symbol, class_member.0, false);
 
@@ -399,6 +426,10 @@ impl SymbolReferences {
         class_member: SymbolIdentifier,
         in_signature: bool,
     ) {
+        self.record_class_like_reference(
+            ReferenceSource::ClassLikeMember(in_signature, referencing_class_member.0, referencing_class_member.1),
+            class_member.0,
+        );
         if referencing_class_member == class_member {
             return;
         }
@@ -463,6 +494,7 @@ impl SymbolReferences {
         in_signature: bool,
     ) {
         if !class_member.1.is_empty() {
+            self.record_class_like_reference(ReferenceSource::File(in_signature, file_name), class_member.0);
             self.add_file_reference_to_class_member(file_name, (class_member.0, empty_word()), false);
         }
 
@@ -484,7 +516,51 @@ impl SymbolReferences {
         class_member: SymbolIdentifier,
         in_signature: bool,
     ) {
+        if let Some(source) = scope.get_reference_source() {
+            self.record_class_like_reference(source.with_signature(in_signature), class_member.0);
+        }
         self.add_reference(scope.get_reference_origin(), class_member, in_signature);
+    }
+
+    pub fn add_class_like_reference(&mut self, source: ReferenceSource, target: Word) {
+        let target = target.to_ascii_lowercase();
+        self.record_class_like_reference(source, target);
+        let (origin, in_signature) = source.origin();
+        self.add_reference(origin, (target, empty_word()), in_signature);
+    }
+
+    fn record_class_like_reference(&mut self, source: ReferenceSource, target: Word) {
+        let target = target.to_ascii_lowercase();
+        if matches!(source, ReferenceSource::ClassLike(_, class) | ReferenceSource::ClassLikeMember(_, class, _) if class == target)
+        {
+            return;
+        }
+        if source.origin().1 {
+            let body_source = source.with_signature(false);
+            if let Some(targets) = self.class_like_references.get_mut(&body_source) {
+                targets.remove(&target);
+                if targets.is_empty() {
+                    self.class_like_references.remove(&body_source);
+                }
+            }
+        } else if self
+            .class_like_references
+            .get(&source.with_signature(true))
+            .is_some_and(|targets| targets.contains(&target))
+        {
+            return;
+        }
+        insert_reference(&mut self.class_like_references, source, target);
+    }
+
+    pub fn add_reference_to_class_like(&mut self, scope: &ScopeContext<'_>, target: Word, in_signature: bool) {
+        if let Some(source) = scope.get_reference_source() {
+            self.add_class_like_reference(source.with_signature(in_signature), target);
+        }
+    }
+
+    pub fn referenced_class_likes(&self) -> impl Iterator<Item = Word> + '_ {
+        self.class_like_references.values().flat_map(|targets| targets.iter().copied())
     }
 
     #[inline]
@@ -560,6 +636,11 @@ impl SymbolReferences {
     /// Signature edges suppress matching body edges; other reference roles stay distinct.
     #[inline]
     pub fn extend(&mut self, other: Self) {
+        for (source, targets) in other.class_like_references {
+            for target in targets {
+                self.record_class_like_reference(source, target);
+            }
+        }
         extend_dependencies(
             &mut self.symbol_references_to_symbols,
             &mut self.symbol_references_to_symbols_in_signature,
@@ -824,6 +905,17 @@ impl SymbolReferences {
             if key.1.is_empty() { safe_symbols.contains(&key.0) } else { safe_symbol_members.contains(key) }
         };
 
+        for (source, targets) in &previous.class_like_references {
+            let (ReferenceOrigin::Symbol(key), false) = source.origin() else {
+                continue;
+            };
+            if is_safe(&key) && !self.class_like_references.contains_key(source) {
+                for target in targets {
+                    self.record_class_like_reference(*source, *target);
+                }
+            }
+        }
+
         // Restore body references for safe symbols
         for (key, refs) in &previous.symbol_references_to_symbols {
             if is_safe(key) && !self.symbol_references_to_symbols.contains_key(key) {
@@ -890,6 +982,12 @@ impl SymbolReferences {
     ) {
         // Remove body (not signature) references
         for key in symbols_and_members {
+            if key.1.is_empty() {
+                self.class_like_references.remove(&ReferenceSource::Symbol(false, key.0));
+                self.class_like_references.remove(&ReferenceSource::ClassLike(false, key.0));
+            } else {
+                self.class_like_references.remove(&ReferenceSource::ClassLikeMember(false, key.0, key.1));
+            }
             self.symbol_references_to_symbols.remove(key);
             self.symbol_references_to_overridden_members.remove(key);
             self.property_write_references.remove(key);
@@ -909,6 +1007,7 @@ impl SymbolReferences {
 
         // Remove file-level body references (signature refs kept)
         for name in file_names {
+            self.class_like_references.remove(&ReferenceSource::File(false, *name));
             self.file_references_to_symbols.remove(name);
             self.file_property_write_references.remove(name);
             self.file_property_read_references.remove(name);
@@ -921,6 +1020,9 @@ impl SymbolReferences {
     /// references must be rebuilt because either may have changed.
     #[inline]
     pub fn remove_references_from_files(&mut self, file_names: &WordSet) {
+        self.class_like_references.retain(
+            |source, _| !matches!(source.origin().0, ReferenceOrigin::File(file) if file_names.contains(&file)),
+        );
         for name in file_names {
             self.file_references_to_symbols.remove(name);
             self.file_references_to_symbols_in_signature.remove(name);
@@ -932,6 +1034,9 @@ impl SymbolReferences {
     /// Removes references whose source files no longer exist in the current codebase.
     #[inline]
     pub fn retain_references_from_files(&mut self, file_names: &WordSet) {
+        self.class_like_references.retain(
+            |source, _| !matches!(source.origin().0, ReferenceOrigin::File(file) if !file_names.contains(&file)),
+        );
         self.file_references_to_symbols.retain(|name, _| file_names.contains(name));
         self.file_references_to_symbols_in_signature.retain(|name, _| file_names.contains(name));
         self.file_property_write_references.retain(|name, _| file_names.contains(name));
@@ -945,6 +1050,7 @@ impl SymbolReferences {
     /// * `invalid_symbols_and_members`: A set containing `(SymbolName, MemberName)` tuples for invalid items.
     #[inline]
     pub fn remove_references_from_invalid_symbols(&mut self, invalid_symbols_and_members: &HashSet<SymbolIdentifier>) {
+        self.class_like_references.retain(|source, _| !matches!(source.origin().0, ReferenceOrigin::Symbol(key) if invalid_symbols_and_members.contains(&key)));
         // Retain only entries where the key (referencing item) is NOT in the invalid set.
         self.symbol_references_to_symbols
             .retain(|referencing_item, _| !invalid_symbols_and_members.contains(referencing_item));
@@ -976,6 +1082,10 @@ impl SymbolReferences {
             if key.1.is_empty() { safe_symbols.contains(&key.0) } else { safe_symbol_members.contains(key) }
         };
 
+        self.class_like_references.retain(|source, _| match source.origin().0 {
+            ReferenceOrigin::Symbol(key) => is_safe(&key),
+            ReferenceOrigin::File(_) => true,
+        });
         self.symbol_references_to_symbols.retain(|k, _| is_safe(k));
         self.symbol_references_to_symbols_in_signature.retain(|k, _| is_safe(k));
         self.symbol_references_to_overridden_members.retain(|k, _| is_safe(k));
@@ -1000,6 +1110,14 @@ impl SymbolReferences {
     /// Much faster when the dirty set is small relative to the total number of references.
     pub fn remove_dirty_symbol_references(&mut self, dirty_symbols: &HashSet<SymbolIdentifier>) {
         for key in dirty_symbols {
+            for signature in [false, true] {
+                if key.1.is_empty() {
+                    self.class_like_references.remove(&ReferenceSource::Symbol(signature, key.0));
+                    self.class_like_references.remove(&ReferenceSource::ClassLike(signature, key.0));
+                } else {
+                    self.class_like_references.remove(&ReferenceSource::ClassLikeMember(signature, key.0, key.1));
+                }
+            }
             self.symbol_references_to_symbols.remove(key);
             self.symbol_references_to_symbols_in_signature.remove(key);
             self.symbol_references_to_overridden_members.remove(key);
