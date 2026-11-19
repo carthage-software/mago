@@ -8,12 +8,9 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
-use mago_syntax::cst::Access;
-use mago_syntax::cst::ClassLikeMemberSelector;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::NodeKind;
-use mago_syntax::cst::Variable;
 use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
 
@@ -22,6 +19,7 @@ use crate::context::LintContext;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
+use crate::rule::utils::misc::is_plain_reference;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -134,27 +132,6 @@ impl LintRule for PreferNullCoalescingAssignmentRule {
             );
             edits.push(TextEdit::delete(binary.span().from_start(assignment.rhs.span().end)).with_safety(safety));
         });
-    }
-}
-
-/// Whether evaluating the expression twice, as `??` followed by `=` does, reads the same target without side effects.
-fn is_plain_reference(expression: &Expression<'_>) -> bool {
-    match expression {
-        Expression::Variable(Variable::Direct(_)) => true,
-        Expression::Access(Access::Property(access)) => {
-            matches!(access.property, ClassLikeMemberSelector::Identifier(_)) && is_plain_reference(access.object)
-        }
-        Expression::Access(Access::StaticProperty(access)) => {
-            matches!(
-                access.class,
-                Expression::Identifier(_) | Expression::Self_(_) | Expression::Static(_) | Expression::Parent(_)
-            ) && matches!(access.property, Variable::Direct(_))
-        }
-        Expression::ArrayAccess(access) => {
-            matches!(access.index, Expression::Literal(_) | Expression::Variable(Variable::Direct(_)))
-                && is_plain_reference(access.array)
-        }
-        _ => false,
     }
 }
 

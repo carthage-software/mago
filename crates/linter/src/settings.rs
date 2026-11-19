@@ -151,6 +151,7 @@ use crate::rule::PreferFakeHelperConfig;
 use crate::rule::PreferFirstClassCallableConfig;
 use crate::rule::PreferInterfaceConfig;
 use crate::rule::PreferNullCoalescingAssignmentConfig;
+use crate::rule::PreferNullCoalescingConfig;
 use crate::rule::PreferPreIncrementConfig;
 use crate::rule::PreferSelfConfig;
 use crate::rule::PreferSelfReturnTypeConfig;
@@ -433,6 +434,7 @@ pub struct RulesSettings {
     pub prefer_pre_increment: RuleSettings<PreferPreIncrementConfig>,
     pub prefer_self_return_type: RuleSettings<PreferSelfReturnTypeConfig>,
     pub prefer_self: RuleSettings<PreferSelfConfig>,
+    pub prefer_null_coalescing: RuleSettings<PreferNullCoalescingConfig>,
     pub prefer_null_coalescing_assignment: RuleSettings<PreferNullCoalescingAssignmentConfig>,
     pub switch_continue_to_break: RuleSettings<SwitchContinueToBreakConfig>,
     pub no_null_property_init: RuleSettings<NoNullPropertyInitConfig>,
