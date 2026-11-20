@@ -25,4 +25,16 @@ final class ParameterMetadata
         public readonly array $attributes,
         public readonly MetadataFlags $flags,
     ) {}
+
+    public function callableInvocationKind(): ?CallableInvocationKind
+    {
+        $immediate = $this->flags->contains(MetadataFlags::IMMEDIATELY_INVOKED_CALLABLE);
+        $later = $this->flags->contains(MetadataFlags::LATER_INVOKED_CALLABLE);
+
+        return match (true) {
+            $immediate && !$later => CallableInvocationKind::Immediately,
+            $later && !$immediate => CallableInvocationKind::Later,
+            default => null,
+        };
+    }
 }

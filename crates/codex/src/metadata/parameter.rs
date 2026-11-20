@@ -7,6 +7,16 @@ use crate::metadata::ttype::TypeMetadata;
 use crate::misc::VariableIdentifier;
 use crate::ttype::atomic::TAtomic;
 
+/// Describes when a callable passed to a parameter is invoked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum CallableInvocationKind {
+    /// The callable is invoked before the receiving function returns.
+    Immediately,
+    /// The callable may be stored or invoked after the receiving function returns.
+    Later,
+}
+
 /// Contains metadata associated with a single parameter within a function, method, or closure signature.
 ///
 /// This captures details like the parameter's name, type hint, attributes, default value,
@@ -88,6 +98,27 @@ impl FunctionLikeParameterMetadata {
             closure_this_type: None,
             default_type: None,
         }
+    }
+
+    /// Returns the explicitly declared invocation timing, if any.
+    #[inline]
+    #[must_use]
+    pub fn callable_invocation_kind(&self) -> Option<CallableInvocationKind> {
+        match (
+            self.flags.contains(MetadataFlags::IMMEDIATELY_INVOKED_CALLABLE),
+            self.flags.contains(MetadataFlags::LATER_INVOKED_CALLABLE),
+        ) {
+            (true, false) => Some(CallableInvocationKind::Immediately),
+            (false, true) => Some(CallableInvocationKind::Later),
+            _ => None,
+        }
+    }
+
+    /// Sets invocation timing without changing unrelated parameter flags.
+    #[inline]
+    pub fn set_callable_invocation_kind(&mut self, kind: Option<CallableInvocationKind>) {
+        self.flags.set(MetadataFlags::IMMEDIATELY_INVOKED_CALLABLE, kind == Some(CallableInvocationKind::Immediately));
+        self.flags.set(MetadataFlags::LATER_INVOKED_CALLABLE, kind == Some(CallableInvocationKind::Later));
     }
 
     /// Returns a reference to the parameter's name identifier (e.g., `$userId`).

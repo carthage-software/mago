@@ -16,6 +16,7 @@ use mago_algebra::saturate_clauses;
 use mago_codex::assertion::Assertion;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::metadata::parameter::CallableInvocationKind;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -26,6 +27,7 @@ use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::resource::TResource;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
+use mago_codex::ttype::cast::cast_atomic_to_callable;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
@@ -69,9 +71,12 @@ use crate::formula::negate_or_synthesize;
 use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::MethodInvocationKind;
+use crate::invocation::analyzer::get_parameter_of_argument;
 use crate::invocation::arguments::is_argument_mutated_by_reference;
 use crate::invocation::arguments::is_argument_referenceable;
 use crate::invocation::arguments::is_array_multisort;
+use crate::invocation::callbacks::accepts_callable_collection;
+use crate::invocation::callbacks::callback_values_from_array;
 use crate::invocation::resolver::resolve_invocation_type;
 use crate::plugin::provider::assertion::InvocationAssertions;
 use crate::reconciler;
@@ -278,7 +283,7 @@ where
             collect_plugin_throw_types(context, block_context, artifacts, invoication, identifier);
         }
 
-        record_immediate_callback_throw_types(context, block_context, artifacts, invoication, identifier);
+        record_immediate_builtin_callback_throw_types(context, block_context, artifacts, invoication, identifier);
     }
 
     if !apply_assertions {
@@ -429,82 +434,127 @@ where
     )
 }
 
-fn record_immediate_callback_throw_types<'ctx, 'arena, A>(
+fn record_immediate_builtin_callback_throw_types<'ctx, 'arena, A>(
     context: &Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
-    artifacts: &AnalysisArtifacts,
+    artifacts: &mut AnalysisArtifacts,
     invocation: &Invocation<'ctx, '_, 'arena>,
     identifier: &FunctionLikeIdentifier,
 ) where
     A: Arena,
 {
-    let Some(callback_parameter_offset) = immediate_callback_parameter_offset(identifier) else {
+    let Some(target_metadata) = invocation.target.get_function_like_metadata() else {
         return;
     };
 
-    let (Some(callback_expression), _) =
-        get_argument_for_parameter(context, block_context, invocation, Some(callback_parameter_offset), None)
-    else {
-        return;
-    };
-
-    let Some(callback_type) = artifacts.get_expression_type(callback_expression) else {
-        return;
-    };
-
-    let array_map_callback_will_not_run = context.settings.find_overly_wide_throw_types
-        && array_map_callback_is_definitely_not_invoked(artifacts, invocation, identifier);
-
-    if !array_map_callback_will_not_run {
-        for callable in callback_type.types.iter().filter_map(|atomic| match atomic {
-            TAtomic::Callable(TCallable::Alias(identifier)) => Some(*identifier),
-            TAtomic::Callable(TCallable::Signature(signature)) => signature.source,
-            _ => None,
-        }) {
-            record_callback_throw_types(context, block_context, callable, invocation.span);
-        }
-    }
-
-    if !matches!(identifier, FunctionLikeIdentifier::Function(name) if name.as_bytes() == b"preg_replace_callback_array")
+    // Timing alone cannot say whether a userland API catches the callback's exception.
+    if !target_metadata.flags.is_built_in()
+        || !target_metadata
+            .parameters
+            .iter()
+            .any(|parameter| parameter.callable_invocation_kind() == Some(CallableInvocationKind::Immediately))
     {
         return;
     }
 
-    for atomic in callback_type.types.iter() {
+    if context.settings.find_overly_wide_throw_types
+        && array_map_callback_is_definitely_not_invoked(artifacts, invocation, identifier)
+    {
+        return;
+    }
+    let mut callback_expressions = Vec::new();
+    let mut callback_types = Vec::new();
+    for (argument_offset, argument) in invocation.arguments_source.iter_arguments().enumerate() {
+        let Some((parameter_offset, _)) = get_parameter_of_argument(&invocation.target, &argument, argument_offset)
+        else {
+            continue;
+        };
+        let Some(parameter) = target_metadata.parameters.get(parameter_offset) else {
+            continue;
+        };
+        if parameter.callable_invocation_kind() != Some(CallableInvocationKind::Immediately) {
+            continue;
+        }
+        let Some(expression) = argument.value() else {
+            continue;
+        };
+
+        let Some(expression_type) = artifacts.get_expression_type(expression) else {
+            callback_expressions.push(expression);
+            continue;
+        };
+
+        if accepts_callable_collection(parameter) {
+            callback_expressions.extend(callback_values_from_array(expression));
+            callback_types.extend(callback_array_value_types(expression_type));
+        } else {
+            callback_expressions.push(expression);
+        }
+    }
+
+    // A typed alias can also escape through another use. Only a literal owned
+    // by this argument can transfer its diagnostic to the immediate caller.
+    let inline_callbacks = callback_expressions
+        .iter()
+        .map(|expression| unwrap_expression(expression))
+        .filter(|expression| matches!(expression, Expression::Closure(_) | Expression::ArrowFunction(_)))
+        .map(|expression| FunctionLikeIdentifier::for_closure(context.source_file, expression.span()))
+        .collect::<foldhash::HashSet<_>>();
+
+    let callable_identifiers = callback_expressions
+        .iter()
+        .filter_map(|expression| artifacts.get_expression_type(expression))
+        .chain(callback_types)
+        .flat_map(|callback_type| {
+            callback_type.types.iter().filter_map(|atomic| {
+                let callable = cast_atomic_to_callable(atomic, context.codebase, None)?;
+                match callable.as_ref() {
+                    TCallable::Alias(identifier) => Some(*identifier),
+                    TCallable::Signature(signature) => signature.source,
+                }
+            })
+        })
+        .collect::<foldhash::HashSet<_>>();
+
+    for callback in callable_identifiers {
+        if let FunctionLikeIdentifier::Closure(name) = callback
+            && let Some(pending) =
+                artifacts.get_pending_immediate_callback_throws(name, inline_callbacks.contains(&callback))
+        {
+            for (exception, spans) in &pending.exceptions {
+                block_context.possibly_thrown_exceptions.entry(*exception).or_default().extend(spans);
+            }
+            block_context.possibly_thrown_generic_exceptions.extend(pending.generic_exceptions.iter().cloned());
+        }
+        record_callback_throw_types(context, block_context, callback, invocation.span);
+    }
+}
+
+fn callback_array_value_types(callback_array_type: &TUnion) -> Vec<&TUnion> {
+    let mut callback_types = Vec::new();
+    for atomic in callback_array_type.types.iter() {
         let TAtomic::Array(array) = atomic else {
             continue;
         };
 
-        let callback_types = match array {
-            TArray::List(list) => {
-                let mut unions = vec![list.element_type.as_ref()];
-                if let Some(known_elements) = &list.known_elements {
-                    unions.extend(known_elements.values().map(|(_, element)| element));
-                }
-                unions
-            }
+        match array {
             TArray::Keyed(keyed) => {
-                let mut unions = Vec::new();
+                if let Some(items) = &keyed.known_items {
+                    callback_types.extend(items.values().map(|(_, value_type)| value_type));
+                }
                 if let Some((_, value_type)) = &keyed.parameters {
-                    unions.push(value_type.as_ref());
+                    callback_types.push(value_type);
                 }
-                if let Some(known_items) = &keyed.known_items {
-                    unions.extend(known_items.values().map(|(_, item)| item));
-                }
-                unions
             }
-        };
-
-        for callback_type in callback_types {
-            for callable in callback_type.types.iter().filter_map(|atomic| match atomic {
-                TAtomic::Callable(TCallable::Alias(identifier)) => Some(*identifier),
-                TAtomic::Callable(TCallable::Signature(signature)) => signature.source,
-                _ => None,
-            }) {
-                record_callback_throw_types(context, block_context, callable, invocation.span);
+            TArray::List(list) => {
+                if let Some(items) = &list.known_elements {
+                    callback_types.extend(items.values().map(|(_, value_type)| value_type));
+                }
+                callback_types.push(&list.element_type);
             }
         }
     }
+    callback_types
 }
 
 fn array_map_callback_is_definitely_not_invoked(
@@ -604,31 +654,6 @@ fn record_callback_throw_types<'ctx, A>(
                 }
             }
         }
-    }
-}
-
-fn immediate_callback_parameter_offset(identifier: &FunctionLikeIdentifier) -> Option<usize> {
-    let FunctionLikeIdentifier::Function(name) = identifier else {
-        return None;
-    };
-
-    match name.as_bytes() {
-        b"array_all"
-        | b"array_any"
-        | b"array_filter"
-        | b"array_find"
-        | b"array_find_key"
-        | b"array_reduce"
-        | b"array_walk"
-        | b"array_walk_recursive"
-        | b"iterator_apply"
-        | b"preg_replace_callback"
-        | b"uasort"
-        | b"uksort"
-        | b"usort" => Some(1),
-        b"array_map" | b"preg_replace_callback_array" => Some(0),
-        b"call_user_func" | b"call_user_func_array" | b"forward_static_call" | b"forward_static_call_array" => Some(0),
-        _ => None,
     }
 }
 

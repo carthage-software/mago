@@ -973,6 +973,7 @@ function user_error(string $message, int $error_level = E_USER_NOTICE) {}
 
 /**
  * @return callable|null
+ * @param-later-invoked-callable $callback
  */
 function set_error_handler(?callable $callback, int $error_levels = E_ALL) {}
 
@@ -986,6 +987,7 @@ function restore_error_handler(): true {}
 
 /**
  * @return callable|null
+ * @param-later-invoked-callable $callback
  */
 function set_exception_handler(?callable $callback) {}
 

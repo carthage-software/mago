@@ -36,6 +36,8 @@ final class MetadataFlags
     public const EXPERIMENTAL = 1 << 40;
     public const POLYFILL = 1 << 41;
     public const PATCH = 1 << 42;
+    public const IMMEDIATELY_INVOKED_CALLABLE = 1 << 48;
+    public const LATER_INVOKED_CALLABLE = 1 << 49;
 
     public function __construct(
         public readonly int $bits,

@@ -26,6 +26,32 @@ If your code were an essay, the linter is the grammar pass and the analyzer is t
 - **Speed.** Rust core, parallelised, runs an entire project in seconds.
 - **Heuristic checks.** A configurable set of advisory checks for code-quality concerns that are not strict errors but often indicate latent bugs.
 
+## Callable parameter timing
+
+Use `@param-immediately-invoked-callable` and `@param-later-invoked-callable` to describe when a callable parameter runs:
+
+```php
+/**
+ * @param-immediately-invoked-callable $callback
+ */
+function run(callable $callback): void
+{
+    $callback();
+}
+
+/**
+ * @param-later-invoked-callable $callback
+ */
+function register(callable $callback): void
+{
+    // The callback may run after this function returns.
+}
+```
+
+The tag must name an existing callable parameter or a parameter whose array values are callables. Unknown names, non-callable types, and conflicting timing tags are reported as `invalid-param-tag`. Built-in callback parameters use the same metadata as userland functions.
+
+Immediate timing does not promise that callback exceptions escape the wrapper. With `check-throws` enabled, Mago propagates callback exceptions for annotated built-ins, including exceptions inferred from inline callback bodies. For userland wrappers, callback throws remain checked at the callback; the wrapper's own `@throws` contract determines what callers must handle, because the analyzer does not infer catch behavior across calls. A callback can therefore still get a closure-local warning even when the wrapper catches it. A stored callback keeps its own throws diagnostic even when also passed to an immediate built-in, because another use can let it escape. Later-invoked callbacks are not propagated to the registration call.
+
 ## Where to next
 
 - [Command reference](/tools/analyzer/command-reference/): every flag `mago analyze` accepts.

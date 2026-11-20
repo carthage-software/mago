@@ -57,6 +57,34 @@ fn parses_param_with_type_and_variable() {
 }
 
 #[test]
+fn parses_callable_invocation_timing_tags() {
+    let arena = LocalArena::new();
+    let document = parse(
+        &arena,
+        b"/** @param-immediately-invoked-callable $callback\n * @param-later-invoked-callable $callbacks */",
+    );
+
+    assert!(!document.has_errors(), "expected no errors, got {:?}", document.errors);
+    let tags: Vec<_> = document
+        .elements
+        .iter()
+        .filter_map(|element| match element {
+            Element::Tag(tag) => Some(tag),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(tags.len(), 2);
+    let TagValue::ParamImmediatelyInvokedCallable(immediate) = &tags[0].value else {
+        panic!("expected immediate callable tag, got {:?}", tags[0].value);
+    };
+    assert_eq!(immediate.parameter.value, b"$callback");
+    let TagValue::ParamLaterInvokedCallable(later) = &tags[1].value else {
+        panic!("expected later callable tag, got {:?}", tags[1].value);
+    };
+    assert_eq!(later.parameter.value, b"$callbacks");
+}
+
+#[test]
 fn parses_param_with_type_and_no_variable() {
     let arena = LocalArena::new();
     let document = parse(&arena, b"/** @param list<string> */");
