@@ -3,6 +3,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use mago_allocator::Arena;
+use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
@@ -11,6 +12,7 @@ use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
+use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::combine_union_types;
@@ -93,6 +95,7 @@ where
     let mut current_type = Rc::clone(&root_array_type);
 
     let root_var_id = get_block_expression_id(root_array_expression, context, block_context);
+    let writes_container_directly = array_target_expressions.len() == 1;
     let current_index = analyze_nested_array_assignment(
         context,
         block_context,
@@ -168,6 +171,15 @@ where
         }));
     }
 
+    let root_array_type = if root_is_array_access_object
+        && writes_container_directly
+        && matches!(root_array_expression, Expression::Variable(_))
+    {
+        pin_open_type_parameters(context, root_array_type, index_type.as_deref(), assign_value_type)
+    } else {
+        root_array_type
+    };
+
     let root_array_type = Rc::new(root_array_type);
     if let Some(root_var_id) = &root_var_id {
         block_context.locals.insert(*root_var_id, Rc::clone(&root_array_type));
@@ -229,6 +241,66 @@ where
     artifacts.set_rc_expression_type(&root_array_expression, root_array_type);
 
     Ok(())
+}
+
+/// Binds the open (`_`) type arguments of an `ArrayAccess` object to the key and value written through `offsetSet()`.
+fn pin_open_type_parameters<A>(
+    context: &Context<'_, '_, A>,
+    mut container_type: TUnion,
+    key_type: Option<&TUnion>,
+    value_type: &TUnion,
+) -> TUnion
+where
+    A: Arena,
+{
+    for atomic in container_type.types.to_mut() {
+        let TAtomic::Object(TObject::Named(named_object)) = atomic else {
+            continue;
+        };
+
+        let Some(type_parameters) = named_object.type_parameters.as_mut() else {
+            continue;
+        };
+
+        if !type_parameters.iter().any(TUnion::is_placeholder) {
+            continue;
+        }
+
+        let Some(class_metadata) = context.codebase.get_class_like(named_object.name.as_bytes()) else {
+            continue;
+        };
+
+        let Some(offset_set) = context.codebase.get_declaring_method(named_object.name.as_bytes(), b"offsetSet") else {
+            continue;
+        };
+
+        for (parameter, written_type) in offset_set.parameters.iter().zip([key_type, Some(value_type)]) {
+            let (Some(written_type), Some(parameter_type)) = (written_type, parameter.get_type_metadata()) else {
+                continue;
+            };
+
+            let [TAtomic::GenericParameter(template)] = parameter_type.type_union.types.as_ref() else {
+                continue;
+            };
+
+            if template.defining_entity != GenericParent::ClassLike(class_metadata.name) {
+                continue;
+            }
+
+            if let Some(slot) = class_metadata
+                .template_types
+                .get_index_of(&template.parameter_name)
+                .and_then(|index| type_parameters.get_mut(index))
+                && slot.is_placeholder()
+            {
+                let mut pinned = written_type.clone();
+                pinned.widen_scalars();
+                *slot = pinned;
+            }
+        }
+    }
+
+    container_type
 }
 
 pub(crate) fn update_type_with_key_values<A>(

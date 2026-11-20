@@ -3251,6 +3251,7 @@ test_case!(switch_without_default_narrows_after_exiting_cases);
 test_case!(negated_instanceof_static_keeps_open_class);
 test_case!(unset_property_forgets_memoized_method_result);
 test_case!(new_without_constructor_keeps_template_bound);
+test_case!(array_access_write_pins_open_type_arguments);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
