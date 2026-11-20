@@ -49,6 +49,7 @@ use mago_codex::ttype::get_scalar;
 use mago_codex::ttype::get_string_with_props;
 use mago_codex::ttype::get_union_from_integer;
 use mago_codex::ttype::intersect_union_types;
+use mago_codex::ttype::shared::EMPTY_STRING_ATOMIC;
 use mago_codex::ttype::shared::MIXED_KEYED_ARRAY_ATOMIC;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
@@ -289,7 +290,7 @@ where
         | Assertion::IsLessThanOrEqualVariable(_)
         | Assertion::IsGreaterThanVariable(_)
         | Assertion::IsGreaterThanOrEqualVariable(_) => Some(existing_var_type.clone()),
-        Assertion::StringLengthLessThan(_) => Some(existing_var_type.clone()),
+        Assertion::StringLengthLessThan(length) => Some(reconcile_string_length_less_than(existing_var_type, *length)),
         Assertion::StringLengthGreaterThanOrEqual(length) => {
             Some(reconcile_string_length_greater_than_or_equal(existing_var_type, *length))
         }
@@ -418,6 +419,36 @@ fn reconcile_string_length_greater_than_or_equal(existing_var_type: &TUnion, len
             TAtomic::GenericParameter(generic_parameter) => {
                 if let Some(atomic) = map_concrete_generic_constraint(&generic_parameter, |constraint| {
                     reconcile_string_length_greater_than_or_equal(constraint, length)
+                }) {
+                    acceptable_types.push(atomic);
+                }
+            }
+            atomic => acceptable_types.push(atomic),
+        }
+    }
+
+    new_var_type.types = Cow::Owned(acceptable_types);
+    new_var_type
+}
+
+fn reconcile_string_length_less_than(existing_var_type: &TUnion, length: i64) -> TUnion {
+    if length != 1 {
+        return existing_var_type.clone();
+    }
+
+    let mut new_var_type = existing_var_type.clone();
+    let mut acceptable_types = Vec::new();
+
+    for atomic in std::mem::take(new_var_type.types.to_mut()) {
+        match atomic {
+            TAtomic::Scalar(TScalar::String(string)) => {
+                if !string.is_non_empty && !string.is_truthy && (!string.is_known_literal() || string.is_empty()) {
+                    acceptable_types.push(EMPTY_STRING_ATOMIC.clone());
+                }
+            }
+            TAtomic::GenericParameter(generic_parameter) => {
+                if let Some(atomic) = map_concrete_generic_constraint(&generic_parameter, |constraint| {
+                    reconcile_string_length_less_than(constraint, length)
                 }) {
                     acceptable_types.push(atomic);
                 }
@@ -1804,7 +1835,7 @@ where
                     known_non_list,
                 })));
             }
-            TAtomic::Mixed(_) | TAtomic::Iterable(_) => {
+            TAtomic::Mixed(_) | TAtomic::Iterable(_) | TAtomic::Object(_) => {
                 did_remove_type = true;
                 acceptable_types.push(atomic);
             }

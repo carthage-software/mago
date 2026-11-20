@@ -1507,6 +1507,7 @@ where
                 acceptable_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new())));
             }
         } else {
+            did_remove_type |= matches!(atomic, TAtomic::Object(_));
             acceptable_types.push(atomic);
         }
     }

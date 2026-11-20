@@ -1049,7 +1049,7 @@ where
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, left) {
                 if number_on_right == 0 {
-                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
+                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(true)]]);
                 } else {
                     if_types.insert(
                         array_variable_id,
@@ -1065,7 +1065,7 @@ where
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, right) {
                 if number_on_left == 0 {
-                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
+                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(true)]]);
                 } else {
                     if_types.insert(
                         array_variable_id,
@@ -1808,7 +1808,7 @@ where
                 };
 
                 if minimum_count == 1 {
-                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
+                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(true)]]);
                 } else if minimum_count > 1 {
                     if_types.insert(array_variable_id, vec![vec![Assertion::HasAtLeastCount(minimum_count as usize)]]);
                 }
@@ -1859,7 +1859,10 @@ where
 
     let right_id = assertion_context.get_expression_id(right);
 
-    if let (Some(left_var_id), Some(right_var_id)) = (left_id, right_id) {
+    if let (Some(left_var_id), Some(right_var_id)) = (left_id, right_id)
+        && !left_integer.as_ref().is_some_and(TInteger::is_literal)
+        && !right_integer.as_ref().is_some_and(TInteger::is_literal)
+    {
         let relation = if matches!(operator, BinaryOperator::LessThanOrEqual(_)) {
             Assertion::IsLessThanOrEqualVariable(right_var_id)
         } else {
@@ -1995,7 +1998,7 @@ where
                 };
 
                 if minimum_count == 1 {
-                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
+                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(true)]]);
                 } else if minimum_count > 1 {
                     if_types.insert(array_variable_id, vec![vec![Assertion::HasAtLeastCount(minimum_count as usize)]]);
                 }
@@ -2073,7 +2076,10 @@ where
     let left_id = assertion_context.get_expression_id(left);
     let right_id = assertion_context.get_expression_id(right);
 
-    if let (Some(left_var_id), Some(right_var_id)) = (left_id, right_id) {
+    if let (Some(left_var_id), Some(right_var_id)) = (left_id, right_id)
+        && !left_integer.as_ref().is_some_and(TInteger::is_literal)
+        && !right_integer.as_ref().is_some_and(TInteger::is_literal)
+    {
         let relation = if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
             Assertion::IsGreaterThanOrEqualVariable(right_var_id)
         } else {
