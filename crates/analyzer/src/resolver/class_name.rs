@@ -550,6 +550,9 @@ pub fn get_class_name_from_atomic(codebase: &CodebaseMetadata, atomic: &TAtomic)
                     return None; // This type cannot be interpreted as a class name.
                 }
             }
+            TAtomic::Callable(callable) if callable.is_closure() => {
+                ResolvedClassname::new(Some(word("Closure")), ResolutionOrigin::Object { is_this: false }, true)
+            }
             TAtomic::Mixed(_) => ResolvedClassname::new(None, ResolutionOrigin::Mixed, false),
             _ => {
                 // This type cannot be interpreted as a class name.
