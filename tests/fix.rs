@@ -105,6 +105,84 @@ fn unfixable_issues_do_not_stop_other_fixes() {
 }
 
 #[test]
+fn fail_on_remaining_respects_minimum_fail_level() {
+    let warning_only =
+        "<?php\n\ndeclare(strict_types=1);\n\nfunction check(mixed $value): bool\n{\n    return isset($value);\n}\n";
+    let directory = workspace(warning_only);
+    let output = run(directory.path(), "lint", &[]);
+    let log = format!("{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    assert!(output.status.success(), "{log}");
+
+    let output = run(directory.path(), "lint", &["--fix", "--fail-on-remaining"]);
+    let log = format!("{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    assert!(output.status.success(), "{log}");
+    assert!(log.contains("below the `error` fail threshold"), "{log}");
+    assert_eq!(contents(directory.path()), warning_only);
+
+    let output = run(directory.path(), "lint", &["--fix", "--fail-on-remaining", "--minimum-fail-level", "warning"]);
+    let log = format!("{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    assert_eq!(output.status.code(), Some(1), "{log}");
+    assert_eq!(contents(directory.path()), warning_only);
+
+    let output = run(directory.path(), "lint", &["--fix"]);
+    let log = format!("{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    assert!(output.status.success(), "{log}");
+
+    let empty_code = "<?php\n\nif (empty($foo)) {}\n";
+    let directory = workspace(empty_code);
+    std::fs::write(
+        directory.path().join("mago.toml"),
+        format!("{}\nno-empty = {{ level = \"warning\" }}\n", include_str!("fixtures/fix/mago.toml").trim_end()),
+    )
+    .unwrap();
+    let output = run(directory.path(), "lint", &[]);
+    let log = format!("{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    assert!(output.status.success(), "{log}");
+    let output = run(directory.path(), "lint", &["--fix", "--fail-on-remaining"]);
+    let log = format!("{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    assert!(output.status.success(), "{log}");
+
+    let directory = workspace(empty_code);
+    let output = run(directory.path(), "lint", &[]);
+    let log = format!("{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    assert_eq!(output.status.code(), Some(1), "{log}");
+    let output = run(directory.path(), "lint", &["--fix", "--fail-on-remaining"]);
+    let log = format!("{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    assert_eq!(output.status.code(), Some(1), "{log}");
+
+    let safety = include_str!("fixtures/fix/safety.php");
+    let directory = workspace(safety);
+    let output = run(directory.path(), "lint", &["--fix", "--fail-on-remaining"]);
+    let log = format!("{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    assert!(output.status.success(), "{log}");
+    assert!(!contents(directory.path()).contains("declare(strict_types=1);"), "{}", contents(directory.path()));
+
+    let output = run(directory.path(), "lint", &["--fix", "--fail-on-remaining", "--minimum-fail-level", "warning"]);
+    let log = format!("{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    assert_eq!(output.status.code(), Some(1), "{log}");
+    assert!(!contents(directory.path()).contains("declare(strict_types=1);"), "{}", contents(directory.path()));
+
+    std::fs::write(directory.path().join("src/test.php"), safety).unwrap();
+    let output = run(
+        directory.path(),
+        "lint",
+        &["--fix", "--fail-on-remaining", "--minimum-fail-level", "warning", "--potentially-unsafe"],
+    );
+    let log = format!("{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    assert!(output.status.success(), "{log}");
+    assert!(contents(directory.path()).contains("declare(strict_types=1);"), "{}", contents(directory.path()));
+
+    let mixed = "<?php\n\ndeclare(strict_types=1);\n\nfunction check(mixed $value): bool\n{\n    return isset($value) || is_null($value);\n}\n";
+    let directory = workspace(mixed);
+    let output = run(directory.path(), "lint", &["--fix", "--fail-on-remaining"]);
+    let log = format!("{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+    assert!(output.status.success(), "{log}");
+    let fixed = contents(directory.path());
+    assert!(!fixed.contains("is_null"), "{fixed}");
+    assert!(fixed.contains("isset($value)"), "{fixed}");
+}
+
+#[test]
 fn limits_fixes_to_requested_paths() {
     let directory = workspace(BEFORE);
     std::fs::write(directory.path().join("src/other.php"), BEFORE).unwrap();

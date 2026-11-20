@@ -20,6 +20,7 @@ La plupart des règles du linter et une poignée de vérifications de l'analyseu
 | `--potentially-unsafe` | Applique les corrections marquées comme potentiellement non sûres. Moins risquées que les non sûres mais méritent quand même une revue rapide. |
 | `--format-after-fix`, `fmt` | Lance le formateur sur chaque fichier modifié par `--fix`. |
 | `--dry-run`, `-d`, `diff` | Prévisualise les corrections sous forme de diff unifié sans rien écrire. |
+| `--fail-on-remaining` | Renvoie le code `1` lorsqu'il reste des problèmes au niveau minimal d'échec ou au-dessus après `--fix`. Le seuil par défaut est `error`, comme `mago lint` sans `--fix`. Un seuil plus strict utilise le réglage `minimum-fail-level` existant. |
 
 ## Rapport
 
