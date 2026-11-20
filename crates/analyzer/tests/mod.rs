@@ -3234,6 +3234,7 @@ test_case!(ternary_and_match_arm_keep_condition_clauses);
 test_case!(callback_accepting_wider_type_fits_template);
 test_case!(psalm_reserved_docblock_types_are_known);
 test_case!(properties_of_empty_and_untyped_classes);
+test_case!(namespaced_function_named_like_builtin_has_no_builtin_assertions);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);

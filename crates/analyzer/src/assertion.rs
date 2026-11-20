@@ -321,7 +321,8 @@ where
 
     let function_name = ascii_lowercase_word(function_identifier.value());
     let resolved_function_name = ascii_lowercase_word(assertion_context.resolved_names.get(function_identifier));
-    let should_check_against_unresolved = { function_identifier.is_local() };
+    let should_check_against_unresolved = function_identifier.is_local()
+        && !assertion_context.codebase.function_exists(resolved_function_name.as_bytes());
 
     let is_subclass_of_call = (should_check_against_unresolved && function_name.as_bytes() == b"is_subclass_of")
         || resolved_function_name.as_bytes() == b"is_subclass_of";
