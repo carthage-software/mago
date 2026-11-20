@@ -405,24 +405,7 @@ where
         )?;
     }
 
-    if let Some(root) = get_root_expression_id(target_expression) {
-        let belongs_to_root =
-            |key: &Word| key.as_bytes().strip_prefix(root.as_bytes()).is_some_and(|suffix| suffix.starts_with(b"->"));
-
-        block_context.stable_method_call_assertions.retain(|key, _| !belongs_to_root(key));
-        block_context.stable_method_calls.retain(|key| !belongs_to_root(key));
-        block_context.clauses.retain(|clause| !clause.possibilities.keys().any(belongs_to_root));
-        block_context.reconciled_expression_clauses.retain(|clause| !clause.possibilities.keys().any(belongs_to_root));
-    } else if !matches!(target_expression, Expression::Variable(_)) {
-        block_context.stable_method_call_assertions.clear();
-        block_context.stable_method_calls.clear();
-        block_context.clauses.retain(|clause| {
-            !clause.possibilities.keys().any(|key| memchr::memmem::find(key.as_bytes(), b"()").is_some())
-        });
-        block_context.reconciled_expression_clauses.retain(|clause| {
-            !clause.possibilities.keys().any(|key| memchr::memmem::find(key.as_bytes(), b"()").is_some())
-        });
-    }
+    forget_stable_method_results(block_context, target_expression);
 
     match target_expression {
         Expression::Variable(target_variable) if target_expression_id.is_some() => analyze_assignment_to_variable(
@@ -493,6 +476,28 @@ where
     }
 
     Ok(true)
+}
+
+/// Forgets the remembered results of mutation-free method calls that a write to `target_expression` may change.
+pub(crate) fn forget_stable_method_results(block_context: &mut BlockContext<'_>, target_expression: &Expression<'_>) {
+    if let Some(root) = get_root_expression_id(target_expression) {
+        let belongs_to_root =
+            |key: &Word| key.as_bytes().strip_prefix(root.as_bytes()).is_some_and(|suffix| suffix.starts_with(b"->"));
+
+        block_context.stable_method_call_assertions.retain(|key, _| !belongs_to_root(key));
+        block_context.stable_method_calls.retain(|key| !belongs_to_root(key));
+        block_context.clauses.retain(|clause| !clause.possibilities.keys().any(belongs_to_root));
+        block_context.reconciled_expression_clauses.retain(|clause| !clause.possibilities.keys().any(belongs_to_root));
+    } else if !matches!(target_expression, Expression::Variable(_)) {
+        block_context.stable_method_call_assertions.clear();
+        block_context.stable_method_calls.clear();
+        block_context.clauses.retain(|clause| {
+            !clause.possibilities.keys().any(|key| memchr::memmem::find(key.as_bytes(), b"()").is_some())
+        });
+        block_context.reconciled_expression_clauses.retain(|clause| {
+            !clause.possibilities.keys().any(|key| memchr::memmem::find(key.as_bytes(), b"()").is_some())
+        });
+    }
 }
 
 fn analyze_reference_assignment<'ctx, 'ast, 'arena, A>(
