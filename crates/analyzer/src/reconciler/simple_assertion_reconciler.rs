@@ -2268,6 +2268,8 @@ where
                         } else {
                             continue;
                         }
+
+                        require_list_elements_before(known_elements, i as usize);
                     } else if !element_type.is_never() {
                         *non_empty = true;
                         *known_elements =
@@ -2336,6 +2338,12 @@ where
 
     new_var_type.types = Cow::Owned(acceptable_types);
     new_var_type
+}
+
+fn require_list_elements_before(known_elements: &mut BTreeMap<usize, (bool, TUnion)>, index: usize) {
+    for (_, (optional, _)) in known_elements.range_mut(..index) {
+        *optional = false;
+    }
 }
 
 fn reconcile_has_nonnull_entry_for_key<A>(
@@ -2416,6 +2424,8 @@ where
                     } else {
                         continue;
                     }
+
+                    require_list_elements_before(known_elements, i as usize);
                 } else if !element_type.is_never() {
                     let nonnull = subtract_null(context, assertion, element_type, None, negated, None);
                     *known_elements = Some(BTreeMap::from([(i as usize, (false, nonnull))]).into());
