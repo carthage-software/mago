@@ -64,6 +64,7 @@ pub fn replace_with_polarity(
             constraint,
             intersection_types.as_ref(),
             template_result,
+            polarity,
         )
         .map_or_else(|| union.clone(), |replacement| union.clone_with_types(replacement.types.into_owned()));
     }
@@ -102,6 +103,7 @@ pub fn replace_with_polarity(
                     constraint,
                     intersection_types.as_ref(),
                     template_result,
+                    polarity,
                 );
 
                 if let Some(template_type) = template_type {
@@ -187,6 +189,7 @@ fn replace_template_parameter(
     constraint: &TUnion,
     intersection_types: Option<&Vec<TAtomic>>,
     template_result: &TemplateResult,
+    polarity: Variance,
 ) -> Option<TUnion> {
     let inferred_lower_bounds = &template_result.lower_bounds;
     let mut template_type = None;
@@ -194,7 +197,9 @@ fn replace_template_parameter(
         get_root_template_type(inferred_lower_bounds, parameter_name, defining_entity, HashSet::default(), codebase);
 
     if let Some(traversed_type) = traversed_type {
-        let mut template_type_inner = if !constraint.is_mixed() && traversed_type.is_mixed() {
+        let mut template_type_inner = if !constraint.is_mixed()
+            && (traversed_type.is_mixed() || (polarity == Variance::Contravariant && traversed_type.is_placeholder()))
+        {
             if constraint.is_array_key() { wrap_atomic(TAtomic::Scalar(TScalar::ArrayKey)) } else { constraint.clone() }
         } else {
             traversed_type
