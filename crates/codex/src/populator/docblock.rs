@@ -424,6 +424,20 @@ fn collect_inheritance_work(
                 (std::cmp::Reverse(depth), *interface)
             });
         }
+        if candidates.is_empty()
+            && let Some((first, others)) = interfaces.split_first()
+            && let Some(first_method) = codebase.function_likes.get(&(*first, *method_name))
+            && others.iter().any(|other| {
+                !codebase.is_instance_of(first.as_bytes(), other.as_bytes())
+                    && codebase
+                        .function_likes
+                        .get(&(*other, *method_name))
+                        .is_some_and(|other_method| !documents_same_signature(first_method, other_method))
+            })
+        {
+            continue;
+        }
+
         candidates.extend(interfaces);
 
         candidates.extend(
@@ -441,6 +455,16 @@ fn collect_inheritance_work(
             inheritance_work.push((depth, class_name, *method_name, parent_class, parent_method));
         }
     }
+}
+
+fn documents_same_signature(first: &FunctionLikeMetadata, second: &FunctionLikeMetadata) -> bool {
+    first.parameters.len() == second.parameters.len()
+        && first.parameters.iter().zip(&second.parameters).all(|(first_parameter, second_parameter)| {
+            first_parameter.get_type_metadata().map(|metadata| &metadata.type_union)
+                == second_parameter.get_type_metadata().map(|metadata| &metadata.type_union)
+        })
+        && first.return_type_metadata.as_ref().map(|metadata| &metadata.type_union)
+            == second.return_type_metadata.as_ref().map(|metadata| &metadata.type_union)
 }
 
 struct MethodInheritance {

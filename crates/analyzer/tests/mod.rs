@@ -3257,6 +3257,7 @@ test_case!(possibly_false_array_index_is_reported);
 test_case!(loose_equality_with_zero_or_empty_string_keeps_null);
 test_case!(negated_type_check_on_template_and_numeric);
 test_case!(template_compared_to_literal_keeps_template);
+test_case!(conflicting_interface_docblocks_are_not_inherited);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
