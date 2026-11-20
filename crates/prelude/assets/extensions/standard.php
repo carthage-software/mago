@@ -4352,22 +4352,24 @@ function shuffle(array &$array): true {}
 function count(Countable|array $value, int $mode = COUNT_NORMAL): int {}
 
 /**
- * @template T
+ * @template K
+ * @template V
  *
- * @param object|array<T> $array
- * @param-out ($array is object ? object : ($array is list<T> ? list<T> : array<array-key, T>)) $array
+ * @param object|array<K, V> $array
+ * @param-out ($array is object ? object : ($array is list<V> ? list<V> : array<K, V>)) $array
  *
- * @return ($array is non-empty-array|non-empty-list ? T : false)
+ * @return ($array is non-empty-array|non-empty-list ? V : false)
  */
 function end(object|array &$array): mixed {}
 
 /**
- * @template T
+ * @template K
+ * @template V
  *
- * @param object|array<T> $array
- * @param-out ($array is object ? object : ($array is list<T> ? list<T> : array<array-key, T>)) $array
+ * @param object|array<K, V> $array
+ * @param-out ($array is object ? object : ($array is list<V> ? list<V> : array<K, V>)) $array
  *
- * @return T|false
+ * @return V|false
  */
 function prev(object|array &$array): mixed {}
 
