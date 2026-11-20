@@ -3252,18 +3252,20 @@ function socket_set_blocking($stream, bool $enable): bool {}
  * @param resource $stream
  *
  * @return array{
- *   timed_out: bool,
- *   blocked: bool,
- *   eof: bool,
+ *   timed_out?: bool,
+ *   blocked?: bool,
+ *   eof?: bool,
  *   unread_bytes: int,
  *   stream_type: string,
  *   wrapper_type?: string,
- *   wrapper_data: mixed,
+ *   wrapper_data?: mixed,
  *   mode: string,
  *   seekable: bool,
- *   uri: string,
- *   crypto: array,
- *   mediatype: string,
+ *   uri?: string,
+ *   crypto?: array{cipher_bits: int, cipher_name: string, cipher_version: string, protocol: string},
+ *   mediatype?: string,
+ *   charset?: string,
+ *   base64?: bool,
  * }
  */
 function stream_get_meta_data($stream): array {}
