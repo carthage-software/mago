@@ -3232,6 +3232,7 @@ test_case!(isset_offset_on_scalar_keeps_string);
 test_case!(get_debug_type_comparison_narrows);
 test_case!(ternary_and_match_arm_keep_condition_clauses);
 test_case!(callback_accepting_wider_type_fits_template);
+test_case!(psalm_reserved_docblock_types_are_known);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);

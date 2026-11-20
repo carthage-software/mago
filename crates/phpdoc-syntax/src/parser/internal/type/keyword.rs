@@ -64,6 +64,9 @@ pub enum TypeKeyword {
     CallableString,
     NonEmptyArray,
     NonEmptyMixed,
+    NonEmptyScalar,
+    CallableArray,
+    CallableObject,
     InterfaceString,
     LowercaseString,
     UppercaseString,
@@ -340,6 +343,7 @@ fn lookup_len14(bytes: &[u8]) -> Option<TypeKeyword> {
                 None
             }
         }
+        b'c' if eq(bytes, b"callable-array") => Some(TypeKeyword::CallableArray),
         _ => None,
     }
 }
@@ -352,6 +356,8 @@ fn lookup_len15(bytes: &[u8]) -> Option<TypeKeyword> {
                 Some(TypeKeyword::ClosedResource)
             } else if eq(bytes, b"callable-string") {
                 Some(TypeKeyword::CallableString)
+            } else if eq(bytes, b"callable-object") {
+                Some(TypeKeyword::CallableObject)
             } else {
                 None
             }
@@ -384,6 +390,8 @@ fn lookup_len16(bytes: &[u8]) -> Option<TypeKeyword> {
                 Some(TypeKeyword::NonPositiveInt)
             } else if eq(bytes, b"non-negative-int") {
                 Some(TypeKeyword::NonNegativeInt)
+            } else if eq(bytes, b"non-empty-scalar") {
+                Some(TypeKeyword::NonEmptyScalar)
             } else {
                 None
             }

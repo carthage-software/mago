@@ -145,6 +145,9 @@ where
             TypeKeyword::PureClosure => self.parse_callable_type(CallableTypeKind::PureClosure)?,
             TypeKeyword::Mixed => Type::Mixed(self.parse_keyword()?),
             TypeKeyword::NonEmptyMixed => Type::NonEmptyMixed(self.parse_keyword()?),
+            TypeKeyword::NonEmptyScalar => Type::NonEmptyScalar(self.parse_keyword()?),
+            TypeKeyword::CallableArray => Type::CallableArray(self.parse_keyword()?),
+            TypeKeyword::CallableObject => Type::CallableObject(self.parse_keyword()?),
             TypeKeyword::Null => Type::Null(self.parse_keyword()?),
             TypeKeyword::Void => Type::Void(self.parse_keyword()?),
             TypeKeyword::Never
