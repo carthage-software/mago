@@ -338,6 +338,8 @@ test_case!(class_member_format_ignore_next_interface_constant);
 test_case!(class_member_format_ignore_next_backed_enum);
 test_case!(class_member_format_ignore_in_nested_anonymous_class);
 test_case!(align_assignment_like);
+test_case!(align_assignment_like_without_double_arrows);
+test_case!(align_double_arrows);
 test_case!(align_statement_like);
 test_case!(align_array_like);
 test_case!(align_array_like_compact_inline);

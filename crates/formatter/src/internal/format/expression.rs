@@ -1289,7 +1289,7 @@ where
                 });
 
             if !self.arms.is_empty() {
-                let mut alignment = f.settings.align_assignment_like.then(|| Alignment::new(f.next_id(), false));
+                let mut alignment = f.settings.align_double_arrows.then(|| Alignment::new(f.next_id(), false));
                 let mut arms_document = Document::join(
                     f.arena,
                     self.arms.iter().enumerate().map(|(i, arm)| {
