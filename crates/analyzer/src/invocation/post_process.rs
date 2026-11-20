@@ -82,6 +82,7 @@ use crate::utils::expression::expression_is_nullsafe;
 use crate::utils::expression::get_access_base_expressions;
 use crate::utils::expression::get_block_expression_id;
 use crate::utils::expression::get_non_nullsafe_expression_id;
+use crate::utils::expression::uses_variable_as_offset;
 use crate::utils::misc::unwrap_expression;
 
 pub fn post_invocation_process<'ctx, 'arena, A>(
@@ -1323,11 +1324,8 @@ fn is_descendant_of_any(var_id: Word, roots: &[Word]) -> bool {
     let key = var_id.as_bytes();
     roots.iter().any(|root| {
         let root = root.as_bytes();
-        let Some(rest) = key.strip_prefix(root) else {
-            return false;
-        };
-
-        rest.starts_with(b"->") || rest.first() == Some(&b'[')
+        uses_variable_as_offset(key, root)
+            || key.strip_prefix(root).is_some_and(|rest| rest.starts_with(b"->") || rest.first() == Some(&b'['))
     })
 }
 
