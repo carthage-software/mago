@@ -1805,10 +1805,14 @@ function fprintf($stream, string $format, mixed ...$values): int {}
  */
 function vfprintf($stream, string $format, array $values): int {}
 
+/**
+ * @param-out int|float|string|null $vars
+ */
 function sscanf(string $string, string $format, mixed &...$vars): array|int|null {}
 
 /**
  * @param resource $stream
+ * @param-out int|float|string|null $vars
  */
 function fscanf($stream, string $format, mixed &...$vars): array|int|false|null {}
 
@@ -1921,7 +1925,7 @@ function shell_exec(string $command): string|false|null {}
 function proc_open(
     array|string $command,
     array $descriptor_spec,
-    ?array &$pipes,
+    &$pipes,
     ?string $cwd = null,
     ?array $env_vars = null,
     ?array $options = null,
