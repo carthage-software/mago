@@ -191,6 +191,27 @@ where
         );
     }
 
+    if !in_assignment
+        && index_type.is_falsable()
+        && !index_type.is_false()
+        && !index_type.ignore_falsable_issues()
+        && array_like_type.types.iter().all(TAtomic::is_array)
+    {
+        context.collector.report_with_code(
+            IssueCode::PossiblyFalseArrayIndex,
+            Issue::warning(format!(
+                "Possibly using `false` as an array index to access element{}.",
+                match extended_var_id {
+                    Some(var) => format!(" of variable {var}"),
+                    None => String::new(),
+                }
+            ))
+            .with_annotation(Annotation::primary(access_index_span).with_message("Index might be `false` here."))
+            .with_note("PHP uses `false` as the key `0`, which is rarely the element meant.")
+            .with_help("Check the index against `false` before using it, for example after `array_search()`."),
+        );
+    }
+
     let mut array_atomic_types = array_like_type.types.iter().collect::<Vec<_>>();
 
     let mut value_type = None;

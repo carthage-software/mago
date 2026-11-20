@@ -106,6 +106,7 @@ final class AnalyzerCodeModuleGenerator
         'null-array-access',
         'possibly-null-array-access',
         'possibly-null-array-index',
+        'possibly-false-array-index',
         'possibly-undefined-array-index',
         'possibly-undefined-int-array-index',
         'possibly-undefined-string-array-index',
