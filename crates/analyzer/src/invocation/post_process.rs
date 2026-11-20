@@ -19,6 +19,7 @@ use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::callable::TCallable;
@@ -146,8 +147,17 @@ where
         && let InvocationArgumentsSource::ArgumentList(argument_list) = invoication.arguments_source
     {
         for argument in &argument_list.arguments {
-            let Argument::Named(_) = argument else {
-                continue; // Skip if it's not a named argument
+            let message = match argument {
+                Argument::Named(_) => "Named argument used here",
+                Argument::Positional(positional)
+                    if positional.ellipsis.is_some()
+                        && artifacts
+                            .get_expression_type(&positional.value)
+                            .is_some_and(|argument_type| argument_type.types.iter().any(array_has_string_keys)) =>
+                {
+                    "This unpacked array passes its string keys as named arguments"
+                }
+                _ => continue,
             };
             let full_callable_name =
                 full_callable_name.get_or_init(|| display_callable_name(context, identifier, metadata.original_name));
@@ -155,7 +165,7 @@ where
             context.collector.report_with_code(
                 IssueCode::NamedArgumentNotAllowed,
                 Issue::error(format!("Named arguments are not allowed for {full_callable_name}."))
-                    .with_annotation(Annotation::primary(argument.span()).with_message("Named argument used here"))
+                    .with_annotation(Annotation::primary(argument.span()).with_message(message))
                     .with_annotation(Annotation::secondary(invoication.target.span()).with_message(format!(
                         "The {callable_kind_str} {full_callable_name} only accepts positional arguments"
                     )))
@@ -1304,6 +1314,15 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
         .reconciled_expression_clauses
         .retain(|clause| clause.wedge || !clause.possibilities.keys().copied().any(should_wipe));
     block_context.retain_valid_class_type_relations();
+}
+
+fn array_has_string_keys(atomic: &TAtomic) -> bool {
+    let TAtomic::Array(TArray::Keyed(keyed)) = atomic else {
+        return false;
+    };
+
+    keyed.known_items.as_ref().is_some_and(|items| items.keys().any(|key| matches!(key, ArrayKey::String(_))))
+        || keyed.get_generic_parameters().is_some_and(|(key_type, _)| key_type.types.iter().all(TAtomic::is_string))
 }
 
 fn references_method_call_key(key: Word) -> bool {
