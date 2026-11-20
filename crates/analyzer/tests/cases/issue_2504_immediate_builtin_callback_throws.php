@@ -31,7 +31,7 @@ final class Issue2504Repository
     public function replaceRows(string $subject, Issue2504Mapper $mapper): ?string
     {
         $callbacks = [
-            '/\\d+/' => static fn(array $matches): string => (string) $mapper->fromRow((int) ($matches[0] ?? 0)),
+            '/\\d+/' => /** @throws Issue2504CallbackException */ static fn(array $matches): string => (string) $mapper->fromRow((int) ($matches[0] ?? 0)),
         ];
 
         return preg_replace_callback_array(pattern: $callbacks, subject: $subject);
@@ -67,6 +67,32 @@ final class Issue2504Repository
         $this->catchCallback(static function (): void {
             throw new Issue2504CallbackException();
         });
+    }
+
+    /** @mago-expect analysis:unhandled-thrown-type */
+    public function mixedImmediateAndDeferredCallback(): void
+    {
+        $callback = static function (int $value = 0): int {
+            throw new Issue2504CallbackException((string) $value);
+        };
+
+        try {
+            array_map($callback, [1]);
+        } catch (Issue2504CallbackException) {
+        }
+
+        register_shutdown_function($callback);
+    }
+
+    /** @param list<non-empty-list<int>> $batches */
+    public function catchesInlineInLoop(array $batches, Issue2504Mapper $mapper): void
+    {
+        foreach ($batches as $batch) {
+            try {
+                array_map(static fn(int $value): int => $mapper->fromRow($value), $batch);
+            } catch (Issue2504CallbackException) {
+            }
+        }
     }
 
     /** @mago-expect analysis:unhandled-thrown-type */

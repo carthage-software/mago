@@ -490,6 +490,15 @@ fn record_immediate_builtin_callback_throw_types<'ctx, 'arena, A>(
         }
     }
 
+    // A typed alias can also escape through another use. Only a literal owned
+    // by this argument can transfer its diagnostic to the immediate caller.
+    let inline_callbacks = callback_expressions
+        .iter()
+        .map(|expression| unwrap_expression(expression))
+        .filter(|expression| matches!(expression, Expression::Closure(_) | Expression::ArrowFunction(_)))
+        .map(|expression| FunctionLikeIdentifier::for_closure(context.source_file, expression.span()))
+        .collect::<foldhash::HashSet<_>>();
+
     let callable_identifiers = callback_expressions
         .iter()
         .filter_map(|expression| artifacts.get_expression_type(expression))
@@ -507,7 +516,8 @@ fn record_immediate_builtin_callback_throw_types<'ctx, 'arena, A>(
 
     for callback in callable_identifiers {
         if let FunctionLikeIdentifier::Closure(name) = callback
-            && let Some(pending) = artifacts.get_pending_immediate_callback_throws(name)
+            && let Some(pending) =
+                artifacts.get_pending_immediate_callback_throws(name, inline_callbacks.contains(&callback))
         {
             for (exception, spans) in &pending.exceptions {
                 block_context.possibly_thrown_exceptions.entry(*exception).or_default().extend(spans);

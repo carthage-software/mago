@@ -62,7 +62,7 @@ pub struct ResolvedMethodCall {
 pub(crate) struct PendingImmediateCallbackThrows {
     pub(crate) exceptions: WordMap<HashSet<Span>>,
     pub(crate) generic_exceptions: HashSet<PossiblyThrownGenericException>,
-    used: bool,
+    inline_invoked: bool,
     pub(crate) issues: Vec<Issue>,
 }
 
@@ -162,23 +162,26 @@ impl AnalysisArtifacts {
         generic_exceptions: HashSet<PossiblyThrownGenericException>,
         issues: Vec<Issue>,
     ) {
-        self.pending_immediate_callback_throws
-            .insert(name, PendingImmediateCallbackThrows { exceptions, generic_exceptions, issues, used: false });
+        self.pending_immediate_callback_throws.insert(
+            name,
+            PendingImmediateCallbackThrows { exceptions, generic_exceptions, issues, inline_invoked: false },
+        );
     }
 
     pub(crate) fn get_pending_immediate_callback_throws(
         &mut self,
         name: Word,
+        inline: bool,
     ) -> Option<&PendingImmediateCallbackThrows> {
         let pending = self.pending_immediate_callback_throws.get_mut(&name)?;
-        pending.used = true;
+        pending.inline_invoked |= inline;
         Some(pending)
     }
 
     pub(crate) fn take_unresolved_immediate_callback_throws(&mut self) -> impl Iterator<Item = Issue> {
         std::mem::take(&mut self.pending_immediate_callback_throws)
             .into_values()
-            .filter(|pending| !pending.used)
+            .filter(|pending| !pending.inline_invoked)
             .flat_map(|pending| pending.issues)
     }
 
