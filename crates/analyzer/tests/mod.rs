@@ -3242,6 +3242,7 @@ test_case!(nullsafe_chain_short_circuits_static_access);
 test_case!(foreach_over_template_reads_whole_bound);
 test_case!(method_call_forgets_offset_keyed_by_receiver_property);
 test_case!(intersection_throws_is_caught_as_a_whole);
+test_case!(array_key_exists_string_key_on_int_keyed_array);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
