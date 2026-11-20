@@ -97,6 +97,7 @@ function preg_replace(
  * @param-out int $count
  *
  * @return ($subject is string ? string|null : array<string>|null)
+ * @param-immediately-invoked-callable $callback
  */
 function preg_replace_callback(
     array|string $pattern,
@@ -114,6 +115,7 @@ function preg_replace_callback(
  * @param-out int $count
  *
  * @return ($subject is string ? string|null : array<string>|null)
+ * @param-immediately-invoked-callable $pattern
  */
 function preg_replace_callback_array(
     array $pattern,

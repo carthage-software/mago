@@ -40,6 +40,7 @@ use crate::metadata::flags::MetadataFlags;
 use crate::metadata::function_like::FunctionLikeKind;
 use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::metadata::function_like::MethodMetadata;
+use crate::metadata::parameter::CallableInvocationKind;
 use crate::metadata::ttype::TypeMetadata;
 use crate::misc::GenericParent;
 use crate::scanner::Context;
@@ -58,6 +59,10 @@ use crate::scanner::ttype::get_type_metadata_from_type;
 use crate::scanner::ttype::merge_type_preserving_nullability;
 use crate::scanner::typing_error_issue;
 use crate::scanner::version_claim::evaluate_version_attributes;
+use crate::ttype::atomic::TAtomic;
+use crate::ttype::atomic::array::TArray;
+use crate::ttype::atomic::object::TObject;
+use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::builder;
 use crate::ttype::builder::reject_unresolvable_tag_variable;
 use crate::ttype::get_mixed;
@@ -365,6 +370,31 @@ where
     metadata
 }
 
+fn accepts_callable_type(union: &crate::ttype::union::TUnion) -> bool {
+    union.types.iter().any(|atomic| match atomic {
+        TAtomic::Callable(_) => true,
+        TAtomic::Scalar(TScalar::String(string)) => string.is_callable,
+        TAtomic::Object(TObject::Any | TObject::HasMethod(_)) => true,
+        TAtomic::Object(TObject::Named(named)) => named.get_name().as_bytes().eq_ignore_ascii_case(b"closure"),
+        TAtomic::Array(TArray::Keyed(array)) => {
+            array
+                .known_items
+                .as_deref()
+                .is_some_and(|items| items.values().any(|(_, value)| accepts_callable_type(value)))
+                || array.parameters.as_ref().is_some_and(|(_, value)| accepts_callable_type(value))
+        }
+        TAtomic::Array(TArray::List(array)) => {
+            array
+                .known_elements
+                .as_deref()
+                .is_some_and(|items| items.values().any(|(_, value)| accepts_callable_type(value)))
+                || accepts_callable_type(&array.element_type)
+        }
+        TAtomic::GenericParameter(parameter) => accepts_callable_type(&parameter.constraint),
+        _ => false,
+    })
+}
+
 fn scan_function_like_docblock<A>(
     span: Span,
     functionlike_id: (Word, Word),
@@ -576,6 +606,82 @@ fn scan_function_like_docblock<A>(
             metadata.issues.push(variadic_mismatch_issue);
         }
     });
+
+    let mut callable_invocation_tags = WordMap::<(CallableInvocationKind, Span, bool)>::default();
+    for_each_tag_by_ascending_trust(&document, |tag| {
+        let (parameter, invocation_kind) = match &tag.value {
+            TagValue::ParamImmediatelyInvokedCallable(tag) => (tag.parameter, CallableInvocationKind::Immediately),
+            TagValue::ParamLaterInvokedCallable(tag) => (tag.parameter, CallableInvocationKind::Later),
+            _ => return,
+        };
+
+        let parameter_name = word(parameter.value);
+        let Some(parameter_metadata) = metadata.get_parameter(parameter_name) else {
+            metadata.issues.push(
+                Issue::error("Callable invocation tag references an unknown parameter.")
+                    .with_code(ScanningIssueKind::InvalidParamTag)
+                    .with_annotation(
+                        Annotation::primary(tag.span())
+                            .with_message(format!("Parameter `{parameter_name}` is not defined in this function")),
+                    )
+                    .with_note("Callable invocation tags must reference a parameter in the function signature.")
+                    .with_help("Check for typos or add the parameter to the function signature."),
+            );
+
+            return;
+        };
+
+        if !parameter_metadata
+            .type_metadata
+            .as_ref()
+            .is_some_and(|type_metadata| accepts_callable_type(&type_metadata.type_union))
+        {
+            metadata.issues.push(
+                Issue::error("Callable invocation tag is applied to a non-callable parameter.")
+                    .with_code(ScanningIssueKind::InvalidParamTag)
+                    .with_annotation(
+                        Annotation::primary(tag.span()).with_message("This parameter is not callable-typed"),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(parameter_metadata.get_span()).with_message("Parameter declared here"),
+                    )
+                    .with_note("Callable invocation tags are valid for callable parameters and arrays of callables.")
+                    .with_help("Declare this parameter as callable, Closure, or a container of callables."),
+            );
+
+            return;
+        }
+
+        if let Some((previous_kind, previous_span, is_conflicting)) =
+            callable_invocation_tags.get(&parameter_name).copied()
+        {
+            if previous_kind != invocation_kind && !is_conflicting {
+                metadata.issues.push(
+                    Issue::error("Conflicting callable invocation tags for one parameter.")
+                        .with_code(ScanningIssueKind::InvalidParamTag)
+                        .with_annotation(
+                            Annotation::primary(previous_span).with_message("Conflicting timing tag is here"),
+                        )
+                        .with_annotation(Annotation::secondary(tag.span()).with_message("This timing tag conflicts"))
+                        .with_note("A parameter can be marked as immediately invoked or later invoked, but not both.")
+                        .with_help("Keep only the tag that matches when this callable is invoked."),
+                );
+                callable_invocation_tags.insert(parameter_name, (previous_kind, previous_span, true));
+            }
+        } else {
+            callable_invocation_tags.insert(parameter_name, (invocation_kind, tag.span(), false));
+        }
+    });
+
+    for (parameter_name, (invocation_kind, _, is_conflicting)) in callable_invocation_tags {
+        if is_conflicting {
+            continue;
+        }
+
+        if let Some(parameter) = metadata.get_parameter_mut(parameter_name) {
+            parameter.set_callable_invocation_kind(Some(invocation_kind));
+        }
+    }
 
     for parameter_metadata in metadata.get_parameters_mut() {
         parameter_metadata.add_null_from_null_default();

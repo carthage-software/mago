@@ -334,6 +334,9 @@ function mb_ereg_replace(
     ?string $options = null,
 ): string|false|null {}
 
+/**
+ * @param-immediately-invoked-callable $callback
+ */
 function mb_ereg_replace_callback(
     string $pattern,
     callable $callback,

@@ -431,7 +431,18 @@ where
     }
 
     check_return_type_width(context, block_context, &mut artifacts, function_like_metadata);
-    check_thrown_types(context, block_context, &mut artifacts, function_like_metadata);
+    for issue in artifacts.take_unresolved_immediate_callback_throws() {
+        context.collector.report_with_code(IssueCode::UnhandledThrownType, issue);
+    }
+
+    let thrown_type_issues = check_thrown_types(context, block_context, &mut artifacts, function_like_metadata);
+    if function_like_metadata.kind.is_closure() || function_like_metadata.kind.is_arrow_function() {
+        artifacts.deferred_thrown_type_issues = thrown_type_issues;
+    } else {
+        for issue in thrown_type_issues {
+            context.collector.report_with_code(IssueCode::UnhandledThrownType, issue);
+        }
+    }
 
     std::mem::swap(&mut context.type_resolution_context, &mut previous_type_resolution_context);
     let expression_types = std::mem::take(&mut artifacts.expression_types);
@@ -1277,17 +1288,18 @@ fn check_thrown_types<'ctx, A>(
     block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     function_like_metadata: &'ctx FunctionLikeMetadata,
-) where
+) -> Vec<Issue>
+where
     A: Arena,
 {
     if !context.settings.check_throws && !context.settings.find_overly_wide_throw_types {
         // If the setting is disabled, we skip the check.
-        return;
+        return Vec::new();
     }
 
     let class_like_metadata = if function_like_metadata.kind.is_method() {
         let Some(class_like_metadata) = block_context.scope.get_class_like() else {
-            return;
+            return Vec::new();
         };
 
         Some(class_like_metadata)
@@ -1313,14 +1325,14 @@ fn check_thrown_types<'ctx, A>(
     }
 
     if !context.settings.check_throws {
-        return;
+        return Vec::new();
     }
 
     if block_context.possibly_thrown_exceptions.is_empty()
         && block_context.possibly_thrown_generic_exceptions.is_empty()
     {
         // No exceptions are thrown in this block, so there is nothing to check for missing declarations.
-        return;
+        return Vec::new();
     }
 
     let expected_throw_types = context
@@ -1333,6 +1345,7 @@ fn check_thrown_types<'ctx, A>(
 
     let mut unhandled_thrown_exceptions = HashMap::<Word, Vec<Span>>::default();
 
+    let mut issues = Vec::new();
     for (thrown_type, thrown_spans) in &block_context.possibly_thrown_exceptions {
         // Skip if exception is in unchecked lists
         if is_exception_unchecked(context, *thrown_type) {
@@ -1408,8 +1421,10 @@ fn check_thrown_types<'ctx, A>(
                 "You can add `@throws {thrown_type}` to the {function_kind}'s docblock or wrap the throwing code in a `try-catch` block."
             ));
 
-        context.collector.report_with_code(IssueCode::UnhandledThrownType, issue);
+        issues.push(issue);
     }
+
+    issues
 }
 
 fn check_too_wide_throw_types<'ctx, A, F>(

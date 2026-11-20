@@ -487,6 +487,9 @@ impl FunctionLikeMetadata {
             if let Some(out) = &replacement.out_type {
                 slot.out_type = Some(out.clone());
             }
+            if let Some(callable_invocation_kind) = replacement.callable_invocation_kind() {
+                slot.set_callable_invocation_kind(Some(callable_invocation_kind));
+            }
             if let Some(default) = &replacement.default_type {
                 slot.default_type = Some(default.clone());
             }

@@ -97,7 +97,7 @@ where
 }
 
 /// Finds the parameter that corresponds to a given argument.
-fn get_parameter_of_argument<'target, 'ctx>(
+pub(crate) fn get_parameter_of_argument<'target, 'ctx>(
     target: &'target InvocationTarget<'ctx>,
     argument: &InvocationArgument<'_, '_>,
     mut argument_offset: usize,
