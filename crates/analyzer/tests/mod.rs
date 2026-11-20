@@ -3218,6 +3218,7 @@ test_case!(iterator_foreach_value_type);
 test_case!(inherited_too_wide_throw_type);
 test_case!(too_wide_closure_argument, expected_issue_counts = [("too-wide-throw-type", 2)]);
 test_case!(array_write_with_scalar_key_stores_php_key_type);
+test_case!(file_test_functions_assert_non_empty_string);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);

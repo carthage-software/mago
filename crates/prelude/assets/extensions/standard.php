@@ -3495,20 +3495,44 @@ function filesize(string $filename): int|false {}
  */
 function filetype(string $filename): string|false {}
 
+/**
+ * @assert-if-true =non-empty-string|Stringable $filename
+ */
 function file_exists(string $filename): bool {}
 
+/**
+ * @assert-if-true =non-empty-string|Stringable $filename
+ */
 function is_writable(string $filename): bool {}
 
+/**
+ * @assert-if-true =non-empty-string|Stringable $filename
+ */
 function is_writeable(string $filename): bool {}
 
+/**
+ * @assert-if-true =non-empty-string|Stringable $filename
+ */
 function is_readable(string $filename): bool {}
 
+/**
+ * @assert-if-true =non-empty-string|Stringable $filename
+ */
 function is_executable(string $filename): bool {}
 
+/**
+ * @assert-if-true =non-empty-string|Stringable $filename
+ */
 function is_file(string $filename): bool {}
 
+/**
+ * @assert-if-true =non-empty-string|Stringable $filename
+ */
 function is_dir(string $filename): bool {}
 
+/**
+ * @assert-if-true =non-empty-string|Stringable $filename
+ */
 function is_link(string $filename): bool {}
 
 /**
