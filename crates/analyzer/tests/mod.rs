@@ -3226,6 +3226,7 @@ test_case!(closure_class_constant_is_closure);
 test_case!(write_only_reference_parameters_of_proc_open_and_scanf);
 test_case!(stream_meta_data_keys_may_be_missing);
 test_case!(pathinfo_of_non_empty_path_has_dirname);
+test_case!(reflection_is_instance_false_keeps_type);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
