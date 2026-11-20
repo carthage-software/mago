@@ -483,7 +483,6 @@ mod tests {
 
     use super::AnalysisArtifacts;
     use crate::context::block::BlockContext;
-    use crate::context::block::PossiblyThrownGenericException;
     use crate::context::block::ReferenceConstraint;
     use crate::context::block::ReferenceConstraintSource;
 

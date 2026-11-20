@@ -4127,8 +4127,6 @@ function get_resource_id($resource): int {}
  * @return array<K, V>
  *
  * @no-named-arguments
- * @param array|callable ...$rest
- * @param-immediately-invoked-callable $rest
  */
 function array_diff_ukey(array $array, ...$rest): array {}
 
@@ -4141,8 +4139,6 @@ function array_diff_ukey(array $array, ...$rest): array {}
  * @return array<K, V>
  *
  * @no-named-arguments
- * @param array|callable ...$rest
- * @param-immediately-invoked-callable $rest
  */
 function array_udiff(array $array, ...$rest): array {}
 
@@ -4155,8 +4151,6 @@ function array_udiff(array $array, ...$rest): array {}
  * @return array<K, V>
  *
  * @no-named-arguments
- * @param array|callable ...$rest
- * @param-immediately-invoked-callable $rest
  */
 function array_udiff_assoc(array $array, ...$rest): array {}
 
@@ -4169,8 +4163,6 @@ function array_udiff_assoc(array $array, ...$rest): array {}
  * @return array<K, V>
  *
  * @no-named-arguments
- * @param array|callable ...$rest
- * @param-immediately-invoked-callable $rest
  */
 function array_diff_uassoc(array $array, ...$rest): array {}
 
@@ -4183,8 +4175,6 @@ function array_diff_uassoc(array $array, ...$rest): array {}
  * @return array<K, V>
  *
  * @no-named-arguments
- * @param array|callable ...$rest
- * @param-immediately-invoked-callable $rest
  */
 function array_udiff_uassoc(array $array, ...$rest): array {}
 
@@ -4197,8 +4187,6 @@ function array_udiff_uassoc(array $array, ...$rest): array {}
  * @return array<K, V>
  *
  * @no-named-arguments
- * @param array|callable ...$rest
- * @param-immediately-invoked-callable $rest
  */
 function array_uintersect_assoc(array $array, ...$rest): array {}
 
@@ -4211,8 +4199,6 @@ function array_uintersect_assoc(array $array, ...$rest): array {}
  * @return array<K, V>
  *
  * @no-named-arguments
- * @param array|callable ...$rest
- * @param-immediately-invoked-callable $rest
  */
 function array_intersect_uassoc(array $array, ...$rest): array {}
 
@@ -4225,8 +4211,6 @@ function array_intersect_uassoc(array $array, ...$rest): array {}
  * @return array<K, V>
  *
  * @no-named-arguments
- * @param array|callable ...$rest
- * @param-immediately-invoked-callable $rest
  */
 function array_uintersect_uassoc(array $array, ...$rest): array {}
 
@@ -4239,8 +4223,6 @@ function array_uintersect_uassoc(array $array, ...$rest): array {}
  * @return array<K, V>
  *
  * @no-named-arguments
- * @param array|callable ...$rest
- * @param-immediately-invoked-callable $rest
  */
 function array_intersect_ukey(array $array, ...$rest): array {}
 
@@ -4253,8 +4235,6 @@ function array_intersect_ukey(array $array, ...$rest): array {}
  * @return array<K, V>
  *
  * @no-named-arguments
- * @param array|callable ...$rest
- * @param-immediately-invoked-callable $rest
  */
 function array_uintersect(array $array, ...$rest): array {}
 
