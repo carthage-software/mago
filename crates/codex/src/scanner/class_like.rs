@@ -910,15 +910,17 @@ where
             }
         }
 
-        let mut inheritors = None;
+        let mut inheritors_type = None;
         for tag in document.tags() {
-            if let TagValue::Inheritors(inheritors_tag) = &tag.value {
-                inheritors = Some(*inheritors_tag);
+            match &tag.value {
+                TagValue::Inheritors(inheritors_tag) => inheritors_type = Some(inheritors_tag.r#type),
+                TagValue::Sealed(sealed_tag) => inheritors_type = Some(sealed_tag.r#type),
+                _ => {}
             }
         }
 
-        if let Some(inheritors) = inheritors {
-            match builder::get_union_from_type(inheritors.r#type, scope, &type_context, Some(original_name)) {
+        if let Some(inheritors_type) = inheritors_type {
+            match builder::get_union_from_type(inheritors_type, scope, &type_context, Some(original_name)) {
                 Ok(inheritors_union) => {
                     for inheritor in inheritors_union.types.as_ref() {
                         match inheritor {
@@ -933,7 +935,7 @@ where
                                     Issue::error("The `@inheritors` tag only accepts class, interface, or enum names.")
                                         .with_code(ScanningIssueKind::InvalidInheritorsTag)
                                         .with_annotation(
-                                            Annotation::primary(inheritors.r#type.span())
+                                            Annotation::primary(inheritors_type.span())
                                                 .with_message("This type is not a simple class-like name."),
                                         ),
                                 );
