@@ -24,10 +24,13 @@ use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_array_value_parameter;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_bool;
+use mago_codex::ttype::get_closed_resource;
 use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_float;
 use mago_codex::ttype::get_iterable_value_parameter;
+use mago_codex::ttype::get_mixed_keyed_array;
 use mago_codex::ttype::get_numeric_string;
+use mago_codex::ttype::get_open_resource;
 use mago_codex::ttype::get_true;
 use mago_codex::ttype::shared::EMPTY_KEYED_ARRAY_ATOMIC;
 use mago_codex::ttype::shared::EMPTY_STRING_ATOMIC;
@@ -1247,19 +1250,22 @@ where
         return None;
     };
 
+    let get_class_assertion = || {
+        let resolved = get_class_name_from_atomic(assertion_context.codebase, atomic)?;
+        if resolved.is_invalid() || resolved.is_possibly_invalid() {
+            return None;
+        }
+        let object_type = resolved.get_object_type(assertion_context.codebase);
+        Some(if resolved.is_final { Assertion::IsType(object_type) } else { Assertion::IsIdentical(object_type) })
+    };
+
     let assertion = match kind {
-        BuiltinNarrowingFunction::GetClass => {
-            let resolved = get_class_name_from_atomic(assertion_context.codebase, atomic)?;
-            if resolved.is_invalid() || resolved.is_possibly_invalid() {
-                return None;
-            }
-            let object_type = resolved.get_object_type(assertion_context.codebase);
-            if resolved.is_final { Assertion::IsType(object_type) } else { Assertion::IsIdentical(object_type) }
-        }
-        BuiltinNarrowingFunction::GetType => {
-            let scalar = gettype_literal_to_scalar(atomic)?;
-            Assertion::IsType(scalar)
-        }
+        BuiltinNarrowingFunction::Class => get_class_assertion()?,
+        BuiltinNarrowingFunction::Type => Assertion::IsType(gettype_literal_to_scalar(atomic)?),
+        BuiltinNarrowingFunction::DebugType => match get_debug_type_literal_to_type(atomic) {
+            Some(debug_type) => Assertion::IsType(debug_type),
+            None => get_class_assertion()?,
+        },
     };
 
     let assertion = if negated {
@@ -1289,6 +1295,25 @@ fn gettype_literal_to_scalar(atomic: &TAtomic) -> Option<TAtomic> {
         b"boolean" => Some(TAtomic::Scalar(TScalar::bool())),
         b"object" => Some(TAtomic::Object(TObject::Any)),
         b"NULL" => Some(TAtomic::Null),
+        b"array" => Some(get_mixed_keyed_array().get_single_owned()),
+        b"resource" => Some(get_open_resource().get_single_owned()),
+        b"resource (closed)" => Some(get_closed_resource().get_single_owned()),
+        _ => None,
+    }
+}
+
+fn get_debug_type_literal_to_type(atomic: &TAtomic) -> Option<TAtomic> {
+    let TAtomic::Scalar(TScalar::String(string)) = atomic else {
+        return None;
+    };
+    match string.get_known_literal_value()? {
+        b"null" => Some(TAtomic::Null),
+        b"bool" => Some(TAtomic::Scalar(TScalar::bool())),
+        b"int" => Some(TAtomic::Scalar(TScalar::int())),
+        b"float" => Some(TAtomic::Scalar(TScalar::float())),
+        b"string" => Some(TAtomic::Scalar(TScalar::string())),
+        b"array" => Some(get_mixed_keyed_array().get_single_owned()),
+        b"resource (closed)" => Some(get_closed_resource().get_single_owned()),
         _ => None,
     }
 }

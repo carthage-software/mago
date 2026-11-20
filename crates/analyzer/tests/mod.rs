@@ -3229,6 +3229,7 @@ test_case!(pathinfo_of_non_empty_path_has_dirname);
 test_case!(reflection_is_instance_false_keeps_type);
 test_case!(list_offset_isset_defines_lower_offsets);
 test_case!(isset_offset_on_scalar_keeps_string);
+test_case!(get_debug_type_comparison_narrows);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
