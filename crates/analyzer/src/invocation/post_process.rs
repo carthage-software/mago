@@ -78,6 +78,7 @@ use crate::reconciler;
 use crate::reconciler::assertion_reconciler::intersect_union_with_union;
 use crate::utils::exception::get_throw_type_atomics;
 use crate::utils::exception::get_throw_type_object_names;
+use crate::utils::exception::is_structural_throw_type;
 use crate::utils::expression::expression_is_nullsafe;
 use crate::utils::expression::get_access_base_expressions;
 use crate::utils::expression::get_block_expression_id;
@@ -246,7 +247,7 @@ where
                 for resolved_exception_type in resolved_exception_types {
                     for exception_atomic in resolved_exception_type.types.into_owned() {
                         for thrown_atomic in get_throw_type_atomics(&exception_atomic) {
-                            if matches!(&thrown_atomic, TAtomic::GenericParameter(_))
+                            if is_structural_throw_type(&thrown_atomic)
                                 && thrown_atomic.extends_or_implements(context.codebase, b"Throwable")
                             {
                                 let object_names = get_throw_type_object_names(context.codebase, &thrown_atomic);
@@ -589,7 +590,7 @@ fn record_callback_throw_types<'ctx, A>(
             }
 
             for thrown_atomic in get_throw_type_atomics(atomic_type) {
-                if matches!(&thrown_atomic, TAtomic::GenericParameter(_))
+                if is_structural_throw_type(&thrown_atomic)
                     && thrown_atomic.extends_or_implements(context.codebase, b"Throwable")
                 {
                     let thrown_generic = PossiblyThrownGenericException {

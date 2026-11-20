@@ -99,6 +99,7 @@ use crate::statement::r#loop::assignment_map_visitor::get_assignment_map;
 use crate::statement::r#loop::cleaner::clean_nodes;
 use crate::utils::exception::get_throw_type_atomics;
 use crate::utils::exception::get_throw_type_object_names;
+use crate::utils::exception::is_structural_throw_type;
 use crate::utils::misc::unwrap_expression;
 
 mod assignment_map_visitor;
@@ -2866,7 +2867,7 @@ fn record_method_throws<'ctx, A>(
             }
 
             for thrown_atomic in get_throw_type_atomics(atomic_type) {
-                if matches!(&thrown_atomic, TAtomic::GenericParameter(_))
+                if is_structural_throw_type(&thrown_atomic)
                     && thrown_atomic.extends_or_implements(context.codebase, b"Throwable")
                 {
                     let thrown_generic = PossiblyThrownGenericException {

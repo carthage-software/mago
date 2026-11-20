@@ -7,6 +7,13 @@ use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::union::TUnion;
 use mago_word::Word;
 
+/// Whether a thrown type is tracked as a whole rather than by class name: a template, or an intersection such as
+/// `Marker&Throwable`, which is caught only by a class all of its parts extend or by one of its parts.
+pub fn is_structural_throw_type(atomic_type: &TAtomic) -> bool {
+    matches!(atomic_type, TAtomic::GenericParameter(_))
+        || atomic_type.get_intersection_types().is_some_and(|intersection_types| !intersection_types.is_empty())
+}
+
 pub fn get_throw_type_atomics(atomic_type: &TAtomic) -> Vec<TAtomic> {
     let TAtomic::GenericParameter(parameter) = atomic_type else {
         return vec![atomic_type.clone()];
