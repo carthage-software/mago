@@ -610,6 +610,17 @@ pub(crate) fn can_be_identical(
         };
     }
 
+    if let Some((TAtomic::Callable(callable), other)) = match (first_part, second_part) {
+        (TAtomic::Callable(_), TAtomic::Callable(_)) => None,
+        (TAtomic::Callable(_), other) => Some((first_part, other)),
+        (other, TAtomic::Callable(_)) => Some((second_part, other)),
+        _ => None,
+    } && callable.is_closure()
+        && !can_atomic_be_closure(other, codebase)
+    {
+        return false;
+    }
+
     if matches!(first_part, TAtomic::Callable(_)) != matches!(second_part, TAtomic::Callable(_))
         && can_atomic_be_callable(first_part, codebase)
         && can_atomic_be_callable(second_part, codebase)
@@ -1210,6 +1221,17 @@ fn keyed_arrays_can_be_identical(
     }
 
     parameters_can_be_identical(codebase, first_array, second_array, inside_assertion)
+}
+
+fn can_atomic_be_closure(atomic: &TAtomic, codebase: &CodebaseMetadata) -> bool {
+    match atomic {
+        TAtomic::Object(TObject::Named(named)) => codebase.is_instance_of(b"Closure", named.name.as_bytes()),
+        TAtomic::Object(TObject::Enum(_)) | TAtomic::Scalar(_) | TAtomic::Array(_) | TAtomic::Null => false,
+        TAtomic::GenericParameter(parameter) => {
+            parameter.constraint.types.iter().any(|constraint| can_atomic_be_closure(constraint, codebase))
+        }
+        _ => true,
+    }
 }
 
 #[cfg(test)]
