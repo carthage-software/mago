@@ -200,9 +200,7 @@ where
             return negate_formula(&clauses, algebra_thresholds);
         }
 
-        if binary.operator.is_null_coalesce()
-            && artifacts.get_expression_type(binary.rhs).is_some_and(|ty| ty.is_always_falsy())
-        {
+        if binary.operator.is_null_coalesce() && is_always_falsy_expression(binary.rhs, artifacts) {
             return get_base_formula(
                 binary.lhs.span(),
                 binary.lhs.span(),
@@ -419,7 +417,7 @@ where
 
     if let Expression::Conditional(conditional_expr) = expression
         && let Some(then) = conditional_expr.then
-        && artifacts.get_expression_type(conditional_expr.r#else).is_some_and(|t| t.is_always_falsy())
+        && is_always_falsy_expression(conditional_expr.r#else, artifacts)
     {
         return handle_binary_and_operation(
             conditional_object_id,
@@ -1402,6 +1400,13 @@ pub fn remove_clauses_with_mixed_variables(
             c
         })
         .collect::<Vec<Clause>>()
+}
+
+fn is_always_falsy_expression(expression: &Expression<'_>, artifacts: &AnalysisArtifacts) -> bool {
+    match artifacts.get_expression_type(expression) {
+        Some(expression_type) => expression_type.is_always_falsy(),
+        None => matches!(unwrap_expression(expression), Expression::Literal(Literal::False(_) | Literal::Null(_))),
+    }
 }
 
 #[cfg(test)]
