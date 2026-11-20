@@ -457,7 +457,9 @@ fn record_immediate_builtin_callback_throw_types<'ctx, 'arena, A>(
         return;
     }
 
-    if array_map_callback_is_definitely_not_invoked(artifacts, invocation, identifier) {
+    if context.settings.find_overly_wide_throw_types
+        && array_map_callback_is_definitely_not_invoked(artifacts, invocation, identifier)
+    {
         return;
     }
     let mut callback_expressions = Vec::new();
