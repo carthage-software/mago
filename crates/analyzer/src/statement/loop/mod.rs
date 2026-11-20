@@ -29,6 +29,7 @@ use mago_codex::ttype::atomic::derived::TDerived;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
+use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::combine_union_types;
@@ -2649,6 +2650,27 @@ fn widen_growing_integers(current: &TUnion, previous: &TUnion) -> Option<TUnion>
         types.push(TAtomic::Scalar(TScalar::String(TString::general())));
     }
 
+    let literal_floats = |union: &TUnion| -> Vec<TFloat> {
+        union
+            .types
+            .iter()
+            .filter_map(|atomic| match atomic {
+                TAtomic::Scalar(TScalar::Float(float @ TFloat::Literal(_))) => Some(*float),
+                _ => None,
+            })
+            .collect()
+    };
+
+    let current_floats = literal_floats(current);
+    let previous_floats = literal_floats(previous);
+    let widen_floats = current_floats.len() > 1
+        && !previous_floats.is_empty()
+        && current_floats.iter().any(|literal| !previous_floats.contains(literal));
+    if widen_floats {
+        changed = true;
+        types.push(TAtomic::Scalar(TScalar::float()));
+    }
+
     let previous_value = previous.types.iter().find_map(|atomic| match atomic {
         TAtomic::Array(TArray::Keyed(keyed)) => keyed.parameters.as_ref().map(|(_, value)| value.as_ref()),
         TAtomic::Array(TArray::List(list)) => Some(list.element_type.as_ref()),
@@ -2659,6 +2681,7 @@ fn widen_growing_integers(current: &TUnion, previous: &TUnion) -> Option<TUnion>
         if (widen_ints && atomic.is_int())
             || (widen_strings
                 && matches!(atomic, TAtomic::Scalar(TScalar::String(string)) if string.get_known_literal_value().is_some()))
+            || (widen_floats && matches!(atomic, TAtomic::Scalar(TScalar::Float(TFloat::Literal(_)))))
         {
             continue;
         }
