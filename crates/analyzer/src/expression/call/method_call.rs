@@ -3,6 +3,7 @@ use mago_word::Word;
 use mago_word::WordMap;
 use std::rc::Rc;
 
+use crate::expression::access::property_access::is_isset_from_loop_mixed;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -12,6 +13,7 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_mixed;
+use mago_codex::ttype::get_mixed_maybe_from_loop;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_null;
 use mago_codex::ttype::template::TemplateResult;
@@ -415,6 +417,7 @@ where
             .push(vec![mago_codex::assertion::Assertion::IsNotType(mago_codex::ttype::atomic::TAtomic::Null)]);
     }
 
+    let encountered_mixed = method_resolution.encountered_mixed;
     if has_resolved_methods || method_resolution.undocumented_methods.is_empty() {
         analyze_invocation_targets(
             context,
@@ -425,7 +428,7 @@ where
             InvocationArgumentsSource::ArgumentList(argument_list),
             span,
             this_variable,
-            method_resolution.encountered_mixed,
+            encountered_mixed,
             is_null_safe && method_resolution.encountered_null,
             artifacts.get_expression_type(object).is_some_and(|t| t.has_nullsafe_null()),
         )?;
@@ -443,6 +446,10 @@ where
             MethodInvocationKind::Instance,
             !has_resolved_methods,
         )?;
+    }
+
+    if encountered_mixed && is_isset_from_loop_mixed(artifacts.get_expression_type(object)) {
+        artifacts.set_expression_type(&span, get_mixed_maybe_from_loop(true));
     }
 
     if let Some((object_id, object_type, narrowed)) = narrowed_receiver

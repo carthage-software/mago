@@ -3260,6 +3260,7 @@ test_case!(template_compared_to_literal_keeps_template);
 test_case!(conflicting_interface_docblocks_are_not_inherited);
 test_case!(order_comparison_else_branch_narrows);
 test_case!(template_compared_to_enum_case_keeps_template);
+test_case!(loop_isset_value_keeps_its_loop_origin);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
