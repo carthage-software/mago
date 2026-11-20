@@ -570,8 +570,6 @@ impl<'ctx> BlockContext<'ctx> {
 
         self.class_string_sources
             .retain(|holder, source| !var_has_root(*holder, remove_var_id) && !var_has_root(*source, remove_var_id));
-
-        self.parent_conflicting_clause_variables.insert(remove_var_id);
     }
 
     pub(crate) fn add_class_type_relation(&mut self, source: Word, target: Word) {

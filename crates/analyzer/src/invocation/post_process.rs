@@ -938,6 +938,7 @@ where
                 }
 
                 block_context.remove_variable_from_conflicting_clauses(context, argument_id, None);
+                block_context.parent_conflicting_clause_variables.insert(argument_id);
 
                 assign_to_expression(
                     context,
@@ -968,6 +969,7 @@ where
                 {
                     block_context.remove_descendants(context, *argument_id, &existing_type, Some(&new_type));
                     block_context.remove_variable_from_conflicting_clauses(context, *argument_id, None);
+                    block_context.parent_conflicting_clause_variables.insert(*argument_id);
                 }
 
                 assign_to_expression(
