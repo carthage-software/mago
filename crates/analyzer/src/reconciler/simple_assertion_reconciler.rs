@@ -2460,13 +2460,19 @@ where
                 }));
                 acceptable_types.extend(keyed_array.types.into_owned());
             }
-            TAtomic::Object(TObject::Named(_)) => {
+            TAtomic::Object(TObject::Named(_) | TObject::Any) => {
                 acceptable_types.push(atomic);
             }
             TAtomic::Scalar(TScalar::String(s)) if !s.is_known_literal() => {
                 if let ArrayKey::Integer(_) = key_name {
                     acceptable_types.push(atomic);
                 }
+            }
+            TAtomic::Scalar(TScalar::Generic | TScalar::ArrayKey) if matches!(key_name, ArrayKey::Integer(_)) => {
+                acceptable_types.push(TAtomic::Scalar(TScalar::string()));
+            }
+            TAtomic::Scalar(TScalar::Numeric) if matches!(key_name, ArrayKey::Integer(_)) => {
+                acceptable_types.push(TAtomic::Scalar(TScalar::numeric_string()));
             }
             _ => {}
         }
