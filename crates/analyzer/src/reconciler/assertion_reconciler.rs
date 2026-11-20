@@ -1615,6 +1615,23 @@ where
 
                 return TUnion::from_atomic(asserted_atomic);
             }
+            TAtomic::GenericParameter(generic_parameter) => {
+                let get_literal = || TUnion::from_atomic(asserted_atomic.clone());
+                if let Some(atomic) = map_generic_constraint_or_else(generic_parameter, get_literal, |constraint| {
+                    handle_literal_equality_with_class_string(
+                        context,
+                        assertion,
+                        assertion_class_string_val,
+                        constraint,
+                        None,
+                        old_var_type_atom,
+                        None,
+                        negated,
+                    )
+                }) {
+                    return TUnion::from_atomic(atomic);
+                }
+            }
             _ => {}
         }
     }
@@ -1644,7 +1661,9 @@ where
     let literal_asserted_type = TAtomic::Scalar(TScalar::literal_float(assertion_float_val));
     let is_loose_equality = matches!(assertion, Assertion::IsEqual(_));
 
-    if existing_var_type.has_scalar() || existing_var_type.has_numeric() || existing_var_type.has_mixed() {
+    if (existing_var_type.has_scalar() || existing_var_type.has_numeric() || existing_var_type.has_mixed())
+        && !existing_var_type.types.iter().any(|atomic| matches!(atomic, TAtomic::GenericParameter(_)))
+    {
         return if is_loose_equality { existing_var_type.clone() } else { TUnion::from_atomic(literal_asserted_type) };
     }
 
