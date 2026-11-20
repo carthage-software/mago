@@ -81,6 +81,8 @@ where
     new_locals: Option<WordMap<Rc<TUnion>>>,
     redefined_variables: Option<WordMap<Rc<TUnion>>>,
     possibly_redefined_variables: Option<WordMap<Rc<TUnion>>>,
+    unset_variables: Option<WordSet>,
+    possibly_unset_variables: WordSet,
     leftover_statement_groups: Vec<(Vec<Statement<'arena>>, bool)>,
     leftover_case_equality_expression: Option<Expression<'arena>>,
     has_fallthrough: bool,
@@ -115,6 +117,8 @@ where
             new_locals: None,
             redefined_variables: None,
             possibly_redefined_variables: None,
+            unset_variables: None,
+            possibly_unset_variables: WordSet::default(),
             leftover_statement_groups: vec![],
             leftover_case_equality_expression: None,
             has_fallthrough: false,
@@ -298,6 +302,16 @@ where
                 for (var_id, var_type) in redefined_vars {
                     possibly_redefined_vars.insert(var_id, var_type);
                 }
+            }
+        }
+
+        let unset_variables = self.unset_variables.unwrap_or_default();
+        for variable_id in self.possibly_unset_variables {
+            if is_exhaustive && unset_variables.contains(&variable_id) {
+                self.block_context.remove_variable(variable_id.as_bytes(), true, self.context);
+            } else if let Some(variable_type) = self.block_context.locals.get_mut(&variable_id) {
+                Rc::make_mut(variable_type).set_possibly_undefined(true, None);
+                self.block_context.possibly_undefined_variable_ids.insert(variable_id);
             }
         }
 
@@ -943,6 +957,16 @@ where
         let mut removed_var_ids = WordSet::default();
         let case_redefined_vars =
             case_block_context.get_redefined_locals(&original_block_context.locals, false, &mut removed_var_ids);
+
+        removed_var_ids.retain(|id| {
+            !id.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':'))
+                && self.block_context.locals.contains_key(id)
+        });
+        self.possibly_unset_variables.extend(removed_var_ids.iter().copied());
+        match &mut self.unset_variables {
+            Some(unset_variables) => unset_variables.retain(|id| removed_var_ids.contains(id)),
+            None => self.unset_variables = Some(removed_var_ids),
+        }
 
         if let Some(possibly_redefined_var_ids) = &mut self.possibly_redefined_variables {
             for (var_id, var_type) in &case_redefined_vars {
