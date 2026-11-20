@@ -199,6 +199,7 @@ where
         &mut conditionally_referenced_variable_ids,
     );
 
+    if_block_context.clauses.clone_from(&conditional_context_clauses);
     if !reconcilable_if_types.is_empty() {
         let mut changed_variable_ids = WordSet::default();
 
@@ -213,6 +214,8 @@ where
             false,
             false,
         );
+
+        BlockContext::retain_unreconciled_clauses(&mut if_block_context.clauses, &changed_variable_ids);
     }
 
     let mut else_block_context = block_context.clone();
