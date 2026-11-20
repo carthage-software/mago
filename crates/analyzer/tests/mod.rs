@@ -3239,6 +3239,7 @@ test_case!(trait_this_instanceof_user_class_is_not_redundant);
 test_case!(reference_to_required_union_key_is_not_null);
 test_case!(loop_condition_nullsafe_coalesce_false_narrows);
 test_case!(nullsafe_chain_short_circuits_static_access);
+test_case!(foreach_over_template_reads_whole_bound);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);

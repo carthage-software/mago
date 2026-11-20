@@ -2375,16 +2375,21 @@ where
     let mut has_valid_iterable_type = false;
     let mut invalid_atomic_ids = Vec::with_capacity(iterator_type.types.len());
 
-    for iterator_atomic_original in iterator_type.types.iter().flat_map(|atomic| match atomic {
-        TAtomic::Derived(TDerived::Intersection(intersection)) => intersection.get_base_type().types.as_ref(),
-        _ => std::slice::from_ref(atomic),
-    }) {
-        let iterator_atomic = if let TAtomic::GenericParameter(generic_parameter) = iterator_atomic_original {
-            generic_parameter.get_constraint().get_single()
-        } else {
-            iterator_atomic_original
-        };
+    let mut iterator_atomics = Vec::with_capacity(iterator_type.types.len());
+    let mut pending_atomics: Vec<&TAtomic> = iterator_type.types.iter().rev().collect();
+    while let Some(atomic) = pending_atomics.pop() {
+        match atomic {
+            TAtomic::Derived(TDerived::Intersection(intersection)) => {
+                pending_atomics.extend(intersection.get_base_type().types.iter().rev());
+            }
+            TAtomic::GenericParameter(generic_parameter) => {
+                pending_atomics.extend(generic_parameter.get_constraint().types.iter().rev());
+            }
+            _ => iterator_atomics.push(atomic),
+        }
+    }
 
+    for iterator_atomic in iterator_atomics {
         match iterator_atomic {
             TAtomic::Null | TAtomic::Scalar(TScalar::Bool(TBool { value: Some(false) })) => {
                 always_enters_loop = false;
