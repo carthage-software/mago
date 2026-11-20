@@ -1237,7 +1237,8 @@ where
         let possible_keys: Vec<ArrayKey> = index_type.types.iter().filter_map(TAtomic::to_array_key).collect();
 
         let mut key_possibly_missing = false;
-        if !possible_keys.is_empty() && possible_keys.len() == index_type.types.len() {
+        let all_keys_known = !possible_keys.is_empty() && possible_keys.len() == index_type.types.len();
+        if all_keys_known {
             for key in &possible_keys {
                 if let Some((optional, known_item)) = known_items.get(key) {
                     key_possibly_missing |= *optional;
@@ -1278,7 +1279,9 @@ where
             *has_valid_expected_index = true;
         }
 
-        *has_possibly_undefined = true;
+        if key_possibly_missing || !all_keys_known {
+            *has_possibly_undefined = true;
+        }
 
         if (context.settings.strict_array_index_existence
             || (key_possibly_missing
