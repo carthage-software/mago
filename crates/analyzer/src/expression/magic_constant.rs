@@ -85,7 +85,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MagicConstant<'arena> {
                 }
             }
             MagicConstant::Function(_) | MagicConstant::Method(_) => {
-                if block_context.scope.get_function_like().is_none() { get_string() } else { get_non_empty_string() }
+                if block_context.scope.get_function_like().is_none()
+                    && block_context.scope.get_property_hook().is_none()
+                {
+                    get_string()
+                } else {
+                    get_non_empty_string()
+                }
             }
             MagicConstant::Property(_) => {
                 if let Some((property_name, _)) = block_context.scope.get_property_hook() {

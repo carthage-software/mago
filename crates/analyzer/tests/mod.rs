@@ -3220,6 +3220,7 @@ test_case!(too_wide_closure_argument, expected_issue_counts = [("too-wide-throw-
 test_case!(array_write_with_scalar_key_stores_php_key_type);
 test_case!(file_test_functions_assert_non_empty_string);
 test_case!(switch_case_unset_is_possibly_undefined);
+test_case!(property_hook_function_and_method_constants_are_non_empty);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
