@@ -28,7 +28,15 @@ final class CallableInvocationKindTest extends TestCase
         ];
         foreach ($cases as [$bits, $expected]) {
             $parameter = new ParameterMetadata(
-                '$callback', $location, $location, null, null, null, null, null, [],
+                '$callback',
+                $location,
+                $location,
+                null,
+                null,
+                null,
+                null,
+                null,
+                [],
                 new MetadataFlags($bits | MetadataFlags::VARIADIC),
             );
             self::assertSame($expected, $parameter->callableInvocationKind());
@@ -39,9 +47,9 @@ final class CallableInvocationKindTest extends TestCase
     public function testTimingSurvivesMethodParameterWireDecoding(): void
     {
         $cases = [
-            [0, null],
+            [0,                                           null],
             [MetadataFlags::IMMEDIATELY_INVOKED_CALLABLE, CallableInvocationKind::Immediately],
-            [MetadataFlags::LATER_INVOKED_CALLABLE, CallableInvocationKind::Later],
+            [MetadataFlags::LATER_INVOKED_CALLABLE,       CallableInvocationKind::Later],
         ];
         foreach ($cases as [$bits, $expected]) {
             $writer = new PayloadWriter();
