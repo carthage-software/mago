@@ -1290,7 +1290,7 @@ function dirname(string $path, int $levels = 1): string {}
 /**
  * @param 1|2|4|8|15 $flags
  *
- * @return ($flags is 15 ? array{dirname?: string, basename: string, extension?: string, filename: string} : string)
+ * @return ($flags is 15 ? ($path is non-empty-string ? array{dirname: string, basename: string, extension?: string, filename: string} : array{dirname?: string, basename: string, extension?: string, filename: string}) : string)
  */
 function pathinfo(string $path, int $flags = PATHINFO_ALL): array|string {}
 
