@@ -3245,6 +3245,7 @@ test_case!(intersection_throws_is_caught_as_a_whole);
 test_case!(array_key_exists_string_key_on_int_keyed_array);
 test_case!(unpacked_string_keys_into_no_named_arguments);
 test_case!(phpstan_sealed_tag_limits_inheritors);
+test_case!(deprecated_enum_case_is_reported);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
