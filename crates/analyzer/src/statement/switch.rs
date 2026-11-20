@@ -275,6 +275,14 @@ where
                         .is_some_and(|id| final_else_context.locals.get(id).is_some_and(|t| t.is_never()))
             };
 
+        if all_options_exit && !is_exhaustive {
+            for (variable_id, variable_type) in &self.running_else_context.locals {
+                if self.block_context.locals.get(variable_id).is_some_and(|existing| existing != variable_type) {
+                    self.block_context.locals.insert(*variable_id, Rc::clone(variable_type));
+                }
+            }
+        }
+
         let mut possibly_redefined_vars = self.possibly_redefined_variables.unwrap_or_default();
         if let Some(new_locals) = self.new_locals {
             possibly_redefined_vars.retain(|k, _| !new_locals.contains_key(k));
