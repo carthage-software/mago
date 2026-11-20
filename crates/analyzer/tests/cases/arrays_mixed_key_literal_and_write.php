@@ -43,8 +43,6 @@ function from_invalid_key_write(\stdClass $key): array
     // @mago-expect analysis:invalid-array-index
     $result[$key] = 1;
 
-    // The rejected write still widens the inferred key type: genuine mismatch.
-    /** @mago-expect analysis:invalid-return-statement */
     return $result;
 }
 

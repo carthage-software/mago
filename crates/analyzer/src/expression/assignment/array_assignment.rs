@@ -268,19 +268,43 @@ where
 
 fn normalize_key_type(key_type: &Rc<TUnion>) -> Rc<TUnion> {
     if key_type.is_mixed() {
-        Rc::new(get_arraykey())
-    } else if key_type.has_null() {
-        let mut types: Vec<TAtomic> = key_type.types.iter().filter(|t| !t.is_null()).cloned().collect();
-        types.push(TAtomic::Scalar(TScalar::String(TString::known_literal(empty_word()))));
-
-        Rc::new(TUnion::from_vec(types))
-    } else if key_type.types.iter().any(TAtomic::is_array) {
-        let types: Vec<TAtomic> = key_type.types.iter().filter(|t| !t.is_array()).cloned().collect();
-
-        Rc::new(if types.is_empty() { get_arraykey() } else { TUnion::from_vec(types) })
-    } else {
-        widen_numeric_string_key(key_type).map_or_else(|| Rc::clone(key_type), Rc::new)
+        return Rc::new(get_arraykey());
     }
+
+    if !key_type.types.iter().any(|atomic| {
+        matches!(
+            atomic,
+            TAtomic::Null
+                | TAtomic::Object(_)
+                | TAtomic::Array(_)
+                | TAtomic::Scalar(TScalar::Bool(_) | TScalar::Float(_) | TScalar::Generic | TScalar::Numeric)
+        )
+    }) {
+        return widen_numeric_string_key(key_type).map_or_else(|| Rc::clone(key_type), Rc::new);
+    }
+
+    let mut types = Vec::with_capacity(key_type.types.len());
+    for atomic in key_type.types.iter() {
+        match atomic {
+            TAtomic::Null => types.push(TAtomic::Scalar(TScalar::String(TString::known_literal(empty_word())))),
+            TAtomic::Scalar(TScalar::Bool(boolean)) => {
+                types.push(TAtomic::Scalar(
+                    boolean.value.map_or_else(TScalar::int, |value| TScalar::literal_int(i64::from(value))),
+                ));
+            }
+            TAtomic::Scalar(TScalar::Float(_)) => types.push(TAtomic::Scalar(TScalar::int())),
+            TAtomic::Scalar(TScalar::Generic | TScalar::Numeric) => types.push(TAtomic::Scalar(TScalar::ArrayKey)),
+            TAtomic::Object(_) | TAtomic::Array(_) => {}
+            _ => types.push(atomic.clone()),
+        }
+    }
+
+    if types.is_empty() {
+        return Rc::new(get_arraykey());
+    }
+
+    let normalized = TUnion::from_vec(types);
+    Rc::new(widen_numeric_string_key(&normalized).unwrap_or(normalized))
 }
 
 fn update_atomic_given_key<A>(
