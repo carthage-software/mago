@@ -1384,6 +1384,9 @@ where
             TAtomic::Scalar(TScalar::Bool(TBool { value: None })) if is_loose_equality => {
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
+            TAtomic::Null if is_loose_equality && assertion_integer == 0 => {
+                acceptable_types.push(existing_var_atomic_type.clone());
+            }
             TAtomic::GenericParameter(generic_parameter) => {
                 did_remove_type = true;
                 let get_int_literal = || TUnion::from_atomic(literal_asserted_type.clone());
@@ -1469,6 +1472,9 @@ where
                 if is_loose_equality
                     && scalars_can_be_identical_with_coercion(existing_var_atomic_type, &literal_asserted_type) =>
             {
+                acceptable_types.push(existing_var_atomic_type.clone());
+            }
+            TAtomic::Null if is_loose_equality && assertion_str_val.is_empty() => {
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::GenericParameter(generic_parameter) => {
