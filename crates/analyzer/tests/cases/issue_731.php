@@ -54,8 +54,6 @@ function weird(): void
     assert(null === get_test()?->x->name, description: 'expected null');
     assert(null === get_test()?->x->t::create()->x->name, description: 'expected null');
     assert(null === get_test()?->x->t::create()->test()[0], description: 'expected null');
-    // @mago-expect analysis:possibly-null-property-access
     assert(null === get_test()?->x::$t2::create()->x->name, description: 'expected null');
-    // @mago-expect analysis:possibly-null-property-access
     assert(null === get_test()?->x::$t2::create()->test()[0], description: 'expected null');
 }
