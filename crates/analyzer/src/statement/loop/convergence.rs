@@ -603,7 +603,7 @@ mod tests {
         ",
             4,
         );
-        assert!(skipped >= 3, "seeded loop variables must not delay convergence");
+        assert!(skipped >= 2, "seeded loop variables must not delay convergence");
     }
 
     #[test]

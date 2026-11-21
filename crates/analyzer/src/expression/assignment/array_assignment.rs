@@ -80,8 +80,8 @@ where
         array_target_expressions.last().unwrap_unchecked().get_array()
     };
 
-    if is_created_by_write(block_context, root_array_expression) {
-        artifacts.set_expression_type(root_array_expression, get_empty_keyed_array());
+    if let Some(created_root_type) = get_created_root_type(context, block_context, root_array_expression) {
+        artifacts.set_expression_type(root_array_expression, created_root_type);
     } else if artifacts.get_expression_type(root_array_expression).is_none() {
         let was_inside_general_use = block_context.flags.inside_general_use();
         block_context.flags.set_inside_general_use(true);
@@ -842,15 +842,34 @@ where
     result
 }
 
-fn is_created_by_write(block_context: &BlockContext<'_>, root_array_expression: &Expression<'_>) -> bool {
+fn get_created_root_type<A>(
+    context: &Context<'_, '_, A>,
+    block_context: &BlockContext<'_>,
+    root_array_expression: &Expression<'_>,
+) -> Option<TUnion>
+where
+    A: Arena,
+{
     let Expression::Variable(Variable::Direct(variable)) = root_array_expression else {
-        return false;
+        return None;
     };
 
     let variable_id = word(variable.name);
+    match block_context.locals.get(&variable_id) {
+        None if !block_context.variables_possibly_in_scope.contains(&variable_id) => Some(get_empty_keyed_array()),
+        Some(existing_type) if existing_type.possibly_undefined() => {
+            let mut defined_type = (**existing_type).clone();
+            defined_type.set_possibly_undefined(false, None);
 
-    !block_context.locals.contains_key(&variable_id)
-        && !block_context.variables_possibly_in_scope.contains(&variable_id)
+            Some(combine_union_types(
+                &defined_type,
+                &get_empty_keyed_array(),
+                context.codebase,
+                context.settings.combiner_options(),
+            ))
+        }
+        _ => None,
+    }
 }
 
 pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena, A>(
