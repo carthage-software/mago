@@ -153,6 +153,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
 
             loop_scope.final_actions.insert(ControlAction::Continue);
 
+            for (variable_id, parent_type) in &loop_scope.parent_context_variables {
+                let combined = add_optional_union_type_rc(
+                    block_context.locals.get(variable_id).unwrap_or(parent_type),
+                    loop_scope.parent_variables_at_continues.get(variable_id).map(AsRef::as_ref),
+                    context.codebase,
+                );
+
+                loop_scope.parent_variables_at_continues.insert(*variable_id, combined);
+            }
+
             if loop_scope.iteration_count == 0 {
                 let defined_here = block_context
                     .locals

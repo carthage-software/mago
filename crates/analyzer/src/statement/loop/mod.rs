@@ -1528,6 +1528,20 @@ where
                             preserve_array_shapes_for.contains(variable_id),
                         )),
                     );
+                } else if !does_sometimes_break
+                    && pre_conditions.is_empty()
+                    && let Some(continue_type) = loop_scope.parent_variables_at_continues.get(variable_id)
+                {
+                    loop_parent_context.locals.insert(
+                        *variable_id,
+                        Rc::new(combine_loop_types(
+                            variable_type,
+                            continue_type,
+                            codebase,
+                            CombinerOptions::default(),
+                            preserve_array_shapes_for.contains(variable_id),
+                        )),
+                    );
                 }
             } else {
                 loop_parent_context.locals.insert(*variable_id, Rc::clone(variable_type));
