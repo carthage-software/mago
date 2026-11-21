@@ -3283,6 +3283,7 @@ test_case!(integer_string_and_overlapping_array_keys);
 test_case!(isset_offset_of_mixed_value_in_loop);
 test_case!(parent_class_and_interface_document_differently);
 test_case!(inherited_docblock_is_not_checked_against_child_native_type);
+test_case!(destructure_callable_array);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);

@@ -13,6 +13,7 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::atomic::derived::TDerived;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::combine_union_types;
@@ -981,10 +982,12 @@ where
     let non_nullable_type = if source_has_null { Some(array_type.to_non_nullable()) } else { None };
     let destructure_type: &TUnion = non_nullable_type.as_ref().unwrap_or(array_type);
 
-    let can_be_destructured = destructure_type
-        .types
-        .iter()
-        .all(|atomic| atomic.is_array() || atomic.extends_or_implements(context.codebase, b"ArrayAccess"));
+    let is_destructurable =
+        |atomic: &TAtomic| atomic.is_array() || atomic.extends_or_implements(context.codebase, b"ArrayAccess");
+    let can_be_destructured = destructure_type.types.iter().all(|atomic| {
+        is_destructurable(atomic)
+            || matches!(atomic, TAtomic::Derived(TDerived::Intersection(intersection)) if intersection.get_base_type().types.iter().all(is_destructurable))
+    });
 
     if array_type.is_null() {
         let mut issue = Issue::error("Destructuring a `null` value.".to_string());
