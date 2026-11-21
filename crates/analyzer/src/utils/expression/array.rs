@@ -46,6 +46,7 @@ use mago_codex::ttype::intersect_read_types;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::union::TUnion;
+use mago_codex::ttype::wrap_atomic;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -658,6 +659,49 @@ fn can_throw_as_offset(index_type: &TUnion) -> bool {
         .any(|atomic| matches!(atomic, TAtomic::Array(_) | TAtomic::Object(_) | TAtomic::Iterable(_)))
 }
 
+fn with_integer_string_keys(index_type: &TUnion) -> Cow<'_, TUnion> {
+    let is_integer_string_key = |atomic: &TAtomic| {
+        matches!(atomic, TAtomic::Scalar(TScalar::String(_)))
+            && matches!(atomic.to_array_key(), Some(ArrayKey::Integer(_)))
+    };
+
+    if !index_type.types.iter().any(is_integer_string_key) {
+        return Cow::Borrowed(index_type);
+    }
+
+    Cow::Owned(
+        index_type.clone_with_types(
+            index_type
+                .types
+                .iter()
+                .map(|atomic| match atomic.to_array_key() {
+                    Some(ArrayKey::Integer(value)) if is_integer_string_key(atomic) => {
+                        TAtomic::Scalar(TScalar::literal_int(value))
+                    }
+                    _ => atomic.clone(),
+                })
+                .collect(),
+        ),
+    )
+}
+
+fn is_key_type_reachable_by_index<A>(context: &Context<'_, '_, A>, key_type: &TUnion, index_type: &TUnion) -> bool
+where
+    A: Arena,
+{
+    key_type.types.iter().any(|key_atomic| {
+        is_contained_by(
+            context.codebase,
+            &wrap_atomic(key_atomic.clone()),
+            index_type,
+            true,
+            false,
+            false,
+            &mut ComparisonResult::new(),
+        )
+    })
+}
+
 pub(crate) fn handle_array_access_on_list<'ctx, A>(
     context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
@@ -679,6 +723,8 @@ where
         get_int()
     };
 
+    let dim_type = &*with_integer_string_keys(dim_type);
+
     let mut union_comparison_result = ComparisonResult::new();
     let index_type_contained_by_expected = is_contained_by(
         context.codebase,
@@ -696,15 +742,7 @@ where
     let expected_contained_by_index = !index_type_contained_by_expected
         && !expected_key_type.is_never()
         && !can_throw_as_offset(dim_type)
-        && is_contained_by(
-            context.codebase,
-            &expected_key_type,
-            dim_type,
-            true,
-            false,
-            false,
-            &mut ComparisonResult::new(),
-        );
+        && is_key_type_reachable_by_index(context, &expected_key_type, dim_type);
 
     if index_type_contained_by_expected || expected_contained_by_index {
         *has_valid_expected_index = true;
@@ -1049,6 +1087,8 @@ where
         Cow::Owned(get_never())
     };
 
+    let index_type = &*with_integer_string_keys(index_type);
+
     let mut union_comparison_result = ComparisonResult::new();
     let index_type_contained_by_expected =
         is_contained_by(context.codebase, index_type, &key_parameter, true, false, false, &mut union_comparison_result);
@@ -1063,15 +1103,7 @@ where
     let expected_contained_by_index = !index_type_contained_by_expected
         && !key_parameter.is_never()
         && !can_throw_as_offset(index_type)
-        && is_contained_by(
-            context.codebase,
-            &key_parameter,
-            index_type,
-            true,
-            false,
-            false,
-            &mut ComparisonResult::new(),
-        );
+        && is_key_type_reachable_by_index(context, &key_parameter, index_type);
 
     if index_type_contained_by_expected || expected_contained_by_index {
         *has_valid_expected_index = true;
