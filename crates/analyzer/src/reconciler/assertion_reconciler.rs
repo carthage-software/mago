@@ -792,7 +792,11 @@ fn specialize_from_ancestor(
     descendant: &TNamedObject,
     ancestor: &TNamedObject,
 ) -> Option<TNamedObject> {
-    if descendant.type_parameters.is_some() {
+    if descendant
+        .type_parameters
+        .as_ref()
+        .is_some_and(|parameters| !parameters.iter().all(TUnion::from_unspecified_template))
+    {
         return None;
     }
 
