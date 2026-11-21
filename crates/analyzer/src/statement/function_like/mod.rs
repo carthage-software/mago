@@ -241,6 +241,7 @@ where
 
     if let Some(effective_return) = &function_like_metadata.return_type_metadata
         && effective_return.from_docblock
+        && !effective_return.inferred
         && let Some(native_return) = &function_like_metadata.return_type_declaration_metadata
     {
         let expanded_docblock =
@@ -476,6 +477,7 @@ where
                 expand_type_metadata(context, block_context, artifacts, function_like_metadata, parameter_type);
 
             if parameter_type.from_docblock
+                && !parameter_type.inferred
                 && let Some(native_type) = parameter_metadata.get_type_declaration_metadata()
             {
                 let expanded_native =
