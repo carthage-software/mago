@@ -806,7 +806,9 @@ pub(crate) fn can_be_identical(
         || is_contained_by(codebase, second_part, first_part, inside_assertion, &mut second_comparison_result)
         || (first_comparison_result.type_coerced.unwrap_or(false)
             && second_comparison_result.type_coerced.unwrap_or(false))
-        || (allow_type_coercion && scalars_can_be_identical_with_coercion(first_part, second_part))
+        || (allow_type_coercion
+            && (scalars_can_be_identical_with_coercion(first_part, second_part)
+                || stringable_can_equal_string(codebase, first_part, second_part)))
     {
         return true;
     }
@@ -942,6 +944,16 @@ fn strings_can_be_identical(lhs: &TString, rhs: &TString) -> bool {
     }
 
     true
+}
+
+fn stringable_can_equal_string(codebase: &CodebaseMetadata, first: &TAtomic, second: &TAtomic) -> bool {
+    match (first, second) {
+        (TAtomic::Object(TObject::Named(named)), TAtomic::Scalar(TScalar::String(_)))
+        | (TAtomic::Scalar(TScalar::String(_)), TAtomic::Object(TObject::Named(named))) => {
+            codebase.is_instance_of(named.name.as_bytes(), b"Stringable")
+        }
+        _ => false,
+    }
 }
 
 #[must_use]
