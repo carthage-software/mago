@@ -3322,6 +3322,7 @@ test_case!(datetime_get_timezone_may_return_false);
 test_case!(closure_iterable_param_takes_callable_type);
 test_case!(conditional_return_narrows_template_in_branch);
 test_case!(partly_missing_class_constant_keeps_found_types);
+test_case!(pcntl_wait_status_is_int);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
