@@ -690,15 +690,15 @@ class DateTimeZone
 
 class DateInterval
 {
-    public readonly int $y;
-    public readonly int $m;
-    public readonly int $d;
-    public readonly int $h;
-    public readonly int $i;
-    public readonly int $s;
-    public readonly float $f;
+    public int $y;
+    public int $m;
+    public int $d;
+    public int $h;
+    public int $i;
+    public int $s;
+    public float $f;
     /** @var int<0, 1> */
-    public readonly int $invert;
+    public int $invert;
     public readonly int|false $days;
     public readonly bool $from_string;
     public readonly string $date_string;
