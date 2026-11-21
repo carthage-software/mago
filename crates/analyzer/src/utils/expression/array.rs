@@ -157,7 +157,8 @@ where
         return get_never();
     }
 
-    if index_type.is_null() && !index_type.is_keyed_array() {
+    let only_objects = array_like_type.types.iter().all(TAtomic::is_object_type);
+    if index_type.is_null() && !index_type.is_keyed_array() && !only_objects {
         context.collector.report_with_code(
             IssueCode::NullArrayIndex,
             Issue::error(format!(
@@ -175,7 +176,7 @@ where
         );
     }
 
-    if index_type.is_nullable() && !index_type.ignore_nullable_issues() {
+    if index_type.is_nullable() && !index_type.ignore_nullable_issues() && !only_objects {
         context.collector.report_with_code(
             IssueCode::PossiblyNullArrayIndex,
             Issue::warning(format!(
