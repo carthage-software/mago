@@ -3299,6 +3299,7 @@ test_case!(class_string_of_object);
 test_case!(assert_applies_method_assertions_on_this);
 test_case!(inaccessible_property_goes_through_magic_methods);
 test_case!(generator_function_without_return_type);
+test_case!(decimal_int_string_types);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
