@@ -551,7 +551,7 @@ class IntlDateFormatter
     public function parseToCalendar(string $string, &$offset = null): int|float|false {}
 }
 
-class ResourceBundle implements IteratorAggregate, Countable
+class ResourceBundle implements IteratorAggregate, ArrayAccess, Countable
 {
     /**
      * @pure
@@ -590,6 +590,32 @@ class ResourceBundle implements IteratorAggregate, Countable
      * @pure
      */
     public function getIterator(): Iterator {}
+
+    /**
+     * @param string|int $offset
+     *
+     * @pure
+     */
+    public function offsetExists($offset): bool {}
+
+    /**
+     * @param string|int $offset
+     *
+     * @return ResourceBundle|array|string|int|null
+     *
+     * @pure
+     */
+    public function offsetGet($offset) {}
+
+    /**
+     * @param string|int $offset
+     */
+    public function offsetSet($offset, mixed $value): void {}
+
+    /**
+     * @param string|int $offset
+     */
+    public function offsetUnset($offset): void {}
 }
 
 class Transliterator
