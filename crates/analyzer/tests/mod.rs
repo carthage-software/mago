@@ -3292,6 +3292,7 @@ test_case!(literal_class_string_instantiation_is_safe);
 test_case!(type_checks_narrow_mixed_part_of_union);
 test_case!(readonly_properties_initialized_in_unserialize);
 test_case!(date_interval_fields_are_writable);
+test_case!(array_literal_next_key_follows_largest_key);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
