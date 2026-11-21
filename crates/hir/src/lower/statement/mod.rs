@@ -155,7 +155,7 @@ where
             return None;
         };
 
-        if identifier.value() != b"define" {
+        if !identifier.value().trim_prefix(b"\\").eq_ignore_ascii_case(b"define") {
             return None;
         }
 

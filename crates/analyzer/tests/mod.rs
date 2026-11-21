@@ -3267,6 +3267,7 @@ test_case!(extract_defines_unknown_variables);
 test_case!(docblock_return_with_void_may_end_without_return);
 test_case!(unreachable_else_does_not_fall_through);
 test_case!(false_return_is_allowed_by_bool);
+test_case!(fully_qualified_define_declares_constant);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);

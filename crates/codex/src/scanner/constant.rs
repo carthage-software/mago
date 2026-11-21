@@ -84,7 +84,7 @@ where
     };
 
     let function_name = identifier.value();
-    if function_name != b"define" {
+    if !function_name.trim_prefix(b"\\").eq_ignore_ascii_case(b"define") {
         return None;
     }
 

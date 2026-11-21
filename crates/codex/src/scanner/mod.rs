@@ -566,7 +566,7 @@ where
             return;
         }
 
-        if function_name != b"define" {
+        if !bare_name.eq_ignore_ascii_case(b"define") {
             return;
         }
 
