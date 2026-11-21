@@ -7,6 +7,8 @@ use mago_span::Span;
 use mago_syntax::cst::ClassLikeConstant;
 use mago_syntax::cst::Modifier;
 
+use crate::internal::checker::MAY_BE_CALLABLE;
+use crate::internal::checker::hint_type_mask;
 use crate::internal::context::Context;
 
 #[inline]
@@ -111,6 +113,29 @@ pub fn check_class_like_constant<'ast, 'arena>(
         context.report(
             Issue::error("Typed class constants are only available in PHP 8.3 and above.")
                 .with_annotation(Annotation::primary(type_hint.span()).with_message("Type hint used here.")),
+        );
+    }
+
+    if let Some(type_hint) = &class_like_constant.hint
+        && (type_hint.is_bottom() || hint_type_mask(type_hint).0 & MAY_BE_CALLABLE != 0)
+    {
+        let hint_name = BytesDisplay(context.get_code_snippet(type_hint));
+
+        context.report(
+            Issue::error(format!(
+                "Class constant `{class_like_name}::{first_item_name}` cannot have type `{hint_name}`."
+            ))
+            .with_annotation(
+                Annotation::primary(type_hint.span())
+                    .with_message(format!("Type `{hint_name}` is not allowed on class constants.")),
+            )
+            .with_annotations([
+                Annotation::secondary(first_item.span()).with_message(format!(
+                    "{class_like_kind} constant `{class_like_name}::{first_item_name}` is declared here."
+                )),
+                Annotation::secondary(class_like_span)
+                    .with_message(format!("{class_like_kind} `{class_like_fqcn}` is declared here.")),
+            ]),
         );
     }
 
