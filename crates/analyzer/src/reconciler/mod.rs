@@ -578,7 +578,9 @@ where
         return None;
     }
 
-    result.filter(|entry_type| !entry_type.is_never() && !entry_type.is_mixed())
+    result.filter(|entry_type| {
+        !entry_type.is_never() && !matches!(entry_type.types.as_ref(), [TAtomic::Mixed(mixed)] if mixed.is_vanilla())
+    })
 }
 
 pub(crate) fn resolve_literal_array_key(array_key: &[u8]) -> Option<ArrayKey> {

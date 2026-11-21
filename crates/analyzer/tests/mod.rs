@@ -3305,6 +3305,7 @@ test_case!(isset_string_offset_keeps_string);
 test_case!(parent_in_trait);
 test_case!(template_default_keeps_this_generic);
 test_case!(assertion_narrows_generic_to_descendant);
+test_case!(empty_mixed_array_key_keeps_falsy_values);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
