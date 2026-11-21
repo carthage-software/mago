@@ -38,6 +38,7 @@ pub struct LiteralNamedArgumentRule {
 pub struct LiteralNamedArgumentConfig {
     pub level: Level,
     pub check_first_argument: bool,
+    pub check_method_calls: bool,
     /// Minimum number of literal positional arguments in a single call before reporting.
     ///
     /// Default is `1`, meaning any literal positional argument triggers a warning.
@@ -47,7 +48,7 @@ pub struct LiteralNamedArgumentConfig {
 
 impl Default for LiteralNamedArgumentConfig {
     fn default() -> Self {
-        Self { level: Level::Warning, check_first_argument: false, threshold: 1 }
+        Self { level: Level::Warning, check_first_argument: false, check_method_calls: false, threshold: 1 }
     }
 }
 
@@ -71,6 +72,9 @@ impl LintRule for LiteralNamedArgumentRule {
                 This improves readability by clarifying the purpose of the literal value at the call site.
                 It is particularly helpful for boolean flags, numeric constants, and `null` values
                 where the intent is often ambiguous without the parameter name.
+
+                Method calls are only checked when `check-method-calls` is enabled: the linter cannot
+                see whether a method is variadic, marked `@no-named-arguments`, or handled by `__call`.
             "},
             good_example: indoc! {r"
                 <?php
@@ -110,11 +114,15 @@ impl LintRule for LiteralNamedArgumentRule {
             return;
         };
 
-        // Skip variadic functions and functions marked with @no-named-arguments
-        if let Call::Function(function_call) = call
-            && (function_call_matches_any(ctx, function_call, &VARIADIC_FUNCTIONS).is_some()
-                || function_call_matches_any(ctx, function_call, &NO_NAMED_ARGUMENTS_FUNCTIONS).is_some())
-        {
+        let skip = match call {
+            Call::Function(function_call) => {
+                function_call_matches_any(ctx, function_call, &VARIADIC_FUNCTIONS).is_some()
+                    || function_call_matches_any(ctx, function_call, &NO_NAMED_ARGUMENTS_FUNCTIONS).is_some()
+            }
+            _ => !self.cfg.check_method_calls,
+        };
+
+        if skip {
             return;
         }
 
@@ -279,6 +287,7 @@ mod tests {
         name = instance_method_arguments_checked,
         rule = LiteralNamedArgumentRule,
         count = 1,
+        settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.check_method_calls = true,
         code = indoc! {r#"
             <?php
 
@@ -290,6 +299,7 @@ mod tests {
         name = static_method_arguments_checked,
         rule = LiteralNamedArgumentRule,
         count = 1,
+        settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.check_method_calls = true,
         code = indoc! {r"
             <?php
 
@@ -301,6 +311,7 @@ mod tests {
         name = nullsafe_method_arguments_checked,
         rule = LiteralNamedArgumentRule,
         count = 1,
+        settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.check_method_calls = true,
         code = indoc! {r"
             <?php
 
@@ -312,6 +323,7 @@ mod tests {
         name = temporary_object_method_arguments_checked,
         rule = LiteralNamedArgumentRule,
         count = 1,
+        settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.check_method_calls = true,
         code = indoc! {r"
             <?php
 
@@ -323,7 +335,10 @@ mod tests {
         name = method_first_argument_checked_when_enabled,
         rule = LiteralNamedArgumentRule,
         count = 4,
-        settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.check_first_argument = true,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.literal_named_argument.config.check_first_argument = true;
+            s.rules.literal_named_argument.config.check_method_calls = true;
+        },
         code = indoc! {r"
             <?php
 
@@ -337,6 +352,7 @@ mod tests {
     test_lint_success! {
         name = method_first_argument_skipped_by_default,
         rule = LiteralNamedArgumentRule,
+        settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.check_method_calls = true,
         code = indoc! {r"
             <?php
 
@@ -350,6 +366,7 @@ mod tests {
     test_lint_success! {
         name = named_method_arguments_are_fine,
         rule = LiteralNamedArgumentRule,
+        settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.check_method_calls = true,
         code = indoc! {r"
             <?php
 
@@ -363,7 +380,10 @@ mod tests {
     test_lint_success! {
         name = method_arguments_below_threshold,
         rule = LiteralNamedArgumentRule,
-        settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.threshold = 3,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.literal_named_argument.config.threshold = 3;
+            s.rules.literal_named_argument.config.check_method_calls = true;
+        },
         code = indoc! {r"
             <?php
 
@@ -378,7 +398,10 @@ mod tests {
         name = method_arguments_at_threshold,
         rule = LiteralNamedArgumentRule,
         count = 8,
-        settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.threshold = 2,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.literal_named_argument.config.threshold = 2;
+            s.rules.literal_named_argument.config.check_method_calls = true;
+        },
         code = indoc! {r"
             <?php
 
@@ -392,6 +415,7 @@ mod tests {
     test_lint_success! {
         name = non_literal_method_arguments_are_fine,
         rule = LiteralNamedArgumentRule,
+        settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.check_method_calls = true,
         code = indoc! {r"
             <?php
 
@@ -406,6 +430,7 @@ mod tests {
         name = dynamic_method_arguments_checked,
         rule = LiteralNamedArgumentRule,
         count = 3,
+        settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.check_method_calls = true,
         code = indoc! {r"
             <?php
 
@@ -419,6 +444,7 @@ mod tests {
         name = methods_do_not_inherit_function_exclusions,
         rule = LiteralNamedArgumentRule,
         count = 3,
+        settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.check_method_calls = true,
         code = indoc! {r"
             <?php
 
@@ -436,6 +462,20 @@ mod tests {
 
             sprintf('%d', 57);
             strcmp($value, 'expected');
+        "}
+    }
+
+    test_lint_success! {
+        name = method_calls_skipped_by_default,
+        rule = LiteralNamedArgumentRule,
+        code = indoc! {r"
+            <?php
+
+            $this->assertTrue($value, 'message');
+            $reader->stringAt($payload, 'address', 'city');
+            $client->hincrby('key', 'field', 1);
+            Logger::write('info', 'Hello');
+            (new Client())->post($endpoint, $data, 57);
         "}
     }
 }

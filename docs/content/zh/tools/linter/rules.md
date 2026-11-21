@@ -269,6 +269,9 @@ This improves readability by clarifying the purpose of the literal value at the 
 It is particularly helpful for boolean flags, numeric constants, and `null` values
 where the intent is often ambiguous without the parameter name.
 
+Method calls are only checked when `check-method-calls` is enabled: the linter cannot
+see whether a method is variadic, marked `@no-named-arguments`, or handled by `__call`.
+
 <blockquote class="rule-requirement">此规则要求 PHP <code>8.0.0</code> 或更高版本。</blockquote>
 
 <hr class="rule__separator">
@@ -308,6 +311,7 @@ set_option(key: 'feature_x', enable_feature: true); // ✅ clear intent
 | 选项 | 类型 | 默认值 |
 | :--- | :--- | :--- |
 | `check-first-argument` | `boolean` | `false` |
+| `check-method-calls` | `boolean` | `false` |
 | `enabled` | `boolean` | `true` |
 | `level` | `string` | `"warning"` |
 | `threshold` | `number` | `1` |
