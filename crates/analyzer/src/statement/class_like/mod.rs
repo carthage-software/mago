@@ -2306,6 +2306,15 @@ fn check_abstract_method_signatures<'ctx, A>(
                 continue;
             }
 
+            if let Some(parent_name) = class_like_metadata.direct_parent_class
+                && context.codebase.is_instance_of(parent_name.as_bytes(), declaring_class_name_str)
+                && context.codebase.get_class_like_by_name(parent_name).is_some_and(|parent| {
+                    parent.declaring_method_ids.get(method_name_atom) == Some(declaring_method_id)
+                })
+            {
+                continue;
+            }
+
             let Some(overridden_method) = context.codebase.get_declaring_method_by_id(parent_declaring_method_id)
             else {
                 continue;
