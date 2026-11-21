@@ -581,7 +581,14 @@ where
         let declared_type_is_specific = parameter_metadata.get_type_metadata().is_some_and(|tm| {
             let union = &tm.type_union;
 
-            !union.is_vanilla_array() && !union.is_vanilla_mixed()
+            !union.is_vanilla_array()
+                && !union.is_vanilla_mixed()
+                && !matches!(
+                    union.types.as_ref(),
+                    [TAtomic::Iterable(iterable)] if iterable.key_type.is_vanilla_mixed()
+                        && iterable.value_type.is_vanilla_mixed()
+                        && iterable.intersection_types.is_none()
+                )
         });
 
         let mut final_parameter_type = if declared_type_is_specific {

@@ -3319,6 +3319,7 @@ test_case!(foreach_continue_keeps_iteration_types);
 test_case!(object_vars_resolve_class_constant_property_types);
 test_case!(array_access_object_accepts_null_offset);
 test_case!(datetime_get_timezone_may_return_false);
+test_case!(closure_iterable_param_takes_callable_type);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
