@@ -140,10 +140,10 @@ fn truthy_mixed_then_nontruthy_int_yields_nonnull() {
 }
 
 #[test]
-fn nontruthy_int_then_truthy_mixed_yields_truthy_mixed() {
+fn nontruthy_int_then_truthy_mixed_yields_nonnull() {
     let r = combine_default(vec![t_int(), mixed_truthy()]);
     assert_eq!(r.len(), 1);
-    assert_eq!(atomic_id_string(&r[0]), "truthy-mixed");
+    assert_eq!(atomic_id_string(&r[0]), "nonnull");
 }
 
 #[test]
