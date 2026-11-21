@@ -1428,7 +1428,7 @@ function lcfirst(string $string): string {}
 function ucwords(string $string, string $separators = " \t\r\n\f\v"): string {}
 
 /**
- * @param string|array<string, string> $from
+ * @param string|array<array-key, scalar|Stringable|null> $from
  *
  * @pure
  */
@@ -1454,8 +1454,8 @@ function addcslashes(string $string, string $characters): string {}
 function rtrim(string $string, string $characters = " \n\r\t\v\0"): string {}
 
 /**
- * @param string|array<string> $search
- * @param string|array<string> $replace
+ * @param string|array<scalar|Stringable|null> $search
+ * @param string|array<scalar|Stringable|null> $replace
  * @param string|array<string> $subject
  *
  * @return ($subject is string ? string : (
@@ -1472,8 +1472,8 @@ function str_replace(
 ): array|string {}
 
 /**
- * @param string|array<string> $search
- * @param string|array<string> $replace
+ * @param string|array<scalar|Stringable|null> $search
+ * @param string|array<scalar|Stringable|null> $replace
  * @param string|array<string> $subject
  *
  * @return ($subject is string ? string : (
@@ -3790,13 +3790,12 @@ function array_pad(array $array, int $length, mixed $value): array {}
 function array_flip(array $array): array {}
 
 /**
- *
+ * @template K of array-key
  * @template V
  *
- * @param array<string, V> $array
- * @param int $case
+ * @param array<K, V> $array
  *
- * @return ($array is non-empty-array|non-empty-list ? non-empty-array<string, V> : array<string, V>)
+ * @return ($array is non-empty-array|non-empty-list ? non-empty-array<(K is int ? int : string), V> : array<(K is int ? int : string), V>)
  *
  * @pure
  */
@@ -4716,8 +4715,6 @@ function array_walk(object|array &$array, callable $callback, mixed $arg = null)
 function array_walk_recursive(object|array &$array, callable $callback, mixed $arg = null): true {}
 
 /**
- * @param array<string, mixed> $array
- *
  * @return int<0, max>
  */
 function extract(array $array, int $flags = EXTR_OVERWRITE, string $prefix = ''): int {}
