@@ -401,6 +401,7 @@ pub fn handle_return_value<'ctx, A>(
         if inferred_return_type.is_falsable()
             && !inferred_return_type.ignore_falsable_issues()
             && !expected_return_type.is_falsable()
+            && !expected_return_type.types.iter().any(TAtomic::is_general_bool)
             && !expected_return_type.has_template()
         {
             context.collector.report_with_code(
@@ -639,6 +640,7 @@ fn handle_property_hook_return<'ctx, A>(
     if inferred_return_type.is_falsable()
         && !inferred_return_type.ignore_falsable_issues()
         && !expected_return_type.is_falsable()
+        && !expected_return_type.types.iter().any(TAtomic::is_general_bool)
         && !expected_return_type.has_template()
     {
         context.collector.report_with_code(
