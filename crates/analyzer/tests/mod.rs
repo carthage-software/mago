@@ -3280,6 +3280,7 @@ test_case!(elseif_defines_variable_when_if_exits);
 test_case!(empty_count_keeps_countable_objects);
 test_case!(echo_and_print_accept_stringable_values);
 test_case!(integer_string_and_overlapping_array_keys);
+test_case!(isset_offset_of_mixed_value_in_loop);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);

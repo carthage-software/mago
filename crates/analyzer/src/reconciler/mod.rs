@@ -1432,6 +1432,8 @@ where
                         } else {
                             new_base_type_candidate = get_mixed();
                         }
+                    } else if has_isset && existing_key_type_part.is_mixed() {
+                        return Some(get_mixed());
                     } else {
                         continue;
                     }
