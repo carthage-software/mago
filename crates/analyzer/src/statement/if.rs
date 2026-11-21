@@ -1024,7 +1024,7 @@ where
             new_assigned_variable_ids.into_iter().chain(assigned_in_conditional_variable_ids).collect(),
             new_possibly_assigned_variable_ids.clone(),
             &newly_reconciled_variable_ids,
-            false,
+            true,
         );
 
         let mut surviving_clauses: Vec<_> = else_if_clauses.iter().cloned().map(Rc::new).collect();

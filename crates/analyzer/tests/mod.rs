@@ -3276,6 +3276,7 @@ test_case!(simple_xml_iteration_yields_elements);
 test_case!(string_and_key_functions_accept_php_arrays);
 test_case!(namespaced_platform_constant_keeps_platform_type);
 test_case!(falsy_value_widens_truthy_mixed);
+test_case!(elseif_defines_variable_when_if_exits);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
