@@ -3264,6 +3264,7 @@ test_case!(loop_isset_value_keeps_its_loop_origin);
 test_case!(offset_write_creates_undefined_variable);
 test_case!(closure_reference_capture_defines_variable_for_later_arguments);
 test_case!(extract_defines_unknown_variables);
+test_case!(docblock_return_with_void_may_end_without_return);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);

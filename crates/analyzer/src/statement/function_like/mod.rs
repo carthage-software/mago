@@ -353,7 +353,7 @@ where
     if let Some(function_metadata) = block_context.scope.get_function_like()
         && !block_context.flags.has_returned()
         && let Some(return_type) = &function_metadata.return_type_metadata
-        && !return_type.type_union.is_void()
+        && !return_type.type_union.types.iter().any(TAtomic::is_void)
         && !function_like_metadata.flags.has_yield()
         && !function_like_metadata
             .return_type_declaration_metadata
