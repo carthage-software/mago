@@ -7,6 +7,8 @@ use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::metadata::property_hook::PropertyHookMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
@@ -231,11 +233,7 @@ pub fn handle_return_value<'ctx, A>(
                 &mut expected_type,
                 &TypeExpansionOptions {
                     self_class: block_context.scope.get_class_like_name(),
-                    static_class_type: if let Some(calling_class) = block_context.scope.get_class_like_name() {
-                        StaticClassType::Name(calling_class)
-                    } else {
-                        StaticClassType::None
-                    },
+                    static_class_type: get_declared_static_class_type(block_context),
                     ..Default::default()
                 },
             );
@@ -817,6 +815,30 @@ where
         Some(generator_return) => Some((generator_return, true)),
         None => Some((get_mixed(), false)),
     }
+}
+
+fn get_declared_static_class_type(block_context: &BlockContext<'_>) -> StaticClassType {
+    let Some(class) = block_context.scope.get_class_like() else {
+        return StaticClassType::None;
+    };
+
+    if !class.template_types.values().any(|template| template.default.is_some()) {
+        return StaticClassType::Name(class.name);
+    }
+
+    let type_parameters = class
+        .template_types
+        .values()
+        .map(|template| {
+            let mut constraint = template.constraint.clone();
+            constraint.set_from_unspecified_template(true);
+            constraint
+        })
+        .collect();
+
+    StaticClassType::Object(TObject::Named(
+        TNamedObject::new_this(class.original_name).with_type_parameters(Some(type_parameters)),
+    ))
 }
 
 #[cfg(test)]
