@@ -753,6 +753,8 @@ function func_num_args(): int {}
 function func_get_arg(int $position): mixed {}
 
 /**
+ * @return list<mixed>
+ *
  * @pure
  */
 function func_get_args(): array {}
@@ -864,8 +866,6 @@ function property_exists(object|string $object_or_class, string $property): bool
  * @param string $trait
  *
  * @assert-if-true =trait-string $trait
- *
- * @pure
  */
 function trait_exists(string $trait, bool $autoload = true): bool {}
 
@@ -873,8 +873,6 @@ function trait_exists(string $trait, bool $autoload = true): bool {}
  * @param string $class
  *
  * @assert-if-true =class-string $class
- *
- * @pure
  */
 function class_exists(string $class, bool $autoload = true): bool {}
 
@@ -882,8 +880,6 @@ function class_exists(string $class, bool $autoload = true): bool {}
  * @param string $interface
  *
  * @assert-if-true =interface-string $interface
- *
- * @pure
  */
 function interface_exists(string $interface, bool $autoload = true): bool {}
 
@@ -900,8 +896,6 @@ function function_exists(string $function): bool {}
  * @param string $enum
  *
  * @assert-if-true =enum-string $enum
- *
- * @pure
  */
 #[Mago\AvailableSince(80100)]
 function enum_exists(string $enum, bool $autoload = true): bool {}
