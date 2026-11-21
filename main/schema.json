@@ -206,6 +206,7 @@
             "enabled": true,
             "level": "Warning",
             "check-first-argument": false,
+            "check-method-calls": false,
             "threshold": 1
           },
           "loop-does-not-iterate": {
@@ -1428,6 +1429,7 @@
               "enabled": true,
               "level": "Warning",
               "check-first-argument": false,
+              "check-method-calls": false,
               "threshold": 1
             },
             "loop-does-not-iterate": {
@@ -2395,6 +2397,7 @@
             "enabled": true,
             "level": "Warning",
             "check-first-argument": false,
+            "check-method-calls": false,
             "threshold": 1
           }
         },
@@ -4405,6 +4408,10 @@
           "default": "Warning"
         },
         "check-first-argument": {
+          "type": "boolean",
+          "default": false
+        },
+        "check-method-calls": {
           "type": "boolean",
           "default": false
         },

@@ -831,6 +831,8 @@ are passed as <strong>named arguments</strong>.</p>
 <p>This improves readability by clarifying the purpose of the literal value at the call site.
 It is particularly helpful for boolean flags, numeric constants, and <code>null</code> values
 where the intent is often ambiguous without the parameter name.</p>
+<p>Method calls are only checked when <code>check-method-calls</code> is enabled: the linter cannot
+see whether a method is variadic, marked <code>@no-named-arguments</code>, or handled by <code>__call</code>.</p>
 <blockquote class="rule-requirement">此规则要求 PHP <code>8.0.0</code> 或更高版本。</blockquote>
 <hr class="rule__separator">
 <div class="rule-examples">
@@ -856,6 +858,7 @@ set_option(key: 'feature_x', enable_feature: true); // ✅ clear intent
 <hr class="rule__separator">
 <table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>check-first-argument</code></td><td style="text-align: left"><code>boolean</code></td><td style="text-align: left"><code>false</code></td></tr>
+<tr><td style="text-align: left"><code>check-method-calls</code></td><td style="text-align: left"><code>boolean</code></td><td style="text-align: left"><code>false</code></td></tr>
 <tr><td style="text-align: left"><code>enabled</code></td><td style="text-align: left"><code>boolean</code></td><td style="text-align: left"><code>true</code></td></tr>
 <tr><td style="text-align: left"><code>level</code></td><td style="text-align: left"><code>string</code></td><td style="text-align: left"><code>"warning"</code></td></tr>
 <tr><td style="text-align: left"><code>threshold</code></td><td style="text-align: left"><code>number</code></td><td style="text-align: left"><code>1</code></td></tr>
