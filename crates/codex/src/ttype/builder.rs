@@ -1249,6 +1249,9 @@ fn get_class_string_type(
                         | TDerived::Intersection(_),
                     ) => class_strings
                         .push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::of_type(kind, constraint)))),
+                    TAtomic::Object(TObject::Any) => {
+                        class_strings.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::any(kind))));
+                    }
                     TAtomic::GenericParameter(TGenericParameter {
                         parameter_name,
                         defining_entity,
