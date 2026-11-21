@@ -3269,6 +3269,7 @@ test_case!(unreachable_else_does_not_fall_through);
 test_case!(false_return_is_allowed_by_bool);
 test_case!(fully_qualified_define_declares_constant);
 test_case!(increment_counts_as_assignment);
+test_case!(html_tag_after_docblock_type_is_text);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
