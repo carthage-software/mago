@@ -184,11 +184,11 @@ impl Serialize for ExpandedAnnotations<'_, '_> {
                     file_id: &details.expanded,
                     start: ExpandedPosition {
                         offset: annotation.span.start.offset,
-                        line: details.file.line_number(annotation.span.start.offset),
+                        line: details.file.line_number(annotation.span.start.offset) + 1,
                     },
                     end: ExpandedPosition {
                         offset: annotation.span.end.offset,
-                        line: details.file.line_number(annotation.span.end.offset),
+                        line: details.file.line_number(annotation.span.end.offset) + 1,
                     },
                 },
             })?;
