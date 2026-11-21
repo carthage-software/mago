@@ -254,6 +254,8 @@ where
         );
     }
 
+    let existing_target_type =
+        existing_target_type.or_else(|| target_variable_id.and_then(|id| block_context.locals.get(&id).cloned()));
     if let (Some(target_variable_id), Some(existing_target_type)) = (&target_variable_id, &existing_target_type) {
         block_context.remove_descendants(context, *target_variable_id, existing_target_type, Some(&source_type));
         if matches!(target_expression, Expression::Access(Access::Property(_))) {
