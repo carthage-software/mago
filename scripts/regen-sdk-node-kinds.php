@@ -34,7 +34,7 @@ if ($names === []) {
 
 $cases = '';
 foreach ($names as $name) {
-    $case = $name === 'Class' ? 'Class_' : $name;
+    $case = in_array($name, ['Class', 'Namespace'], true) ? "{$name}_" : $name;
     $cases .= "    case {$case} = '{$name}';\n";
 }
 
