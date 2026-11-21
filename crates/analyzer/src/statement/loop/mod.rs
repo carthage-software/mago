@@ -351,7 +351,7 @@ fn inherit_loop_block_context<'ctx, A>(
                         .is_some_and(|defined_at_every_continue| defined_at_every_continue.contains(&variable))
                     {
                         block_context.locals.insert(variable, variable_type);
-                    } else {
+                    } else if !variable.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':')) {
                         let mut variable_type = Rc::unwrap_or_clone(variable_type);
                         variable_type.set_possibly_undefined(true, None);
                         block_context.locals.insert(variable, Rc::new(variable_type));
