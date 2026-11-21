@@ -105,5 +105,6 @@ pub enum Feature {
     PipeOperator,
     CloneWith,
     PartialFunctionApplication,
+    ReadonlyPropertyDefaultValues,
     SwitchSemicolonSeparators,
 }

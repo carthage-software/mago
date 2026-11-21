@@ -572,6 +572,10 @@ pub fn check_property(
                         );
                     }
 
+                    if context.version.is_supported(Feature::ReadonlyPropertyDefaultValues) {
+                        continue;
+                    }
+
                     if let Some(readonly) = last_readonly {
                         context.report(
                             Issue::error(format!(
@@ -592,6 +596,23 @@ pub fn check_property(
                                 Annotation::secondary(class_like_span)
                                     .with_message(format!("{class_like_kind} `{class_like_fqcn}` defined here.")),
                             ),
+                        );
+                    } else if class_like_is_readonly {
+                        context.report(
+                            Issue::error(format!(
+                                "Readonly property `{class_like_name}::{item_name}` cannot have a default value."
+                            ))
+                            .with_annotation(
+                                Annotation::primary(property_concrete_item.value.span())
+                                    .with_message("This is a default value."),
+                            )
+                            .with_annotation(
+                                Annotation::secondary(property_concrete_item.variable.span())
+                                    .with_message(format!("Property `{item_name}` is declared here.")),
+                            )
+                            .with_annotation(Annotation::secondary(class_like_span).with_message(format!(
+                                "{class_like_kind} `{class_like_fqcn}` is readonly, making all properties implicitly readonly."
+                            ))),
                         );
                     }
                 }
