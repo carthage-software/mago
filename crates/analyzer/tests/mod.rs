@@ -3272,6 +3272,7 @@ test_case!(increment_counts_as_assignment);
 test_case!(html_tag_after_docblock_type_is_text);
 test_case!(resource_bundle_offset_read);
 test_case!(dom_child_nodes_are_nodes);
+test_case!(simple_xml_iteration_yields_elements);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
