@@ -35,6 +35,7 @@ use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::cst::Access;
 use mago_syntax::cst::Expression;
+use mago_syntax::cst::Variable;
 use mago_word::Word;
 use mago_word::empty_word;
 use mago_word::word;
@@ -79,7 +80,9 @@ where
         array_target_expressions.last().unwrap_unchecked().get_array()
     };
 
-    if artifacts.get_expression_type(root_array_expression).is_none() {
+    if is_created_by_write(block_context, root_array_expression) {
+        artifacts.set_expression_type(root_array_expression, get_empty_keyed_array());
+    } else if artifacts.get_expression_type(root_array_expression).is_none() {
         let was_inside_general_use = block_context.flags.inside_general_use();
         block_context.flags.set_inside_general_use(true);
         root_array_expression.analyze(context, block_context, artifacts)?;
@@ -837,6 +840,17 @@ where
     }
 
     result
+}
+
+fn is_created_by_write(block_context: &BlockContext<'_>, root_array_expression: &Expression<'_>) -> bool {
+    let Expression::Variable(Variable::Direct(variable)) = root_array_expression else {
+        return false;
+    };
+
+    let variable_id = word(variable.name);
+
+    !block_context.locals.contains_key(&variable_id)
+        && !block_context.variables_possibly_in_scope.contains(&variable_id)
 }
 
 pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena, A>(
