@@ -574,6 +574,10 @@ where
                     acceptable_types.push(atomic);
                 }
             }
+            TAtomic::Mixed(_) => {
+                did_remove_type = true;
+                acceptable_types.push(TAtomic::Resource(resource_to_intersection));
+            }
             _ => {
                 did_remove_type = true;
             }
@@ -626,6 +630,9 @@ where
             }) {
                 object_types.push(atomic);
             }
+        } else if let TAtomic::Mixed(_) = atomic {
+            did_remove_type = true;
+            object_types.push(TAtomic::Object(TObject::Any));
         } else if let TAtomic::Iterable(iterable) = atomic {
             did_remove_type = true;
 
@@ -1034,6 +1041,13 @@ where
             TAtomic::Variable(_) => {
                 acceptable_types.push(atomic.clone());
                 did_remove_type = true;
+            }
+            TAtomic::Mixed(_) => {
+                did_remove_type = true;
+                match assertion_type {
+                    Some(assertion_type) => acceptable_types.push(assertion_type.clone()),
+                    None => acceptable_types.extend(get_mixed_keyed_array().types.iter().cloned()),
+                }
             }
             TAtomic::Object(TObject::Named(_)) => {
                 did_remove_type = true;
