@@ -1203,7 +1203,15 @@ where
             );
         }
 
-        if_scope.final_actions.insert(ControlAction::None);
+        match else_statements {
+            Some(else_statements) => if_scope.final_actions.extend(&ControlAction::from_statements(
+                else_statements.iter().collect(),
+                vec![],
+                Some(artifacts),
+                true,
+            )),
+            None => if_scope.final_actions.insert(ControlAction::None),
+        }
 
         return Ok(());
     }
