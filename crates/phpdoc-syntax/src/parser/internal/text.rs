@@ -47,6 +47,7 @@ where
 
             if self.stream.peek_kind(0) == Some(TokenKind::LeftBrace)
                 && self.stream.lookahead(1).is_some_and(|token| token.kind == TokenKind::Tag)
+                && !self.stream.is_preceded_by_whitespace(1)
             {
                 if plain_end.offset > plain_start.offset {
                     segments.push(TextSegment::PlainText(PlainText {

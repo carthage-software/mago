@@ -3285,6 +3285,7 @@ test_case!(parent_class_and_interface_document_differently);
 test_case!(inherited_docblock_is_not_checked_against_child_native_type);
 test_case!(destructure_callable_array);
 test_case!(offset_write_defines_possibly_undefined_variable);
+test_case!(wordpress_hash_notation_docblocks);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);

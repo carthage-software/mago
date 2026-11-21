@@ -81,6 +81,25 @@ where
         Err(ParseError::UnexpectedToken(token.span_for(self.file_id())))
     }
 
+    /// A WordPress-style hash item (`@type string $key Description.`) names a variable after its
+    /// type, which a type alias (`@type Name = Type`) never does.
+    fn is_at_hash_notation_item(&mut self) -> bool {
+        for offset in 0..32 {
+            if offset > 0 && self.stream.starts_line(offset) {
+                return false;
+            }
+
+            match self.stream.lookahead(offset) {
+                None => return false,
+                Some(token) if token.kind == TokenKind::Equals => return false,
+                Some(token) if token.value.starts_with(b"$") => return true,
+                _ => {}
+            }
+        }
+
+        false
+    }
+
     #[inline]
     fn dispatch_tag_value(&mut self, remainder: &[u8]) -> Result<TagValue<'arena>, ParseError> {
         let mut buffer = [0u8; NORMALIZED_NAME_CAPACITY];
@@ -131,6 +150,7 @@ where
             b"assertiftrue" => Ok(TagValue::AssertIfTrue(self.parse_assert_tag_value()?)),
             b"assertiffalse" => Ok(TagValue::AssertIfFalse(self.parse_assert_tag_value()?)),
             b"where" => self.parse_where_tag_value(),
+            b"type" if self.is_at_hash_notation_item() => self.parse_generic_tag_value(),
             b"type" => self.parse_type_alias_tag_value(),
             b"importtype" => self.parse_type_alias_import_tag_value(),
             b"deprecated" => self.parse_deprecated_tag_value(),
