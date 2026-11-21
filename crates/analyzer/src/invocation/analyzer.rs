@@ -1,5 +1,6 @@
 use mago_allocator::Arena;
 use std::borrow::Cow;
+use std::collections::hash_map::Entry;
 use std::rc::Rc;
 
 use foldhash::HashMap;
@@ -43,6 +44,7 @@ use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::WordSet;
 use mago_word::concat_word;
+use mago_word::word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::artifacts::ClosureBindScope;
@@ -250,6 +252,21 @@ where
     let base_class_metadata = method_call_context.map(|ctx| ctx.class_like_metadata).or(calling_class_like_metadata);
     let calling_instance_type = calling_class_like.and_then(|(_, atomic)| atomic);
     let method_class_type = method_call_context.map(|ctx| &ctx.class_type);
+
+    for (argument_offset, _) in &closure_arguments {
+        if let Some(Expression::Closure(closure)) =
+            invocation.arguments_source.get_argument(*argument_offset).and_then(|argument| argument.value())
+            && let Some(use_clause) = &closure.use_clause
+        {
+            for use_variable in use_clause.variables.iter().filter(|use_variable| use_variable.ampersand.is_some()) {
+                let variable_id = word(use_variable.variable.name);
+                if let Entry::Vacant(entry) = block_context.locals.entry(variable_id) {
+                    entry.insert(Rc::new(get_mixed()));
+                    block_context.variables_possibly_in_scope.insert(variable_id);
+                }
+            }
+        }
+    }
 
     for (argument_offset, parameter) in &non_closure_arguments {
         let Some(argument) = invocation.arguments_source.get_argument(*argument_offset) else {
