@@ -29,10 +29,16 @@ where
             && !matches!(self.stream.peek_kind(2), Some(TokenKind::Colon | TokenKind::Question))
     }
 
+    pub(crate) fn is_at_shape_brace(&mut self) -> bool {
+        self.stream.is_at(TokenKind::LeftBrace)
+            && !self.is_at_hash_notation_block()
+            && !self.stream.lookahead(1).is_some_and(|token| token.value.starts_with(b"@"))
+    }
+
     pub(crate) fn parse_array_like_type(&mut self) -> Result<Type<'arena>, ParseError> {
         let next = self.stream.peek()?;
         let keyword = self.parse_keyword()?;
-        let is_shape = self.stream.is_at(TokenKind::LeftBrace) && !self.is_at_hash_notation_block();
+        let is_shape = self.is_at_shape_brace();
 
         let kind = if next.value.eq_ignore_ascii_case(b"non-empty-array") {
             if !is_shape {
