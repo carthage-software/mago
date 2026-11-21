@@ -32,6 +32,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassConstantAccess<'arena> {
     {
         let resolution = resolve_class_constants(context, block_context, artifacts, self.class, &self.constant, false)?;
 
+        let is_never = resolution.has_invalid_path && resolution.constants.is_empty();
         let mut resulting_type = if resolution.has_ambiguous_path { Some(get_mixed()) } else { None };
         for resolved_constant in resolution.constants {
             resulting_type =
@@ -54,7 +55,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassConstantAccess<'arena> {
             );
         }
 
-        if resolution.has_invalid_path {
+        if is_never {
             artifacts.set_expression_type(self, get_never());
 
             return Ok(());
