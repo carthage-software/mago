@@ -3456,14 +3456,8 @@ function scandir(string $directory, int $sorting_order = 0, $context = null): ar
  */
 function glob(string $pattern, int $flags = 0): array|false {}
 
-/**
- * @return int<1750595956, max>|false
- */
 function fileatime(string $filename): int|false {}
 
-/**
- * @return int<1750595956, max>|false
- */
 function filectime(string $filename): int|false {}
 
 /**
@@ -3476,9 +3470,6 @@ function filegroup(string $filename): int|false {}
  */
 function fileinode(string $filename): int|false {}
 
-/**
- * @return int<1750595956, max>|false
- */
 function filemtime(string $filename): int|false {}
 
 /**
@@ -4602,7 +4593,7 @@ function array_slice(array $array, int $offset, ?int $length = null, bool $prese
 function array_merge(array ...$arrays): array {}
 
 /**
- * @param (callable(string, null|int): string)|null $callback
+ * @param (callable(string, int): (string|false))|null $callback
  */
 function ob_start(?callable $callback = null, int $chunk_size = 0, int $flags = PHP_OUTPUT_HANDLER_STDFLAGS): bool {}
 

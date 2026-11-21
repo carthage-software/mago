@@ -330,10 +330,7 @@ namespace {
 
     function pcntl_async_signals(?bool $enable = null): bool {}
 
-    /**
-     * @return bool|resource
-     */
-    function pcntl_signal_get_handler(int $signal) {}
+    function pcntl_signal_get_handler(int $signal): callable|int {}
 
     function pcntl_unshare(int $flags): bool {}
 
