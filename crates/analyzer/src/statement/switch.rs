@@ -461,16 +461,9 @@ where
         let mut case_statements_are_reachable = self.has_reachable_fallthrough || case_has_direct_entry;
 
         if let Some(case_condition) = switch_case.expression() {
-            let mut has_non_duplicate_empty_case = false;
-            for previous_empty_case in previous_empty_cases {
-                previous_empty_case.expression.analyze(self.context, self.block_context, self.artifacts)?;
-                if !self.check_for_duplicate_case_condition(previous_empty_case.expression, true) {
-                    has_non_duplicate_empty_case = true;
-                }
-            }
-
+            let mut condition_context = None;
             if original_subject_type.is_true() && !self.negated_clauses.is_empty() {
-                let mut condition_context = self.block_context.clone();
+                let mut negated_context = self.block_context.clone();
                 let (assertions, active_assertions) = mago_algebra::find_satisfying_assignments_iter(
                     self.negated_clauses.iter(),
                     None,
@@ -481,7 +474,7 @@ where
                     self.context,
                     &assertions,
                     active_assertions,
-                    &mut condition_context,
+                    &mut negated_context,
                     &mut WordSet::default(),
                     &WordSet::default(),
                     &case_condition.span(),
@@ -489,6 +482,19 @@ where
                     false,
                 );
 
+                condition_context = Some(negated_context);
+            }
+
+            let mut has_non_duplicate_empty_case = false;
+            for previous_empty_case in previous_empty_cases {
+                let previous_context = condition_context.as_mut().unwrap_or(&mut *self.block_context);
+                previous_empty_case.expression.analyze(self.context, previous_context, self.artifacts)?;
+                if !self.check_for_duplicate_case_condition(previous_empty_case.expression, true) {
+                    has_non_duplicate_empty_case = true;
+                }
+            }
+
+            if let Some(mut condition_context) = condition_context {
                 case_condition.analyze(self.context, &mut condition_context, self.artifacts)?;
                 condition_assigned_variables =
                     copy_condition_assignments(original_block_context, &condition_context, &mut case_block_context);

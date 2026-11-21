@@ -3309,6 +3309,7 @@ test_case!(empty_mixed_array_key_keeps_falsy_values);
 test_case!(runtime_stub_signatures_match_php);
 test_case!(url_path_and_argon2_provider_types);
 test_case!(assigned_array_key_replaces_condition_narrowing);
+test_case!(switch_true_fallthrough_case_sees_earlier_cases);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
