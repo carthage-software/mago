@@ -1078,6 +1078,10 @@ where
                         let unpacked_element_type =
                             get_unpacked_argument_type(context, &argument_value_type, argument_expression.span());
 
+                        if unpacked_element_type.is_never() && !argument_value_type.is_never() {
+                            continue;
+                        }
+
                         verify_argument_type(
                             context,
                             &unpacked_element_type,
