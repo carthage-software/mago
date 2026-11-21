@@ -3290,6 +3290,7 @@ test_case!(spreading_empty_array_passes_no_arguments);
 test_case!(redis_cluster_is_known);
 test_case!(literal_class_string_instantiation_is_safe);
 test_case!(type_checks_narrow_mixed_part_of_union);
+test_case!(readonly_properties_initialized_in_unserialize);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
