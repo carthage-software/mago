@@ -170,6 +170,7 @@ where
                 if !block_context.flags.inside_isset()
                     && !block_context.flags.inside_unset()
                     && !block_context.flags.inside_variable_reference()
+                    && !block_context.flags.has_extracted_variables()
                 {
                     context.collector.report_with_code(
                         IssueCode::PossiblyUndefinedVariable,
@@ -224,7 +225,7 @@ where
                 Rc::new(get_null())
             } else if block_context.flags.inside_unset() {
                 Rc::new(get_null())
-            } else if block_context.flags.inside_isset() {
+            } else if block_context.flags.inside_isset() || block_context.flags.has_extracted_variables() {
                 Rc::new(get_mixed())
             } else {
                 let mut issue = Issue::error(format!("Undefined variable: `{variable_name}`.")).with_annotation(
