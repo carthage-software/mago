@@ -481,6 +481,7 @@ where
 
     if has_inconsistent_constructor
         && !skip_constructor_warning
+        && !classname.is_from_literal_class_string()
         && (classname.is_static() || classname.is_from_class_string() || classname.is_object_instance())
     {
         let mut issue = if classname.is_static() {
