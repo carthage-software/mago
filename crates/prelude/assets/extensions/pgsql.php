@@ -566,12 +566,12 @@ namespace {
     ): object|false {}
 
     /**
-     * @return array<int, array>
+     * @return list<array<int|string, string|null>>
      */
     function pg_fetch_all(PgSql\Result $result, int $mode = PGSQL_ASSOC): array {}
 
     /**
-     * @return array<int, string|null>
+     * @return list<string|null>
      */
     function pg_fetch_all_columns(PgSql\Result $result, int $field = 0): array {}
 

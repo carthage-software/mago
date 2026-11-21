@@ -594,6 +594,8 @@ final class mysqli_driver
 class mysqli
 {
     /**
+     * @var int|numeric-string
+     *
      * @readonly
      */
     public int|string $affected_rows;
@@ -847,6 +849,8 @@ class mysqli_result implements IteratorAggregate
     public ?array $lengths;
 
     /**
+     * @var int|numeric-string
+     *
      * @readonly
      */
     public int|string $num_rows;
@@ -871,7 +875,7 @@ class mysqli_result implements IteratorAggregate
     public function fetch_field_direct(int $index): object|false {}
 
     /**
-     * @return array<int|string, mixed>
+     * @return list<array<int|string, mixed>>
      */
     public function fetch_all(int $mode = MYSQLI_NUM): array {}
 
@@ -888,7 +892,7 @@ class mysqli_result implements IteratorAggregate
     public function fetch_object(string $class = 'stdClass', array $constructor_args = []): object|null|false {}
 
     /**
-     * @return array<int, mixed>|null|false
+     * @return list<mixed>|null|false
      */
     public function fetch_row(): array|null|false {}
 
@@ -904,6 +908,8 @@ class mysqli_result implements IteratorAggregate
 class mysqli_stmt
 {
     /**
+     * @var int|numeric-string
+     *
      * @readonly
      */
     public int|string $affected_rows;
@@ -914,11 +920,15 @@ class mysqli_stmt
     public int|string $insert_id;
 
     /**
+     * @var int|numeric-string
+     *
      * @readonly
      */
     public int|string $num_rows;
 
     /**
+     * @var int<0, max>
+     *
      * @readonly
      */
     public int $param_count;
