@@ -549,6 +549,12 @@ where
 {
     if let Some(first_argument) = argument_list.arguments.first() {
         if argument_list.arguments.len() == 1 {
+            // A lone named argument is always broken out when `always_break_named_arguments_list`
+            // is enabled, so the call is not poorly breakable.
+            if f.settings.always_break_named_arguments_list && !first_argument.is_positional() {
+                return false;
+            }
+
             return is_lone_short_argument(f, first_argument.value());
         }
 
