@@ -322,7 +322,9 @@ where
                     found_parent = true;
                 }
 
-                if !found_parent {
+                if !found_parent && self_meta.kind.is_trait() {
+                    possible_types.push(ResolvedClassname::new(None, ResolutionOrigin::Mixed, false));
+                } else if !found_parent {
                     context.collector.report_with_code(
                         IssueCode::InvalidParentType,
                         Issue::error(format!(
