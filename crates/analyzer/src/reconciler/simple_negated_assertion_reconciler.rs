@@ -1506,6 +1506,8 @@ where
             if !mixed.is_truthy() {
                 acceptable_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new())));
             }
+
+            acceptable_types.push(TAtomic::Object(TObject::Named(TNamedObject::new(word("Countable")))));
         } else {
             did_remove_type |= matches!(atomic, TAtomic::Object(_));
             acceptable_types.push(atomic);
