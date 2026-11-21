@@ -1471,8 +1471,15 @@ where
     let mut has_non_redundant_assertion = false;
 
     for (parameter_id, variable_assertions) in assertions {
-        let (assertion_expression, assertion_variable) =
+        let (assertion_expression, mut assertion_variable) =
             resolve_argument_or_special_target(context, block_context, invocation, *parameter_id, this_variable);
+
+        if matches!(assertion_expression, Some(Expression::Call(_)))
+            && let [assertion] = variable_assertions.as_slice()
+            && is_truthiness_assertion(assertion)
+        {
+            assertion_variable = None;
+        }
 
         match assertion_variable {
             Some(assertion_variable) => {
@@ -1881,6 +1888,16 @@ where
     }
 
     type_assertions
+}
+
+fn is_truthiness_assertion(assertion: &Assertion) -> bool {
+    matches!(
+        assertion,
+        Assertion::Truthy
+            | Assertion::Falsy
+            | Assertion::IsType(TAtomic::Scalar(TScalar::Bool(TBool { value: Some(_) })))
+            | Assertion::IsNotType(TAtomic::Scalar(TScalar::Bool(TBool { value: Some(_) })))
+    )
 }
 
 fn add_access_base_assertions<'arena, A>(

@@ -3296,6 +3296,7 @@ test_case!(array_literal_next_key_follows_largest_key);
 test_case!(database_fetch_functions_return_lists);
 test_case!(core_stub_signatures_match_php);
 test_case!(class_string_of_object);
+test_case!(assert_applies_method_assertions_on_this);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
