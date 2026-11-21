@@ -1,12 +1,13 @@
 use mago_allocator::Arena;
 use mago_codex::ttype::get_literal_int;
-use mago_codex::ttype::get_string;
+use mago_codex::ttype::get_nullable_scalar;
 use mago_syntax::cst::PrintConstruct;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
 use crate::common::construct::ConstructInput;
 use crate::common::construct::analyze_construct_inputs;
+use crate::common::construct::with_stringable;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
@@ -28,7 +29,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for PrintConstruct<'arena> {
             "print",
             self.print.span,
             ConstructInput::Expression(self.value),
-            &get_string(),
+            &with_stringable(get_nullable_scalar()),
             false,
             false,
             true,

@@ -13,6 +13,7 @@ use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
 use crate::common::construct::ConstructInput;
 use crate::common::construct::analyze_construct_inputs;
+use crate::common::construct::with_stringable;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
@@ -141,7 +142,7 @@ where
         construct_kind,
         keyword_span,
         ConstructInput::Expression(included_file),
-        &get_string(),
+        &with_stringable(get_string()),
         false,
         false,
         true,

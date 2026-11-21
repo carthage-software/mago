@@ -2,6 +2,9 @@ use mago_allocator::Arena;
 use std::borrow::Cow;
 
 use mago_codex::ttype::TType;
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_mixed;
@@ -13,6 +16,7 @@ use mago_span::Span;
 use mago_syntax::cst::ArgumentList;
 use mago_syntax::cst::Expression;
 use mago_word::Word;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -34,6 +38,11 @@ pub enum ConstructInput<'ast, 'arena> {
 /// on the `ConstructInput` enum. It dispatches to the type verifier for each
 /// provided value and correctly sets the `is_argument` flag to ensure error
 /// messages use the appropriate terminology ("argument" vs. "value").
+pub(crate) fn with_stringable(mut union: TUnion) -> TUnion {
+    union.types.to_mut().push(TAtomic::Object(TObject::Named(TNamedObject::new(word("Stringable")))));
+    union
+}
+
 pub fn analyze_construct_inputs<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
