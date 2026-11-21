@@ -35,6 +35,15 @@ struct FileDetails<'file> {
 struct ExpandedPosition {
     offset: u32,
     line: u32,
+    column: u32,
+}
+
+impl ExpandedPosition {
+    fn new(file: &File, offset: u32) -> Self {
+        let line = file.line_number(offset);
+
+        Self { offset, line: line + 1, column: offset - file.lines[line as usize] + 1 }
+    }
 }
 
 #[derive(Serialize)]
@@ -182,14 +191,8 @@ impl Serialize for ExpandedAnnotations<'_, '_> {
                 kind: annotation.kind,
                 span: ExpandedSpan {
                     file_id: &details.expanded,
-                    start: ExpandedPosition {
-                        offset: annotation.span.start.offset,
-                        line: details.file.line_number(annotation.span.start.offset) + 1,
-                    },
-                    end: ExpandedPosition {
-                        offset: annotation.span.end.offset,
-                        line: details.file.line_number(annotation.span.end.offset) + 1,
-                    },
+                    start: ExpandedPosition::new(details.file, annotation.span.start.offset),
+                    end: ExpandedPosition::new(details.file, annotation.span.end.offset),
                 },
             })?;
         }

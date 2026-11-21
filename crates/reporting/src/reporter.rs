@@ -544,6 +544,8 @@ mod tests {
         let span = &value["issues"][0]["annotations"][0]["span"];
         assert_eq!(span["start"]["line"], 3);
         assert_eq!(span["end"]["line"], 3);
+        assert_eq!(span["start"]["column"], 6);
+        assert_eq!(span["end"]["column"], 8);
     }
 
     #[cfg(feature = "serde")]
