@@ -332,7 +332,9 @@ impl PHPVersion {
             Feature::InterfaceConstantImplicitlyFinal => self.0 < 0x08_01_00,
             Feature::PassNoneEncodings => self.0 < 0x07_03_00,
             Feature::ImplicitlyNullableParameterTypes => self.0 < 0x09_00_00,
-            Feature::PartialFunctionApplication | Feature::ReadonlyPropertyDefaultValues => self.0 >= 0x08_06_00,
+            Feature::PartialFunctionApplication
+            | Feature::ReadonlyPropertyDefaultValues
+            | Feature::EnumDebugInfoMagicMethod => self.0 >= 0x08_06_00,
             _ => true,
         }
     }

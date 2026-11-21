@@ -28,6 +28,7 @@ use crate::internal::checker::hint_type_mask;
 use crate::internal::checker::partial_application;
 use crate::internal::consts::ANONYMOUS_CLASS_NAME;
 use crate::internal::consts::CONSTRUCTOR_MAGIC_METHOD;
+use crate::internal::consts::DEBUG_INFO_MAGIC_METHOD;
 use crate::internal::consts::ENUM_FORBIDDEN_MAGIC_METHODS;
 use crate::internal::consts::RESERVED_KEYWORDS;
 use crate::internal::consts::SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED;
@@ -891,6 +892,8 @@ pub fn check_enum<'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Contex
 
     check_members(&r#enum.members, r#enum.span(), "enum", enum_name_bytes, enum_fqcn_bytes, context);
 
+    let debug_info_supported = context.version.is_supported(Feature::EnumDebugInfoMagicMethod);
+
     for member in &r#enum.members {
         match &member {
             ClassLikeMember::EnumCase(case) => {
@@ -945,10 +948,10 @@ pub fn check_enum<'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Contex
                 let method_name_bytes: &[u8] = method.name.value;
                 let method_name = BytesDisplay(method_name_bytes);
 
-                if let Some(magic_method) = ENUM_FORBIDDEN_MAGIC_METHODS
-                    .iter()
-                    .find(|magic_method| magic_method.eq_ignore_ascii_case(method_name_bytes))
-                {
+                if let Some(magic_method) = ENUM_FORBIDDEN_MAGIC_METHODS.iter().find(|magic_method| {
+                    magic_method.eq_ignore_ascii_case(method_name_bytes)
+                        && !(debug_info_supported && magic_method.eq_ignore_ascii_case(DEBUG_INFO_MAGIC_METHOD))
+                }) {
                     let magic_method = BytesDisplay(magic_method);
                     context.report(
                         Issue::error(format!("Enum `{enum_name}` cannot contain magic method `{magic_method}`."))
