@@ -3312,6 +3312,7 @@ test_case!(assigned_array_key_replaces_condition_narrowing);
 test_case!(switch_true_fallthrough_case_sees_earlier_cases);
 test_case!(inline_tag_after_object_type);
 test_case!(switch_on_stringable_matches_string_cases);
+test_case!(unset_key_check_keeps_non_array_parent);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
