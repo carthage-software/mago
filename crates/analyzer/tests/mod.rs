@@ -3316,6 +3316,7 @@ test_case!(unset_key_check_keeps_non_array_parent);
 test_case!(iterable_with_object_keys_is_traversable);
 test_case!(continue_in_inner_loop_keeps_property_non_null);
 test_case!(foreach_continue_keeps_iteration_types);
+test_case!(object_vars_resolve_class_constant_property_types);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
