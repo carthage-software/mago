@@ -523,6 +523,33 @@ mod tests {
 
     #[cfg(feature = "serde")]
     #[test]
+    fn json_positions_start_at_one() {
+        let file = File::ephemeral(Cow::Borrowed(b"test.php"), Cow::Borrowed(b"<?php\n\necho $x;\n"));
+        let file_id = file.id;
+        let reporter = reporter_for_file(ReportingFormat::Json, file);
+        let issue = Issue::error("message").with_annotation(Annotation::primary(Span::new(
+            file_id,
+            12u32.into(),
+            14u32.into(),
+        )));
+        let mut buffer = Vec::new();
+        let Ok(_) = reporter.report_to(IssueCollection::from([issue]), None, &mut buffer) else {
+            panic!("reporting a positioned issue should succeed");
+        };
+
+        let Ok(value) = serde_json::from_slice::<serde_json::Value>(&buffer) else {
+            panic!("JSON report should be valid JSON");
+        };
+
+        let span = &value["issues"][0]["annotations"][0]["span"];
+        assert_eq!(span["start"]["line"], 3);
+        assert_eq!(span["end"]["line"], 3);
+        assert_eq!(span["start"]["column"], 6);
+        assert_eq!(span["end"]["column"], 8);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
     fn gitlab_writes_empty_list_when_empty() {
         assert_eq!(report_empty(ReportingFormat::Gitlab), b"[]");
     }

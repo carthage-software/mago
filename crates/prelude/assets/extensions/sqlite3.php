@@ -117,6 +117,9 @@ class SQLite3
 
     public function close(): bool {}
 
+    /**
+     * @return array{versionString: string, versionNumber: int}
+     */
     public static function version(): array {}
 
     public function lastInsertRowID(): int {}

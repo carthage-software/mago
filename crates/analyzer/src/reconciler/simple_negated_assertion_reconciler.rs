@@ -891,6 +891,15 @@ where
                 acceptable_types.push(TAtomic::Scalar(TScalar::float()));
                 acceptable_types.push(TAtomic::Scalar(TScalar::bool()));
             }
+        } else if atomic == TAtomic::Scalar(TScalar::Numeric) && matches!(integer_to_subtract, TInteger::Unspecified) {
+            did_remove_type = true;
+
+            if is_equality {
+                acceptable_types.push(atomic);
+            } else {
+                acceptable_types.push(TAtomic::Scalar(TScalar::float()));
+                acceptable_types.push(TAtomic::Scalar(TScalar::numeric_string()));
+            }
         } else if let TAtomic::Scalar(TScalar::Integer(existing_integer)) = atomic {
             did_remove_type = true;
 
@@ -972,6 +981,15 @@ where
             }
 
             did_remove_type = true;
+        } else if atomic == TAtomic::Scalar(TScalar::Numeric) {
+            did_remove_type = true;
+
+            if is_equality {
+                acceptable_types.push(atomic);
+            } else {
+                acceptable_types.push(TAtomic::Scalar(TScalar::int()));
+                acceptable_types.push(TAtomic::Scalar(TScalar::numeric_string()));
+            }
         } else if let TAtomic::Scalar(TScalar::Float(_)) = atomic {
             did_remove_type = true;
 
@@ -1023,12 +1041,12 @@ where
 
             if !is_equality
                 && !generic_parameter.constraint.is_mixed()
-                && let Some(atomic) = map_generic_constraint(generic_parameter, |constraint| {
+                && let Some(new_atomic) = map_generic_constraint(generic_parameter, |constraint| {
                     subtract_arraykey(context, assertion, constraint, None, false, None, is_equality)
                 })
             {
-                new_existing_var_type.remove_type(&atomic);
-                new_existing_var_type.types.to_mut().push(atomic);
+                new_existing_var_type.remove_type(atomic);
+                new_existing_var_type.types.to_mut().push(new_atomic);
             }
         } else if matches!(atomic, TAtomic::Scalar(TScalar::Generic)) {
             if !is_equality {
@@ -1085,11 +1103,12 @@ where
     for atomic in existing_var_types {
         if let TAtomic::GenericParameter(generic_parameter) = atomic {
             if !is_equality && !generic_parameter.constraint.is_mixed() {
-                if let Some(atomic) = map_generic_constraint(generic_parameter, |constraint| {
+                if let Some(new_atomic) = map_generic_constraint(generic_parameter, |constraint| {
                     subtract_bool(context, assertion, constraint, None, false, None, is_equality)
                 }) {
-                    new_existing_var_type.remove_type(&atomic);
-                    new_existing_var_type.types.to_mut().push(atomic);
+                    new_existing_var_type.remove_type(atomic);
+                    new_existing_var_type.types.to_mut().push(new_atomic);
+                    did_remove_type = true;
                 }
             } else {
                 did_remove_type = true;
@@ -1280,7 +1299,7 @@ where
         match atomic {
             TAtomic::GenericParameter(generic_parameter) => {
                 if !is_equality
-                    && let Some(atomic) = map_generic_constraint(generic_parameter, |constraint| {
+                    && let Some(new_atomic) = map_generic_constraint(generic_parameter, |constraint| {
                         subtract_bool_literal(
                             context,
                             assertion,
@@ -1293,8 +1312,8 @@ where
                         )
                     })
                 {
-                    new_existing_var_type.remove_type(&atomic);
-                    new_existing_var_type.types.to_mut().push(atomic);
+                    new_existing_var_type.remove_type(atomic);
+                    new_existing_var_type.types.to_mut().push(new_atomic);
                 } else {
                     did_remove_type = true;
                 }
@@ -1487,7 +1506,10 @@ where
             if !mixed.is_truthy() {
                 acceptable_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new())));
             }
+
+            acceptable_types.push(TAtomic::Object(TObject::Named(TNamedObject::new(word("Countable")))));
         } else {
+            did_remove_type |= matches!(atomic, TAtomic::Object(_));
             acceptable_types.push(atomic);
         }
     }

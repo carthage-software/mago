@@ -64,6 +64,9 @@ pub enum TypeKeyword {
     CallableString,
     NonEmptyArray,
     NonEmptyMixed,
+    NonEmptyScalar,
+    CallableArray,
+    CallableObject,
     InterfaceString,
     LowercaseString,
     UppercaseString,
@@ -102,8 +105,10 @@ pub fn lookup_keyword(bytes: &[u8]) -> Option<TypeKeyword> {
         15 => lookup_len15(bytes),
         16 => lookup_len16(bytes),
         17 => lookup_len17(bytes),
+        18 if eq(bytes, b"decimal-int-string") => Some(TypeKeyword::NumericString),
         20 => lookup_len20(bytes),
         21 => lookup_len21(bytes),
+        22 if eq(bytes, b"non-decimal-int-string") => Some(TypeKeyword::String),
         23 => lookup_len23(bytes),
         24 => lookup_len24(bytes),
         25 => lookup_len25(bytes),
@@ -340,6 +345,7 @@ fn lookup_len14(bytes: &[u8]) -> Option<TypeKeyword> {
                 None
             }
         }
+        b'c' if eq(bytes, b"callable-array") => Some(TypeKeyword::CallableArray),
         _ => None,
     }
 }
@@ -352,6 +358,8 @@ fn lookup_len15(bytes: &[u8]) -> Option<TypeKeyword> {
                 Some(TypeKeyword::ClosedResource)
             } else if eq(bytes, b"callable-string") {
                 Some(TypeKeyword::CallableString)
+            } else if eq(bytes, b"callable-object") {
+                Some(TypeKeyword::CallableObject)
             } else {
                 None
             }
@@ -384,6 +392,8 @@ fn lookup_len16(bytes: &[u8]) -> Option<TypeKeyword> {
                 Some(TypeKeyword::NonPositiveInt)
             } else if eq(bytes, b"non-negative-int") {
                 Some(TypeKeyword::NonNegativeInt)
+            } else if eq(bytes, b"non-empty-scalar") {
+                Some(TypeKeyword::NonEmptyScalar)
             } else {
                 None
             }

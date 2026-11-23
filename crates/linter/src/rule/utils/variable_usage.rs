@@ -737,7 +737,12 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
 
     fn walk_try(&mut self, tr: &'ast Try<'arena>, ctx: &mut ()) {
         self.rec.enter_arm();
-        self.walk_block(&tr.block, ctx);
+        for statement in tr.block.statements.iter() {
+            self.rec.enter_arm();
+            self.walk_statement(statement, ctx);
+            self.rec.exit_arm();
+        }
+
         self.rec.exit_arm();
         for catch in tr.catch_clauses.iter() {
             self.rec.enter_arm();

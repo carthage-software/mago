@@ -20,12 +20,28 @@ impl<'arena, A> PHPDocParser<'arena, A>
 where
     A: Arena,
 {
+    /// A WordPress-style hash (`@param array $args {` followed by `@type` lines or a description)
+    /// separates the brace from the type and starts its content on the next line, without a
+    /// `key:` entry like a multi-line shape has.
+    fn is_at_hash_notation_block(&mut self) -> bool {
+        self.stream.is_preceded_by_whitespace(0)
+            && self.stream.starts_line(1)
+            && !matches!(self.stream.peek_kind(2), Some(TokenKind::Colon | TokenKind::Question))
+    }
+
+    pub(crate) fn is_at_shape_brace(&mut self) -> bool {
+        self.stream.is_at(TokenKind::LeftBrace)
+            && !self.is_at_hash_notation_block()
+            && !self.stream.lookahead(1).is_some_and(|token| token.value.starts_with(b"@"))
+    }
+
     pub(crate) fn parse_array_like_type(&mut self) -> Result<Type<'arena>, ParseError> {
         let next = self.stream.peek()?;
         let keyword = self.parse_keyword()?;
+        let is_shape = self.is_at_shape_brace();
 
         let kind = if next.value.eq_ignore_ascii_case(b"non-empty-array") {
-            if !self.stream.is_at(TokenKind::LeftBrace) {
+            if !is_shape {
                 return Ok(Type::NonEmptyArray(NonEmptyArrayType {
                     keyword,
                     parameters: self.parse_generic_parameters_or_none()?,
@@ -34,7 +50,7 @@ where
 
             ShapeTypeKind::NonEmptyArray
         } else if next.value.eq_ignore_ascii_case(b"associative-array") {
-            if !self.stream.is_at(TokenKind::LeftBrace) {
+            if !is_shape {
                 return Ok(Type::AssociativeArray(AssociativeArrayType {
                     keyword,
                     parameters: self.parse_generic_parameters_or_none()?,
@@ -43,7 +59,7 @@ where
 
             ShapeTypeKind::AssociativeArray
         } else if next.value.eq_ignore_ascii_case(b"non-empty-list") {
-            if !self.stream.is_at(TokenKind::LeftBrace) {
+            if !is_shape {
                 return Ok(Type::NonEmptyList(NonEmptyListType {
                     keyword,
                     parameters: self.parse_generic_parameters_or_none()?,
@@ -52,13 +68,13 @@ where
 
             ShapeTypeKind::NonEmptyList
         } else if next.value.eq_ignore_ascii_case(b"list") {
-            if !self.stream.is_at(TokenKind::LeftBrace) {
+            if !is_shape {
                 return Ok(Type::List(ListType { keyword, parameters: self.parse_generic_parameters_or_none()? }));
             }
 
             ShapeTypeKind::List
         } else {
-            if !self.stream.is_at(TokenKind::LeftBrace) {
+            if !is_shape {
                 return Ok(Type::Array(ArrayType { keyword, parameters: self.parse_generic_parameters_or_none()? }));
             }
 

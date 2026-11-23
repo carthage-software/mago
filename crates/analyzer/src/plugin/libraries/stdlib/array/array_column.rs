@@ -14,6 +14,8 @@ use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::expander;
+use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::get_array_parameters;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_never;
@@ -130,10 +132,16 @@ fn object_property_type(object: &TObject, property_name: &[u8], codebase: &Codeb
         TObject::Named(named) => {
             let class_like = codebase.get_class_like(named.name.as_bytes())?;
 
-            Some(
-                resolve_property_for_external_access(codebase, class_like, concat_word!(b"$", property_name))?
-                    .declared_type(codebase),
-            )
+            let property =
+                resolve_property_for_external_access(codebase, class_like, concat_word!(b"$", property_name))?;
+            let mut property_type = property.declared_type(codebase);
+            expander::expand_union(
+                codebase,
+                &mut property_type,
+                &TypeExpansionOptions { self_class: Some(property.declaring_class.name), ..Default::default() },
+            );
+
+            Some(property_type)
         }
         TObject::Enum(r#enum) => get_enum_builtin_property_type(codebase, r#enum, property_name),
         _ => None,

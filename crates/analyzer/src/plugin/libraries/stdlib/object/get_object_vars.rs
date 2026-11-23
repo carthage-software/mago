@@ -5,6 +5,8 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
+use mago_codex::ttype::expander;
+use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
@@ -77,8 +79,13 @@ impl FunctionReturnTypeProvider for GetObjectVarsProvider {
                 continue;
             };
 
-            let property_type =
+            let mut property_type =
                 property.type_metadata.as_ref().map(|metadata| metadata.type_union.clone()).unwrap_or_else(get_mixed);
+            expander::expand_union(
+                context.codebase(),
+                &mut property_type,
+                &TypeExpansionOptions { self_class: Some(*declaring_class), ..Default::default() },
+            );
 
             known_items.insert(ArrayKey::String(mago_word::word(name)), (false, property_type));
         }

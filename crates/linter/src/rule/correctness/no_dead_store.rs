@@ -590,4 +590,64 @@ mod tests {
             }
         "#}
     }
+
+    test_lint_success! {
+        name = issue_2766,
+        rule = NoDeadStoreRule,
+        code = indoc! {r#"
+            <?php
+
+            function flagAfterWork(callable $work): bool
+            {
+                $active = false;
+
+                try {
+                    $active = true;
+                    $work();
+                    $active = false;
+                } catch (RuntimeException) {
+                    return $active;
+                }
+
+                return $active;
+            }
+
+            function flagAfterIgnoredFailure(callable $work): bool
+            {
+                $active = false;
+
+                try {
+                    $active = true;
+                    $work();
+                    $active = false;
+                } catch (RuntimeException) {
+                }
+
+                return $active;
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = write_after_try_overwrites_writes_in_try,
+        rule = NoDeadStoreRule,
+        count = 2,
+        code = indoc! {r#"
+            <?php
+
+            function overwritten(callable $work): bool
+            {
+                try {
+                    $active = true;
+                    $work();
+                    $active = false;
+                } catch (RuntimeException) {
+                }
+
+                $active = null;
+
+                return $active === null;
+            }
+        "#}
+    }
 }

@@ -24,10 +24,13 @@ use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_array_value_parameter;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_bool;
+use mago_codex::ttype::get_closed_resource;
 use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_float;
 use mago_codex::ttype::get_iterable_value_parameter;
+use mago_codex::ttype::get_mixed_keyed_array;
 use mago_codex::ttype::get_numeric_string;
+use mago_codex::ttype::get_open_resource;
 use mago_codex::ttype::get_true;
 use mago_codex::ttype::shared::EMPTY_KEYED_ARRAY_ATOMIC;
 use mago_codex::ttype::shared::EMPTY_STRING_ATOMIC;
@@ -318,7 +321,8 @@ where
 
     let function_name = ascii_lowercase_word(function_identifier.value());
     let resolved_function_name = ascii_lowercase_word(assertion_context.resolved_names.get(function_identifier));
-    let should_check_against_unresolved = { function_identifier.is_local() };
+    let should_check_against_unresolved = function_identifier.is_local()
+        && !assertion_context.codebase.function_exists(resolved_function_name.as_bytes());
 
     let is_subclass_of_call = (should_check_against_unresolved && function_name.as_bytes() == b"is_subclass_of")
         || resolved_function_name.as_bytes() == b"is_subclass_of";
@@ -1045,7 +1049,7 @@ where
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, left) {
                 if number_on_right == 0 {
-                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
+                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(true)]]);
                 } else {
                     if_types.insert(
                         array_variable_id,
@@ -1061,7 +1065,7 @@ where
 
             if let Some(array_variable_id) = get_first_argument_expression_id(assertion_context, right) {
                 if number_on_left == 0 {
-                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
+                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(true)]]);
                 } else {
                     if_types.insert(
                         array_variable_id,
@@ -1247,19 +1251,22 @@ where
         return None;
     };
 
+    let get_class_assertion = || {
+        let resolved = get_class_name_from_atomic(assertion_context.codebase, atomic)?;
+        if resolved.is_invalid() || resolved.is_possibly_invalid() {
+            return None;
+        }
+        let object_type = resolved.get_object_type(assertion_context.codebase);
+        Some(if resolved.is_final { Assertion::IsType(object_type) } else { Assertion::IsIdentical(object_type) })
+    };
+
     let assertion = match kind {
-        BuiltinNarrowingFunction::GetClass => {
-            let resolved = get_class_name_from_atomic(assertion_context.codebase, atomic)?;
-            if resolved.is_invalid() || resolved.is_possibly_invalid() {
-                return None;
-            }
-            let object_type = resolved.get_object_type(assertion_context.codebase);
-            if resolved.is_final { Assertion::IsType(object_type) } else { Assertion::IsIdentical(object_type) }
-        }
-        BuiltinNarrowingFunction::GetType => {
-            let scalar = gettype_literal_to_scalar(atomic)?;
-            Assertion::IsType(scalar)
-        }
+        BuiltinNarrowingFunction::Class => get_class_assertion()?,
+        BuiltinNarrowingFunction::Type => Assertion::IsType(gettype_literal_to_scalar(atomic)?),
+        BuiltinNarrowingFunction::DebugType => match get_debug_type_literal_to_type(atomic) {
+            Some(debug_type) => Assertion::IsType(debug_type),
+            None => get_class_assertion()?,
+        },
     };
 
     let assertion = if negated {
@@ -1289,6 +1296,25 @@ fn gettype_literal_to_scalar(atomic: &TAtomic) -> Option<TAtomic> {
         b"boolean" => Some(TAtomic::Scalar(TScalar::bool())),
         b"object" => Some(TAtomic::Object(TObject::Any)),
         b"NULL" => Some(TAtomic::Null),
+        b"array" => Some(get_mixed_keyed_array().get_single_owned()),
+        b"resource" => Some(get_open_resource().get_single_owned()),
+        b"resource (closed)" => Some(get_closed_resource().get_single_owned()),
+        _ => None,
+    }
+}
+
+fn get_debug_type_literal_to_type(atomic: &TAtomic) -> Option<TAtomic> {
+    let TAtomic::Scalar(TScalar::String(string)) = atomic else {
+        return None;
+    };
+    match string.get_known_literal_value()? {
+        b"null" => Some(TAtomic::Null),
+        b"bool" => Some(TAtomic::Scalar(TScalar::bool())),
+        b"int" => Some(TAtomic::Scalar(TScalar::int())),
+        b"float" => Some(TAtomic::Scalar(TScalar::float())),
+        b"string" => Some(TAtomic::Scalar(TScalar::string())),
+        b"array" => Some(get_mixed_keyed_array().get_single_owned()),
+        b"resource (closed)" => Some(get_closed_resource().get_single_owned()),
         _ => None,
     }
 }
@@ -1782,7 +1808,7 @@ where
                 };
 
                 if minimum_count == 1 {
-                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
+                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(true)]]);
                 } else if minimum_count > 1 {
                     if_types.insert(array_variable_id, vec![vec![Assertion::HasAtLeastCount(minimum_count as usize)]]);
                 }
@@ -1833,7 +1859,10 @@ where
 
     let right_id = assertion_context.get_expression_id(right);
 
-    if let (Some(left_var_id), Some(right_var_id)) = (left_id, right_id) {
+    if let (Some(left_var_id), Some(right_var_id)) = (left_id, right_id)
+        && !left_integer.as_ref().is_some_and(TInteger::is_literal)
+        && !right_integer.as_ref().is_some_and(TInteger::is_literal)
+    {
         let relation = if matches!(operator, BinaryOperator::LessThanOrEqual(_)) {
             Assertion::IsLessThanOrEqualVariable(right_var_id)
         } else {
@@ -1969,7 +1998,7 @@ where
                 };
 
                 if minimum_count == 1 {
-                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
+                    if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(true)]]);
                 } else if minimum_count > 1 {
                     if_types.insert(array_variable_id, vec![vec![Assertion::HasAtLeastCount(minimum_count as usize)]]);
                 }
@@ -2047,7 +2076,10 @@ where
     let left_id = assertion_context.get_expression_id(left);
     let right_id = assertion_context.get_expression_id(right);
 
-    if let (Some(left_var_id), Some(right_var_id)) = (left_id, right_id) {
+    if let (Some(left_var_id), Some(right_var_id)) = (left_id, right_id)
+        && !left_integer.as_ref().is_some_and(TInteger::is_literal)
+        && !right_integer.as_ref().is_some_and(TInteger::is_literal)
+    {
         let relation = if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
             Assertion::IsGreaterThanOrEqualVariable(right_var_id)
         } else {

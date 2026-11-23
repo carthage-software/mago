@@ -83,6 +83,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
             false, // object_has_nullsafe_null - not applicable for function calls
         )?;
 
+        if resolved_function.is_some_and(|name| name.as_bytes().eq_ignore_ascii_case(b"extract")) {
+            block_context.flags.set_has_extracted_variables(true);
+        }
+
         if context.plugin_registry.has_function_call_hooks() {
             let mut hook_context = HookContext::new(context.codebase, context.source_file, block_context, artifacts)
                 .with_resolved_function(resolved_function);

@@ -29,6 +29,7 @@ use mago_codex::ttype::atomic::derived::TDerived;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
+use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::combine_union_types;
@@ -99,6 +100,7 @@ use crate::statement::r#loop::assignment_map_visitor::get_assignment_map;
 use crate::statement::r#loop::cleaner::clean_nodes;
 use crate::utils::exception::get_throw_type_atomics;
 use crate::utils::exception::get_throw_type_object_names;
+use crate::utils::exception::is_structural_throw_type;
 use crate::utils::misc::unwrap_expression;
 
 mod assignment_map_visitor;
@@ -349,7 +351,7 @@ fn inherit_loop_block_context<'ctx, A>(
                         .is_some_and(|defined_at_every_continue| defined_at_every_continue.contains(&variable))
                     {
                         block_context.locals.insert(variable, variable_type);
-                    } else {
+                    } else if !variable.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':')) {
                         let mut variable_type = Rc::unwrap_or_clone(variable_type);
                         variable_type.set_possibly_undefined(true, None);
                         block_context.locals.insert(variable, Rc::new(variable_type));
@@ -1526,6 +1528,20 @@ where
                             preserve_array_shapes_for.contains(variable_id),
                         )),
                     );
+                } else if !does_sometimes_break
+                    && pre_conditions.is_empty()
+                    && let Some(continue_type) = loop_scope.parent_variables_at_continues.get(variable_id)
+                {
+                    loop_parent_context.locals.insert(
+                        *variable_id,
+                        Rc::new(combine_loop_types(
+                            variable_type,
+                            continue_type,
+                            codebase,
+                            CombinerOptions::default(),
+                            preserve_array_shapes_for.contains(variable_id),
+                        )),
+                    );
                 }
             } else {
                 loop_parent_context.locals.insert(*variable_id, Rc::clone(variable_type));
@@ -2375,16 +2391,21 @@ where
     let mut has_valid_iterable_type = false;
     let mut invalid_atomic_ids = Vec::with_capacity(iterator_type.types.len());
 
-    for iterator_atomic_original in iterator_type.types.iter().flat_map(|atomic| match atomic {
-        TAtomic::Derived(TDerived::Intersection(intersection)) => intersection.get_base_type().types.as_ref(),
-        _ => std::slice::from_ref(atomic),
-    }) {
-        let iterator_atomic = if let TAtomic::GenericParameter(generic_parameter) = iterator_atomic_original {
-            generic_parameter.get_constraint().get_single()
-        } else {
-            iterator_atomic_original
-        };
+    let mut iterator_atomics = Vec::with_capacity(iterator_type.types.len());
+    let mut pending_atomics: Vec<&TAtomic> = iterator_type.types.iter().rev().collect();
+    while let Some(atomic) = pending_atomics.pop() {
+        match atomic {
+            TAtomic::Derived(TDerived::Intersection(intersection)) => {
+                pending_atomics.extend(intersection.get_base_type().types.iter().rev());
+            }
+            TAtomic::GenericParameter(generic_parameter) => {
+                pending_atomics.extend(generic_parameter.get_constraint().types.iter().rev());
+            }
+            _ => iterator_atomics.push(atomic),
+        }
+    }
 
+    for iterator_atomic in iterator_atomics {
         match iterator_atomic {
             TAtomic::Null | TAtomic::Scalar(TScalar::Bool(TBool { value: Some(false) })) => {
                 always_enters_loop = false;
@@ -2643,6 +2664,27 @@ fn widen_growing_integers(current: &TUnion, previous: &TUnion) -> Option<TUnion>
         types.push(TAtomic::Scalar(TScalar::String(TString::general())));
     }
 
+    let literal_floats = |union: &TUnion| -> Vec<TFloat> {
+        union
+            .types
+            .iter()
+            .filter_map(|atomic| match atomic {
+                TAtomic::Scalar(TScalar::Float(float @ TFloat::Literal(_))) => Some(*float),
+                _ => None,
+            })
+            .collect()
+    };
+
+    let current_floats = literal_floats(current);
+    let previous_floats = literal_floats(previous);
+    let widen_floats = current_floats.len() > 1
+        && !previous_floats.is_empty()
+        && current_floats.iter().any(|literal| !previous_floats.contains(literal));
+    if widen_floats {
+        changed = true;
+        types.push(TAtomic::Scalar(TScalar::float()));
+    }
+
     let previous_value = previous.types.iter().find_map(|atomic| match atomic {
         TAtomic::Array(TArray::Keyed(keyed)) => keyed.parameters.as_ref().map(|(_, value)| value.as_ref()),
         TAtomic::Array(TArray::List(list)) => Some(list.element_type.as_ref()),
@@ -2653,6 +2695,7 @@ fn widen_growing_integers(current: &TUnion, previous: &TUnion) -> Option<TUnion>
         if (widen_ints && atomic.is_int())
             || (widen_strings
                 && matches!(atomic, TAtomic::Scalar(TScalar::String(string)) if string.get_known_literal_value().is_some()))
+            || (widen_floats && matches!(atomic, TAtomic::Scalar(TScalar::Float(TFloat::Literal(_)))))
         {
             continue;
         }
@@ -2861,7 +2904,7 @@ fn record_method_throws<'ctx, A>(
             }
 
             for thrown_atomic in get_throw_type_atomics(atomic_type) {
-                if matches!(&thrown_atomic, TAtomic::GenericParameter(_))
+                if is_structural_throw_type(&thrown_atomic)
                     && thrown_atomic.extends_or_implements(context.codebase, b"Throwable")
                 {
                     let thrown_generic = PossiblyThrownGenericException {

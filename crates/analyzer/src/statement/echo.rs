@@ -7,6 +7,7 @@ use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
 use crate::common::construct::ConstructInput;
 use crate::common::construct::analyze_construct_inputs;
+use crate::common::construct::with_stringable;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
@@ -28,7 +29,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Echo<'arena> {
             "echo",
             self.echo.span,
             ConstructInput::ExpressionList(self.values.as_slice()),
-            &get_nullable_scalar(),
+            &with_stringable(get_nullable_scalar()),
             true,
             false,
             true,
@@ -55,7 +56,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for EchoTag<'arena> {
             "echo",
             self.tag,
             ConstructInput::ExpressionList(self.values.as_slice()),
-            &get_nullable_scalar(),
+            &with_stringable(get_nullable_scalar()),
             true,
             false,
             true,

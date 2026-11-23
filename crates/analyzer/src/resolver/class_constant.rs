@@ -445,6 +445,15 @@ where
         let display = format!("{}::{}", metadata.original_name, const_name);
         crate::utils::availability::check_enum_case_availability(context, enum_case_metadata, &display, const_span);
 
+        if enum_case_metadata.flags.is_deprecated() {
+            context.collector.report_with_code(
+                IssueCode::DeprecatedClassConstant,
+                Issue::warning(format!("Use of deprecated enum case `{display}`."))
+                    .with_annotation(Annotation::primary(const_span).with_message("This enum case is deprecated"))
+                    .with_help(format!("Check the documentation for `{display}` for a replacement.")),
+            );
+        }
+
         let const_type =
             TUnion::from_atomic(TAtomic::Object(TObject::Enum(TEnum::new_case(metadata.original_name, const_name))));
 

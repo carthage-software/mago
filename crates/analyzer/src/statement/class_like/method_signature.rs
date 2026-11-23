@@ -277,9 +277,27 @@ pub fn validate_method_signature_compatibility(
             continue;
         };
 
-        let parent_param_type = match &parent_param.type_metadata {
-            Some(t) => &t.type_union,
-            None => continue,
+        let parent_param_type = match (&parent_param.type_metadata, &parent_param.type_declaration_metadata) {
+            (Some(docblock), Some(native))
+                if docblock.from_docblock
+                    && !native.from_docblock
+                    && !docblock.type_union.has_template_types()
+                    && !docblock.type_union.is_expandable()
+                    && !native.type_union.has_template_types()
+                    && !union_comparator::is_contained_by(
+                        codebase,
+                        &docblock.type_union,
+                        &native.type_union,
+                        false,
+                        false,
+                        false,
+                        &mut ComparisonResult::new(),
+                    ) =>
+            {
+                &native.type_union
+            }
+            (Some(t), _) => &t.type_union,
+            (None, _) => continue,
         };
 
         let child_param_type = match &child_param.type_metadata {

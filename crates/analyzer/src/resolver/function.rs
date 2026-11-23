@@ -9,8 +9,9 @@ use crate::utils::misc::unwrap_expression;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BuiltinNarrowingFunction {
-    GetClass,
-    GetType,
+    Class,
+    Type,
+    DebugType,
 }
 
 pub fn resolve_function_name<'arena>(
@@ -77,9 +78,11 @@ pub fn get_builtin_get_class_or_gettype_call<'arena>(
 
     let resolved = resolve_function_name(identifier, resolved_names, codebase);
     let kind = if resolved.eq_ignore_ascii_case(b"get_class") {
-        BuiltinNarrowingFunction::GetClass
+        BuiltinNarrowingFunction::Class
     } else if resolved.eq_ignore_ascii_case(b"gettype") {
-        BuiltinNarrowingFunction::GetType
+        BuiltinNarrowingFunction::Type
+    } else if resolved.eq_ignore_ascii_case(b"get_debug_type") {
+        BuiltinNarrowingFunction::DebugType
     } else {
         return None;
     };

@@ -101,6 +101,9 @@ pub(crate) fn check_property_write<A>(
         && context.settings.version.is_supported(Feature::ReadonlyPropertyReinitializationInClone)
         && function_like.name.as_bytes().eq_ignore_ascii_case(b"__clone");
 
+    let is_unserialize =
+        function_like.method_metadata.is_some() && function_like.name.as_bytes().eq_ignore_ascii_case(b"__unserialize");
+
     let is_class_initializer = function_like.method_metadata.is_some()
         && context
             .codebase
@@ -121,7 +124,7 @@ pub(crate) fn check_property_write<A>(
         } else {
             LocalInitializationState::Uninitialized
         }
-    } else if is_clone_reinitialization {
+    } else if is_clone_reinitialization || is_unserialize {
         LocalInitializationState::Uninitialized
     } else {
         LocalInitializationState::EntryDependent

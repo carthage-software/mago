@@ -158,10 +158,11 @@ function preg_quote(string $str, ?string $delimiter = null): string {}
 
 /**
  * @template K of array-key
+ * @template V
  *
- * @param array<K, string> $array
+ * @param array<K, V> $array
  *
- * @return array<K, string>|false
+ * @return array<K, V>|false
  *
  * @pure
  */

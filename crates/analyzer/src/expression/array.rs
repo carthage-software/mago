@@ -111,6 +111,7 @@ struct ArrayCreationInfo {
     can_create_objectlike: bool,
     array_keys: HashSet<ArrayKey>,
     int_offset: i64,
+    has_int_key: bool,
     is_list: bool,
     known_non_list: bool,
     can_be_empty: bool,
@@ -169,6 +170,7 @@ where
         can_create_objectlike: true,
         array_keys: HashSet::default(),
         int_offset: -1,
+        has_int_key: false,
         is_list: true,
         known_non_list: false,
         can_be_empty: true,
@@ -260,8 +262,12 @@ where
                             if let Some(item_key_literal_type) = key_type.get_single_literal_string_value() {
                                 Some(ArrayKey::from_string(word(item_key_literal_type)))
                             } else if let Some(literal_integer) = key_type.get_single_literal_int_value() {
-                                // The most recent integer key becomes the next available integer key
-                                array_creation_info.int_offset = literal_integer;
+                                array_creation_info.int_offset = if array_creation_info.has_int_key {
+                                    array_creation_info.int_offset.max(literal_integer)
+                                } else {
+                                    literal_integer
+                                };
+                                array_creation_info.has_int_key = true;
 
                                 Some(ArrayKey::Integer(literal_integer))
                             } else if let Some(class_string) = key_type.get_single_class_string_value() {
@@ -305,6 +311,7 @@ where
 
                 if array_creation_info.known_int_offset {
                     array_creation_info.int_offset += 1;
+                    array_creation_info.has_int_key = true;
 
                     (
                         Some(ArrayKey::Integer(array_creation_info.int_offset)),

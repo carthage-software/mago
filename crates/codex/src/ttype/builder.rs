@@ -354,6 +354,35 @@ pub fn get_union_from_type(
         Type::Scalar(_) => get_scalar(),
         Type::Empty(_) => get_empty(),
         Type::EmptyScalar(_) => get_empty_scalar(),
+        Type::NonEmptyScalar(_) => TUnion::from_vec(vec![
+            TAtomic::Scalar(TScalar::String(TString::truthy())),
+            TAtomic::Scalar(TScalar::Integer(TInteger::To(-1))),
+            TAtomic::Scalar(TScalar::Integer(TInteger::From(1))),
+            TAtomic::Scalar(TScalar::float()),
+            TAtomic::Scalar(TScalar::r#true()),
+        ]),
+        Type::CallableObject(_) => TUnion::from_vec(vec![
+            TAtomic::Object(TObject::Named(TNamedObject::new(word("Closure")))),
+            TAtomic::Object(TObject::new_has_method(word("__invoke"))),
+        ]),
+        Type::CallableArray(_) => wrap_atomic(TAtomic::Array(TArray::List(TList {
+            element_type: Arc::new(get_never()),
+            known_elements: Some(Arc::new(BTreeMap::from([
+                (
+                    0,
+                    (
+                        false,
+                        TUnion::from_vec(vec![TAtomic::Object(TObject::Any), TAtomic::Scalar(TScalar::class_string())]),
+                    ),
+                ),
+                (1, (false, get_non_empty_string())),
+            ]))),
+            known_count: None,
+            non_empty: true,
+        }))),
+        Type::StringableObject(_) => {
+            wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(word("Stringable")))))
+        }
         Type::CallableString(_) => get_callable_string(),
         Type::LowercaseCallableString(_) => get_string_with_props(false, false, false, true, TStringCasing::Lowercase),
         Type::UppercaseCallableString(_) => get_string_with_props(false, false, false, true, TStringCasing::Uppercase),
@@ -1220,6 +1249,9 @@ fn get_class_string_type(
                         | TDerived::Intersection(_),
                     ) => class_strings
                         .push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::of_type(kind, constraint)))),
+                    TAtomic::Object(TObject::Any) => {
+                        class_strings.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::any(kind))));
+                    }
                     TAtomic::GenericParameter(TGenericParameter {
                         parameter_name,
                         defining_entity,

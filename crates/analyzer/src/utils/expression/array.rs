@@ -46,6 +46,7 @@ use mago_codex::ttype::intersect_read_types;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::union::TUnion;
+use mago_codex::ttype::wrap_atomic;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -156,7 +157,8 @@ where
         return get_never();
     }
 
-    if index_type.is_null() && !index_type.is_keyed_array() {
+    let only_objects = array_like_type.types.iter().all(TAtomic::is_object_type);
+    if index_type.is_null() && !index_type.is_keyed_array() && !only_objects {
         context.collector.report_with_code(
             IssueCode::NullArrayIndex,
             Issue::error(format!(
@@ -174,7 +176,7 @@ where
         );
     }
 
-    if index_type.is_nullable() && !index_type.ignore_nullable_issues() {
+    if index_type.is_nullable() && !index_type.ignore_nullable_issues() && !only_objects {
         context.collector.report_with_code(
             IssueCode::PossiblyNullArrayIndex,
             Issue::warning(format!(
@@ -188,6 +190,27 @@ where
             .with_note("Using `null` as an array key is equivalent to using an empty string `''`.")
             .with_note("The analysis indicates this index could be `null` at runtime.")
             .with_help("Ensure the index is always an integer or a string, potentially using checks or assertions before access."),
+        );
+    }
+
+    if !in_assignment
+        && index_type.is_falsable()
+        && !index_type.is_false()
+        && !index_type.ignore_falsable_issues()
+        && array_like_type.types.iter().all(TAtomic::is_array)
+    {
+        context.collector.report_with_code(
+            IssueCode::PossiblyFalseArrayIndex,
+            Issue::warning(format!(
+                "Possibly using `false` as an array index to access element{}.",
+                match extended_var_id {
+                    Some(var) => format!(" of variable {var}"),
+                    None => String::new(),
+                }
+            ))
+            .with_annotation(Annotation::primary(access_index_span).with_message("Index might be `false` here."))
+            .with_note("PHP uses `false` as the key `0`, which is rarely the element meant.")
+            .with_help("Check the index against `false` before using it, for example after `array_search()`."),
         );
     }
 
@@ -637,6 +660,49 @@ fn can_throw_as_offset(index_type: &TUnion) -> bool {
         .any(|atomic| matches!(atomic, TAtomic::Array(_) | TAtomic::Object(_) | TAtomic::Iterable(_)))
 }
 
+fn with_integer_string_keys(index_type: &TUnion) -> Cow<'_, TUnion> {
+    let is_integer_string_key = |atomic: &TAtomic| {
+        matches!(atomic, TAtomic::Scalar(TScalar::String(_)))
+            && matches!(atomic.to_array_key(), Some(ArrayKey::Integer(_)))
+    };
+
+    if !index_type.types.iter().any(is_integer_string_key) {
+        return Cow::Borrowed(index_type);
+    }
+
+    Cow::Owned(
+        index_type.clone_with_types(
+            index_type
+                .types
+                .iter()
+                .map(|atomic| match atomic.to_array_key() {
+                    Some(ArrayKey::Integer(value)) if is_integer_string_key(atomic) => {
+                        TAtomic::Scalar(TScalar::literal_int(value))
+                    }
+                    _ => atomic.clone(),
+                })
+                .collect(),
+        ),
+    )
+}
+
+fn is_key_type_reachable_by_index<A>(context: &Context<'_, '_, A>, key_type: &TUnion, index_type: &TUnion) -> bool
+where
+    A: Arena,
+{
+    key_type.types.iter().any(|key_atomic| {
+        is_contained_by(
+            context.codebase,
+            &wrap_atomic(key_atomic.clone()),
+            index_type,
+            true,
+            false,
+            false,
+            &mut ComparisonResult::new(),
+        )
+    })
+}
+
 pub(crate) fn handle_array_access_on_list<'ctx, A>(
     context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
@@ -658,6 +724,8 @@ where
         get_int()
     };
 
+    let dim_type = &*with_integer_string_keys(dim_type);
+
     let mut union_comparison_result = ComparisonResult::new();
     let index_type_contained_by_expected = is_contained_by(
         context.codebase,
@@ -675,15 +743,7 @@ where
     let expected_contained_by_index = !index_type_contained_by_expected
         && !expected_key_type.is_never()
         && !can_throw_as_offset(dim_type)
-        && is_contained_by(
-            context.codebase,
-            &expected_key_type,
-            dim_type,
-            true,
-            false,
-            false,
-            &mut ComparisonResult::new(),
-        );
+        && is_key_type_reachable_by_index(context, &expected_key_type, dim_type);
 
     if index_type_contained_by_expected || expected_contained_by_index {
         *has_valid_expected_index = true;
@@ -1028,6 +1088,8 @@ where
         Cow::Owned(get_never())
     };
 
+    let index_type = &*with_integer_string_keys(index_type);
+
     let mut union_comparison_result = ComparisonResult::new();
     let index_type_contained_by_expected =
         is_contained_by(context.codebase, index_type, &key_parameter, true, false, false, &mut union_comparison_result);
@@ -1042,15 +1104,7 @@ where
     let expected_contained_by_index = !index_type_contained_by_expected
         && !key_parameter.is_never()
         && !can_throw_as_offset(index_type)
-        && is_contained_by(
-            context.codebase,
-            &key_parameter,
-            index_type,
-            true,
-            false,
-            false,
-            &mut ComparisonResult::new(),
-        );
+        && is_key_type_reachable_by_index(context, &key_parameter, index_type);
 
     if index_type_contained_by_expected || expected_contained_by_index {
         *has_valid_expected_index = true;
@@ -1237,7 +1291,8 @@ where
         let possible_keys: Vec<ArrayKey> = index_type.types.iter().filter_map(TAtomic::to_array_key).collect();
 
         let mut key_possibly_missing = false;
-        if !possible_keys.is_empty() && possible_keys.len() == index_type.types.len() {
+        let all_keys_known = !possible_keys.is_empty() && possible_keys.len() == index_type.types.len();
+        if all_keys_known {
             for key in &possible_keys {
                 if let Some((optional, known_item)) = known_items.get(key) {
                     key_possibly_missing |= *optional;
@@ -1278,7 +1333,9 @@ where
             *has_valid_expected_index = true;
         }
 
-        *has_possibly_undefined = true;
+        if key_possibly_missing || !all_keys_known {
+            *has_possibly_undefined = true;
+        }
 
         if (context.settings.strict_array_index_existence
             || (key_possibly_missing
@@ -1753,7 +1810,7 @@ where
         }
     }
 
-    if matches!(mixed, TAtomic::Never) {
+    if matches!(mixed, TAtomic::Never) || mixed.is_mixed_isset_from_loop() {
         return get_mixed_maybe_from_loop(true);
     }
 

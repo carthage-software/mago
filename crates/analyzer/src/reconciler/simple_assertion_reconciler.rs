@@ -49,6 +49,7 @@ use mago_codex::ttype::get_scalar;
 use mago_codex::ttype::get_string_with_props;
 use mago_codex::ttype::get_union_from_integer;
 use mago_codex::ttype::intersect_union_types;
+use mago_codex::ttype::shared::EMPTY_STRING_ATOMIC;
 use mago_codex::ttype::shared::MIXED_KEYED_ARRAY_ATOMIC;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
@@ -289,7 +290,7 @@ where
         | Assertion::IsLessThanOrEqualVariable(_)
         | Assertion::IsGreaterThanVariable(_)
         | Assertion::IsGreaterThanOrEqualVariable(_) => Some(existing_var_type.clone()),
-        Assertion::StringLengthLessThan(_) => Some(existing_var_type.clone()),
+        Assertion::StringLengthLessThan(length) => Some(reconcile_string_length_less_than(existing_var_type, *length)),
         Assertion::StringLengthGreaterThanOrEqual(length) => {
             Some(reconcile_string_length_greater_than_or_equal(existing_var_type, *length))
         }
@@ -430,6 +431,36 @@ fn reconcile_string_length_greater_than_or_equal(existing_var_type: &TUnion, len
     new_var_type
 }
 
+fn reconcile_string_length_less_than(existing_var_type: &TUnion, length: i64) -> TUnion {
+    if length != 1 {
+        return existing_var_type.clone();
+    }
+
+    let mut new_var_type = existing_var_type.clone();
+    let mut acceptable_types = Vec::new();
+
+    for atomic in std::mem::take(new_var_type.types.to_mut()) {
+        match atomic {
+            TAtomic::Scalar(TScalar::String(string)) => {
+                if !string.is_non_empty && !string.is_truthy && (!string.is_known_literal() || string.is_empty()) {
+                    acceptable_types.push(EMPTY_STRING_ATOMIC.clone());
+                }
+            }
+            TAtomic::GenericParameter(generic_parameter) => {
+                if let Some(atomic) = map_concrete_generic_constraint(&generic_parameter, |constraint| {
+                    reconcile_string_length_less_than(constraint, length)
+                }) {
+                    acceptable_types.push(atomic);
+                }
+            }
+            atomic => acceptable_types.push(atomic),
+        }
+    }
+
+    new_var_type.types = Cow::Owned(acceptable_types);
+    new_var_type
+}
+
 pub(crate) fn intersect_null<A>(
     context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
@@ -543,6 +574,10 @@ where
                     acceptable_types.push(atomic);
                 }
             }
+            TAtomic::Mixed(_) => {
+                did_remove_type = true;
+                acceptable_types.push(TAtomic::Resource(resource_to_intersection));
+            }
             _ => {
                 did_remove_type = true;
             }
@@ -595,6 +630,9 @@ where
             }) {
                 object_types.push(atomic);
             }
+        } else if let TAtomic::Mixed(_) = atomic {
+            did_remove_type = true;
+            object_types.push(TAtomic::Object(TObject::Any));
         } else if let TAtomic::Iterable(iterable) = atomic {
             did_remove_type = true;
 
@@ -1003,6 +1041,13 @@ where
             TAtomic::Variable(_) => {
                 acceptable_types.push(atomic.clone());
                 did_remove_type = true;
+            }
+            TAtomic::Mixed(_) => {
+                did_remove_type = true;
+                match assertion_type {
+                    Some(assertion_type) => acceptable_types.push(assertion_type.clone()),
+                    None => acceptable_types.extend(get_mixed_keyed_array().types.iter().cloned()),
+                }
             }
             TAtomic::Object(TObject::Named(_)) => {
                 did_remove_type = true;
@@ -1804,7 +1849,7 @@ where
                     known_non_list,
                 })));
             }
-            TAtomic::Mixed(_) | TAtomic::Iterable(_) => {
+            TAtomic::Mixed(_) | TAtomic::Iterable(_) | TAtomic::Object(_) => {
                 did_remove_type = true;
                 acceptable_types.push(atomic);
             }
@@ -2134,6 +2179,7 @@ where
     new_var_type.types.to_mut().retain(|atomic| {
         (allow_int_key && atomic.is_array_accessible_with_int_or_string_key())
             || (!allow_int_key && atomic.is_array_accessible_with_string_key())
+            || matches!(atomic, TAtomic::Scalar(TScalar::String(_)))
             || matches!(atomic, TAtomic::Object(TObject::Named(named)) if context.codebase.is_instance_of(named.name.as_bytes(), b"ArrayAccess"))
     });
 
@@ -2268,6 +2314,8 @@ where
                         } else {
                             continue;
                         }
+
+                        require_list_elements_before(known_elements, i as usize);
                     } else if !element_type.is_never() {
                         *non_empty = true;
                         *known_elements =
@@ -2336,6 +2384,12 @@ where
 
     new_var_type.types = Cow::Owned(acceptable_types);
     new_var_type
+}
+
+fn require_list_elements_before(known_elements: &mut BTreeMap<usize, (bool, TUnion)>, index: usize) {
+    for (_, (optional, _)) in known_elements.range_mut(..index) {
+        *optional = false;
+    }
 }
 
 fn reconcile_has_nonnull_entry_for_key<A>(
@@ -2416,6 +2470,8 @@ where
                     } else {
                         continue;
                     }
+
+                    require_list_elements_before(known_elements, i as usize);
                 } else if !element_type.is_never() {
                     let nonnull = subtract_null(context, assertion, element_type, None, negated, None);
                     *known_elements = Some(BTreeMap::from([(i as usize, (false, nonnull))]).into());
@@ -2450,13 +2506,19 @@ where
                 }));
                 acceptable_types.extend(keyed_array.types.into_owned());
             }
-            TAtomic::Object(TObject::Named(_)) => {
+            TAtomic::Object(TObject::Named(_) | TObject::Any) => {
                 acceptable_types.push(atomic);
             }
             TAtomic::Scalar(TScalar::String(s)) if !s.is_known_literal() => {
                 if let ArrayKey::Integer(_) = key_name {
                     acceptable_types.push(atomic);
                 }
+            }
+            TAtomic::Scalar(TScalar::Generic | TScalar::ArrayKey) if matches!(key_name, ArrayKey::Integer(_)) => {
+                acceptable_types.push(TAtomic::Scalar(TScalar::string()));
+            }
+            TAtomic::Scalar(TScalar::Numeric) if matches!(key_name, ArrayKey::Integer(_)) => {
+                acceptable_types.push(TAtomic::Scalar(TScalar::numeric_string()));
             }
             _ => {}
         }

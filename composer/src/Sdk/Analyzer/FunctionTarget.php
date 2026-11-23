@@ -37,6 +37,6 @@ final class FunctionTarget
 
     public static function namespace(string $namespace): self
     {
-        return new self(FunctionTargetKind::Namespace, $namespace);
+        return new self(FunctionTargetKind::Namespace_, $namespace);
     }
 }

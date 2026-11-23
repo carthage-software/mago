@@ -20,6 +20,7 @@ use mago_codex::metadata::parameter::CallableInvocationKind;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::callable::TCallable;
@@ -83,10 +84,12 @@ use crate::reconciler;
 use crate::reconciler::assertion_reconciler::intersect_union_with_union;
 use crate::utils::exception::get_throw_type_atomics;
 use crate::utils::exception::get_throw_type_object_names;
+use crate::utils::exception::is_structural_throw_type;
 use crate::utils::expression::expression_is_nullsafe;
 use crate::utils::expression::get_access_base_expressions;
 use crate::utils::expression::get_block_expression_id;
 use crate::utils::expression::get_non_nullsafe_expression_id;
+use crate::utils::expression::uses_variable_as_offset;
 use crate::utils::misc::unwrap_expression;
 
 pub fn post_invocation_process<'ctx, 'arena, A>(
@@ -149,8 +152,17 @@ where
         && let InvocationArgumentsSource::ArgumentList(argument_list) = invoication.arguments_source
     {
         for argument in &argument_list.arguments {
-            let Argument::Named(_) = argument else {
-                continue; // Skip if it's not a named argument
+            let message = match argument {
+                Argument::Named(_) => "Named argument used here",
+                Argument::Positional(positional)
+                    if positional.ellipsis.is_some()
+                        && artifacts
+                            .get_expression_type(&positional.value)
+                            .is_some_and(|argument_type| argument_type.types.iter().any(array_has_string_keys)) =>
+                {
+                    "This unpacked array passes its string keys as named arguments"
+                }
+                _ => continue,
             };
             let full_callable_name =
                 full_callable_name.get_or_init(|| display_callable_name(context, identifier, metadata.original_name));
@@ -158,7 +170,7 @@ where
             context.collector.report_with_code(
                 IssueCode::NamedArgumentNotAllowed,
                 Issue::error(format!("Named arguments are not allowed for {full_callable_name}."))
-                    .with_annotation(Annotation::primary(argument.span()).with_message("Named argument used here"))
+                    .with_annotation(Annotation::primary(argument.span()).with_message(message))
                     .with_annotation(Annotation::secondary(invoication.target.span()).with_message(format!(
                         "The {callable_kind_str} {full_callable_name} only accepts positional arguments"
                     )))
@@ -250,7 +262,7 @@ where
                 for resolved_exception_type in resolved_exception_types {
                     for exception_atomic in resolved_exception_type.types.into_owned() {
                         for thrown_atomic in get_throw_type_atomics(&exception_atomic) {
-                            if matches!(&thrown_atomic, TAtomic::GenericParameter(_))
+                            if is_structural_throw_type(&thrown_atomic)
                                 && thrown_atomic.extends_or_implements(context.codebase, b"Throwable")
                             {
                                 let object_names = get_throw_type_object_names(context.codebase, &thrown_atomic);
@@ -638,7 +650,7 @@ fn record_callback_throw_types<'ctx, A>(
             }
 
             for thrown_atomic in get_throw_type_atomics(atomic_type) {
-                if matches!(&thrown_atomic, TAtomic::GenericParameter(_))
+                if is_structural_throw_type(&thrown_atomic)
                     && thrown_atomic.extends_or_implements(context.codebase, b"Throwable")
                 {
                     let thrown_generic = PossiblyThrownGenericException {
@@ -963,6 +975,7 @@ where
                 }
 
                 block_context.remove_variable_from_conflicting_clauses(context, argument_id, None);
+                block_context.parent_conflicting_clause_variables.insert(argument_id);
 
                 assign_to_expression(
                     context,
@@ -993,6 +1006,7 @@ where
                 {
                     block_context.remove_descendants(context, *argument_id, &existing_type, Some(&new_type));
                     block_context.remove_variable_from_conflicting_clauses(context, *argument_id, None);
+                    block_context.parent_conflicting_clause_variables.insert(*argument_id);
                 }
 
                 assign_to_expression(
@@ -1327,6 +1341,15 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
     block_context.retain_valid_class_type_relations();
 }
 
+fn array_has_string_keys(atomic: &TAtomic) -> bool {
+    let TAtomic::Array(TArray::Keyed(keyed)) = atomic else {
+        return false;
+    };
+
+    keyed.known_items.as_ref().is_some_and(|items| items.keys().any(|key| matches!(key, ArrayKey::String(_))))
+        || keyed.get_generic_parameters().is_some_and(|(key_type, _)| key_type.types.iter().all(TAtomic::is_string))
+}
+
 fn references_method_call_key(key: Word) -> bool {
     let bytes = key.as_bytes();
     memchr::memchr_iter(b'(', bytes).any(|index| bytes.get(index + 1) == Some(&b')'))
@@ -1346,11 +1369,8 @@ fn is_descendant_of_any(var_id: Word, roots: &[Word]) -> bool {
     let key = var_id.as_bytes();
     roots.iter().any(|root| {
         let root = root.as_bytes();
-        let Some(rest) = key.strip_prefix(root) else {
-            return false;
-        };
-
-        rest.starts_with(b"->") || rest.first() == Some(&b'[')
+        uses_variable_as_offset(key, root)
+            || key.strip_prefix(root).is_some_and(|rest| rest.starts_with(b"->") || rest.first() == Some(&b'['))
     })
 }
 
@@ -1476,8 +1496,15 @@ where
     let mut has_non_redundant_assertion = false;
 
     for (parameter_id, variable_assertions) in assertions {
-        let (assertion_expression, assertion_variable) =
+        let (assertion_expression, mut assertion_variable) =
             resolve_argument_or_special_target(context, block_context, invocation, *parameter_id, this_variable);
+
+        if matches!(assertion_expression, Some(Expression::Call(_)))
+            && let [assertion] = variable_assertions.as_slice()
+            && is_truthiness_assertion(assertion)
+        {
+            assertion_variable = None;
+        }
 
         match assertion_variable {
             Some(assertion_variable) => {
@@ -1886,6 +1913,16 @@ where
     }
 
     type_assertions
+}
+
+fn is_truthiness_assertion(assertion: &Assertion) -> bool {
+    matches!(
+        assertion,
+        Assertion::Truthy
+            | Assertion::Falsy
+            | Assertion::IsType(TAtomic::Scalar(TScalar::Bool(TBool { value: Some(_) })))
+            | Assertion::IsNotType(TAtomic::Scalar(TScalar::Bool(TBool { value: Some(_) })))
+    )
 }
 
 fn add_access_base_assertions<'arena, A>(

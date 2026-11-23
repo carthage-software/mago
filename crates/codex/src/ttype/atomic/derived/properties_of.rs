@@ -94,6 +94,7 @@ impl TPropertiesOf {
         let mut known_items: BTreeMap<ArrayKey, (bool, TUnion)> = BTreeMap::new();
         // Track whether we need an unsealed array (for non-final classes)
         let mut needs_unsealed = false;
+        let mut resolved_any = false;
 
         for target in target_types {
             match target {
@@ -101,6 +102,8 @@ impl TPropertiesOf {
                     let Some(class_like_metadata) = codebase.get_class_like(named.name.as_bytes()) else {
                         continue;
                     };
+
+                    resolved_any = true;
 
                     // Non-final classes (not enums, interfaces, or traits) need unsealed arrays
                     // since subclasses may have additional properties
@@ -128,26 +131,22 @@ impl TPropertiesOf {
                             continue;
                         }
 
-                        // Get the property type
-                        if let Some(type_metadata) = &property_metadata.type_metadata {
-                            // Property name without the leading '$'
-                            let name_str = prop_name.as_bytes();
-                            let stripped_name = name_str.trim_prefix(b"$");
-                            let key = ArrayKey::String(Word::from(stripped_name));
-                            let is_optional = false; // Class properties are not optional in the shape
+                        let property_type = property_metadata
+                            .type_metadata
+                            .as_ref()
+                            .map_or_else(get_mixed, |type_metadata| type_metadata.type_union.clone());
+                        let key = ArrayKey::String(Word::from(prop_name.as_bytes().trim_prefix(b"$")));
 
-                            // Merge with existing entry if present (for union types)
-                            if let Some((_, existing_union)) = known_items.get_mut(&key) {
-                                for atomic in type_metadata.type_union.types.iter() {
-                                    if !existing_union.types.contains(atomic) {
-                                        let mut types = existing_union.types.to_vec();
-                                        types.push(atomic.clone());
-                                        *existing_union = TUnion::from_vec(types);
-                                    }
+                        if let Some((_, existing_union)) = known_items.get_mut(&key) {
+                            for atomic in property_type.types.iter() {
+                                if !existing_union.types.contains(atomic) {
+                                    let mut types = existing_union.types.to_vec();
+                                    types.push(atomic.clone());
+                                    *existing_union = TUnion::from_vec(types);
                                 }
-                            } else {
-                                known_items.insert(key, (is_optional, type_metadata.type_union.clone()));
                             }
+                        } else {
+                            known_items.insert(key, (false, property_type));
                         }
                     }
                 }
@@ -159,6 +158,8 @@ impl TPropertiesOf {
                     let Some(class_like_metadata) = codebase.get_class_like(enum_name.as_bytes()) else {
                         continue;
                     };
+
+                    resolved_any = true;
 
                     // Collect case names (and values for backed enums)
                     let mut name_types = vec![];
@@ -213,7 +214,7 @@ impl TPropertiesOf {
             }
         }
 
-        if known_items.is_empty() && !needs_unsealed {
+        if known_items.is_empty() && !needs_unsealed && !resolved_any {
             None
         } else {
             let has_known_items = !known_items.is_empty();

@@ -918,6 +918,11 @@ where
     });
 
     let operand_id = get_block_expression_id(operand, context, block_context);
+    if let Some(operand_id) = operand_id {
+        block_context.assigned_variable_ids.insert(operand_id, operand.start_offset());
+        block_context.possibly_assigned_variable_ids.insert(operand_id);
+    }
+
     let successful = assign_to_expression(
         context,
         block_context,
@@ -1166,6 +1171,11 @@ where
     });
 
     let operand_id = get_block_expression_id(operand, context, block_context);
+    if let Some(operand_id) = operand_id {
+        block_context.assigned_variable_ids.insert(operand_id, operand.start_offset());
+        block_context.possibly_assigned_variable_ids.insert(operand_id);
+    }
+
     let successful = assign_to_expression(
         context,
         block_context,

@@ -268,6 +268,7 @@ namespace {
     function pcntl_forkx(int $flags): int {}
 
     /**
+     * @param-out int $status
      * @param-out array $resource_usage
      */
     function pcntl_waitpid(int $process_id, &$status, int $flags = 0, &$resource_usage = []): int {}
@@ -330,13 +331,13 @@ namespace {
 
     function pcntl_async_signals(?bool $enable = null): bool {}
 
-    /**
-     * @return bool|resource
-     */
-    function pcntl_signal_get_handler(int $signal) {}
+    function pcntl_signal_get_handler(int $signal): callable|int {}
 
     function pcntl_unshare(int $flags): bool {}
 
+    /**
+     * @param-out array $info
+     */
     function pcntl_waitid(int $idtype = P_ALL, ?int $id = null, &$info = [], int $flags = WEXITED): bool {}
 
     function pcntl_getcpuaffinity(?int $process_id = null): array|false {}

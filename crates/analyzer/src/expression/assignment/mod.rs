@@ -13,6 +13,7 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::atomic::derived::TDerived;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::combine_union_types;
@@ -253,6 +254,8 @@ where
         );
     }
 
+    let existing_target_type =
+        existing_target_type.or_else(|| target_variable_id.and_then(|id| block_context.locals.get(&id).cloned()));
     if let (Some(target_variable_id), Some(existing_target_type)) = (&target_variable_id, &existing_target_type) {
         block_context.remove_descendants(context, *target_variable_id, existing_target_type, Some(&source_type));
         if matches!(target_expression, Expression::Access(Access::Property(_))) {
@@ -405,24 +408,7 @@ where
         )?;
     }
 
-    if let Some(root) = get_root_expression_id(target_expression) {
-        let belongs_to_root =
-            |key: &Word| key.as_bytes().strip_prefix(root.as_bytes()).is_some_and(|suffix| suffix.starts_with(b"->"));
-
-        block_context.stable_method_call_assertions.retain(|key, _| !belongs_to_root(key));
-        block_context.stable_method_calls.retain(|key| !belongs_to_root(key));
-        block_context.clauses.retain(|clause| !clause.possibilities.keys().any(belongs_to_root));
-        block_context.reconciled_expression_clauses.retain(|clause| !clause.possibilities.keys().any(belongs_to_root));
-    } else if !matches!(target_expression, Expression::Variable(_)) {
-        block_context.stable_method_call_assertions.clear();
-        block_context.stable_method_calls.clear();
-        block_context.clauses.retain(|clause| {
-            !clause.possibilities.keys().any(|key| memchr::memmem::find(key.as_bytes(), b"()").is_some())
-        });
-        block_context.reconciled_expression_clauses.retain(|clause| {
-            !clause.possibilities.keys().any(|key| memchr::memmem::find(key.as_bytes(), b"()").is_some())
-        });
-    }
+    forget_stable_method_results(block_context, target_expression);
 
     match target_expression {
         Expression::Variable(target_variable) if target_expression_id.is_some() => analyze_assignment_to_variable(
@@ -493,6 +479,28 @@ where
     }
 
     Ok(true)
+}
+
+/// Forgets the remembered results of mutation-free method calls that a write to `target_expression` may change.
+pub(crate) fn forget_stable_method_results(block_context: &mut BlockContext<'_>, target_expression: &Expression<'_>) {
+    if let Some(root) = get_root_expression_id(target_expression) {
+        let belongs_to_root =
+            |key: &Word| key.as_bytes().strip_prefix(root.as_bytes()).is_some_and(|suffix| suffix.starts_with(b"->"));
+
+        block_context.stable_method_call_assertions.retain(|key, _| !belongs_to_root(key));
+        block_context.stable_method_calls.retain(|key| !belongs_to_root(key));
+        block_context.clauses.retain(|clause| !clause.possibilities.keys().any(belongs_to_root));
+        block_context.reconciled_expression_clauses.retain(|clause| !clause.possibilities.keys().any(belongs_to_root));
+    } else if !matches!(target_expression, Expression::Variable(_)) {
+        block_context.stable_method_call_assertions.clear();
+        block_context.stable_method_calls.clear();
+        block_context.clauses.retain(|clause| {
+            !clause.possibilities.keys().any(|key| memchr::memmem::find(key.as_bytes(), b"()").is_some())
+        });
+        block_context.reconciled_expression_clauses.retain(|clause| {
+            !clause.possibilities.keys().any(|key| memchr::memmem::find(key.as_bytes(), b"()").is_some())
+        });
+    }
 }
 
 fn analyze_reference_assignment<'ctx, 'ast, 'arena, A>(
@@ -976,10 +984,12 @@ where
     let non_nullable_type = if source_has_null { Some(array_type.to_non_nullable()) } else { None };
     let destructure_type: &TUnion = non_nullable_type.as_ref().unwrap_or(array_type);
 
-    let can_be_destructured = destructure_type
-        .types
-        .iter()
-        .all(|atomic| atomic.is_array() || atomic.extends_or_implements(context.codebase, b"ArrayAccess"));
+    let is_destructurable =
+        |atomic: &TAtomic| atomic.is_array() || atomic.extends_or_implements(context.codebase, b"ArrayAccess");
+    let can_be_destructured = destructure_type.types.iter().all(|atomic| {
+        is_destructurable(atomic)
+            || matches!(atomic, TAtomic::Derived(TDerived::Intersection(intersection)) if intersection.get_base_type().types.iter().all(is_destructurable))
+    });
 
     if array_type.is_null() {
         let mut issue = Issue::error("Destructuring a `null` value.".to_string());

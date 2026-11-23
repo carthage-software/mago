@@ -28,6 +28,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::expression::assignment::forget_stable_method_results;
 use crate::utils::expression::get_block_expression_id;
 use crate::utils::expression::get_root_expression_id;
 use crate::visibility::ProtectedMember;
@@ -62,6 +63,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                 block_context.remove_variable(value_id.as_bytes(), true, context);
                 block_context.possibly_assigned_variable_ids.insert(*value_id);
                 block_context.references_possibly_from_confusing_scope.remove(value_id);
+            }
+
+            if !matches!(value, Expression::Variable(_)) {
+                forget_stable_method_results(block_context, value);
             }
 
             check_property_unset(context, block_context, artifacts, self.unset.span, value);

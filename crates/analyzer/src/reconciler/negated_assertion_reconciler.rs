@@ -168,6 +168,17 @@ fn subtract_complex_type<A>(
             continue;
         }
 
+        if let (TAtomic::Object(TObject::Named(existing_object)), TAtomic::Object(TObject::Named(assertion_object))) =
+            (&existing_atomic, assertion_type)
+            && assertion_object.is_static
+            && !existing_object.is_static
+            && !context.codebase.is_enum_or_final_class(assertion_object.name.as_bytes())
+        {
+            *can_be_disjunct = true;
+            acceptable_types.push(existing_atomic);
+            continue;
+        }
+
         if atomic_comparator::is_contained_by(
             context.codebase,
             &existing_atomic,

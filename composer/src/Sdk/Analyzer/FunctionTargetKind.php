@@ -11,5 +11,5 @@ enum FunctionTargetKind: int
 {
     case Exact = 1;
     case Prefix = 2;
-    case Namespace = 3;
+    case Namespace_ = 3;
 }

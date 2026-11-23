@@ -6,6 +6,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::Declare;
 use mago_syntax::cst::Expression;
+use mago_syntax::cst::Global;
 use mago_syntax::cst::Goto;
 use mago_syntax::cst::Inline;
 use mago_syntax::cst::InlineKind;
@@ -17,11 +18,15 @@ use mago_syntax::cst::Node;
 use mago_syntax::cst::Program;
 use mago_syntax::cst::Sequence;
 use mago_syntax::cst::Statement;
+use mago_syntax::cst::Static;
+use mago_syntax::cst::Unset;
 use mago_syntax::cst::UseItem;
 use mago_syntax::cst::UseItems;
 use mago_syntax::cst::UseType;
+use mago_syntax::cst::Variable;
 use mago_syntax::walker::Walker;
 
+use crate::internal::checker::check_this_variable;
 use crate::internal::consts::DECLARE_DIRECTIVES;
 use crate::internal::consts::ENCODING_DECLARE_DIRECTIVE;
 use crate::internal::consts::STRICT_TYPES_DECLARE_DIRECTIVE;
@@ -433,4 +438,29 @@ pub fn check_goto<'ast, 'arena>(goto: &'ast Goto<'arena>, context: &mut Context<
     }
 
     context.report(issue);
+}
+
+#[inline]
+pub fn check_global(global: &Global, context: &mut Context<'_, '_, '_>) {
+    for variable in &global.variables {
+        if let Variable::Direct(variable) = variable {
+            check_this_variable(variable, "Cannot use `$this` as a global variable.", context);
+        }
+    }
+}
+
+#[inline]
+pub fn check_static(r#static: &Static, context: &mut Context<'_, '_, '_>) {
+    for item in &r#static.items {
+        check_this_variable(item.variable(), "Cannot use `$this` as a static variable.", context);
+    }
+}
+
+#[inline]
+pub fn check_unset(unset: &Unset, context: &mut Context<'_, '_, '_>) {
+    for value in &unset.values {
+        if let Expression::Variable(Variable::Direct(variable)) = value {
+            check_this_variable(variable, "Cannot unset `$this`.", context);
+        }
+    }
 }

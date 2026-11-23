@@ -674,6 +674,24 @@ fn infer_templates_from_input_and_container_types<A>(
                             Cow::Borrowed(input_parameter_type)
                         };
 
+                        let input_param_for_inference = match container_parameter_type.types.as_ref() {
+                            [TAtomic::GenericParameter(parameter)]
+                                if !parameter.constraint.is_mixed()
+                                    && union_comparator::is_contained_by(
+                                        context.codebase,
+                                        &parameter.constraint,
+                                        &input_param_for_inference,
+                                        false,
+                                        false,
+                                        false,
+                                        &mut ComparisonResult::default(),
+                                    ) =>
+                            {
+                                Cow::Owned((*parameter.constraint).clone())
+                            }
+                            _ => input_param_for_inference,
+                        };
+
                         infer_templates_from_input_and_container_types(
                             context,
                             container_parameter_type,

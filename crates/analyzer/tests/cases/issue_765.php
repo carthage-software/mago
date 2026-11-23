@@ -7,7 +7,7 @@ declare(strict_types=1);
  *
  * @throws RuntimeException
  *
- * @return array{'fragment'?: string, 'host'?: non-empty-string, 'pass'?: string, 'path'?: non-empty-string, 'port'?: int<0, 65535>, 'query'?: string, 'scheme'?: non-empty-string, 'user'?: string}
+ * @return array{'fragment'?: string, 'host'?: non-empty-string, 'pass'?: string, 'path'?: string, 'port'?: int<0, 65535>, 'query'?: string, 'scheme'?: non-empty-string, 'user'?: string}
  */
 function getFullResult(string $url): array
 {
@@ -115,7 +115,7 @@ function getPass(string $url): ?string
  *
  * @throws RuntimeException
  *
- * @return non-empty-string|null
+ * @return string|null
  */
 function getPath(string $url): ?string
 {
@@ -169,7 +169,7 @@ function getFragment(string $url): ?string
  *
  * @throws RuntimeException
  *
- * @return array{'fragment'?: string, 'host'?: non-empty-string, 'pass'?: string, 'path'?: non-empty-string, 'port'?: int<0, 65535>, 'query'?: string, 'scheme'?: non-empty-string, 'user'?: string}
+ * @return array{'fragment'?: string, 'host'?: non-empty-string, 'pass'?: string, 'path'?: string, 'port'?: int<0, 65535>, 'query'?: string, 'scheme'?: non-empty-string, 'user'?: string}
  */
 function getFullResultWithMinusOne(string $url): array
 {

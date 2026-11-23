@@ -322,7 +322,9 @@ where
                     found_parent = true;
                 }
 
-                if !found_parent {
+                if !found_parent && self_meta.kind.is_trait() {
+                    possible_types.push(ResolvedClassname::new(None, ResolutionOrigin::Mixed, false));
+                } else if !found_parent {
                     context.collector.report_with_code(
                         IssueCode::InvalidParentType,
                         Issue::error(format!(
@@ -367,11 +369,13 @@ where
                 expression.unparenthesized(),
                 Expression::Access(Access::NullSafeProperty(_)) | Expression::Call(Call::NullSafeMethod(_))
             );
+            let null_is_short_circuit =
+                expression_type.is_some_and(|expression_type| expression_type.has_nullsafe_null());
 
             for atomic in expression_type.map(|u| u.types.iter()).unwrap_or_default() {
                 if let Some(resolved_classname) = get_class_name_from_atomic(context.codebase, atomic) {
                     possible_types.push(resolved_classname);
-                } else if atomic.is_null() && is_directly_nullsafe {
+                } else if atomic.is_null() && is_directly_nullsafe && !null_is_short_circuit {
                     context.collector.report_with_code(
                         IssueCode::PossiblyNullPropertyAccess,
                         Issue::error("Attempting static access on a possibly `null` value.")
@@ -379,12 +383,12 @@ where
                                 Annotation::primary(expression.span())
                                     .with_message("This expression can be `null` here"),
                             )
-                            .with_note("PHP's nullsafe operator (`?->`) does not short-circuit static access (`::`).")
+                            .with_note("The nullsafe operator (`?->`) only skips the chain when its object is `null`; the member it reads can be `null` itself.")
                             .with_help(
                                 "Add a null check before the static access, or ensure the expression is never null.",
                             ),
                     );
-                } else if atomic.is_null() && expression_is_nullsafe(expression) {
+                } else if atomic.is_null() && (null_is_short_circuit || expression_is_nullsafe(expression)) {
                     // Nullsafe in chain short-circuits, skip error
                 } else if atomic.is_null() {
                     context.collector.report_with_code(
@@ -549,6 +553,9 @@ pub fn get_class_name_from_atomic(codebase: &CodebaseMetadata, atomic: &TAtomic)
                 } else {
                     return None; // This type cannot be interpreted as a class name.
                 }
+            }
+            TAtomic::Callable(callable) if callable.is_closure() => {
+                ResolvedClassname::new(Some(word("Closure")), ResolutionOrigin::Object { is_this: false }, true)
             }
             TAtomic::Mixed(_) => ResolvedClassname::new(None, ResolutionOrigin::Mixed, false),
             _ => {

@@ -5,6 +5,7 @@ use crate::ttype::comparator::generic_comparator::update_failed_result_from_nest
 use crate::ttype::comparator::union_comparator;
 use crate::ttype::get_arraykey;
 use crate::ttype::get_iterable_parameters;
+use crate::ttype::union::TUnion;
 
 pub fn is_contained_by(
     codebase: &CodebaseMetadata,
@@ -23,11 +24,17 @@ pub fn is_contained_by(
 
     // `iterable<V>` desugars to `iterable<mixed, V>` whose *array* arm is
     // `array<array-key, V>` (PHP arrays can only hold array-key keys).
-    if matches!(input_type_part, TAtomic::Iterable(_))
-        && matches!(container_type_part, TAtomic::Array(_))
-        && input_k.is_mixed()
-    {
-        input_k = get_arraykey();
+    if matches!(input_type_part, TAtomic::Iterable(_)) && matches!(container_type_part, TAtomic::Array(_)) {
+        if input_k.is_mixed() {
+            input_k = get_arraykey();
+        } else if input_k.types.iter().any(TAtomic::is_object_type) {
+            let keys: Vec<TAtomic> = input_k.types.iter().filter(|key| !key.is_object_type()).cloned().collect();
+            if keys.is_empty() {
+                return true;
+            }
+
+            input_k = TUnion::from_vec(keys);
+        }
     }
 
     let mut all_types_contain = true;

@@ -1290,7 +1290,7 @@ function dirname(string $path, int $levels = 1): string {}
 /**
  * @param 1|2|4|8|15 $flags
  *
- * @return ($flags is 15 ? array{dirname?: string, basename: string, extension?: string, filename: string} : string)
+ * @return ($flags is 15 ? ($path is non-empty-string ? array{dirname: string, basename: string, extension?: string, filename: string} : array{dirname?: string, basename: string, extension?: string, filename: string}) : string)
  */
 function pathinfo(string $path, int $flags = PATHINFO_ALL): array|string {}
 
@@ -1428,7 +1428,7 @@ function lcfirst(string $string): string {}
 function ucwords(string $string, string $separators = " \t\r\n\f\v"): string {}
 
 /**
- * @param string|array<string, string> $from
+ * @param string|array<array-key, scalar|Stringable|null> $from
  *
  * @pure
  */
@@ -1454,8 +1454,8 @@ function addcslashes(string $string, string $characters): string {}
 function rtrim(string $string, string $characters = " \n\r\t\v\0"): string {}
 
 /**
- * @param string|array<string> $search
- * @param string|array<string> $replace
+ * @param string|array<scalar|Stringable|null> $search
+ * @param string|array<scalar|Stringable|null> $replace
  * @param string|array<string> $subject
  *
  * @return ($subject is string ? string : (
@@ -1472,8 +1472,8 @@ function str_replace(
 ): array|string {}
 
 /**
- * @param string|array<string> $search
- * @param string|array<string> $replace
+ * @param string|array<scalar|Stringable|null> $search
+ * @param string|array<scalar|Stringable|null> $replace
  * @param string|array<string> $subject
  *
  * @return ($subject is string ? string : (
@@ -1809,10 +1809,14 @@ function fprintf($stream, string $format, mixed ...$values): int {}
  */
 function vfprintf($stream, string $format, array $values): int {}
 
+/**
+ * @param-out int|float|string|null $vars
+ */
 function sscanf(string $string, string $format, mixed &...$vars): array|int|null {}
 
 /**
  * @param resource $stream
+ * @param-out int|float|string|null $vars
  */
 function fscanf($stream, string $format, mixed &...$vars): array|int|false|null {}
 
@@ -1925,7 +1929,7 @@ function shell_exec(string $command): string|false|null {}
 function proc_open(
     array|string $command,
     array $descriptor_spec,
-    ?array &$pipes,
+    &$pipes,
     ?string $cwd = null,
     ?array $env_vars = null,
     ?array $options = null,
@@ -3258,18 +3262,20 @@ function socket_set_blocking($stream, bool $enable): bool {}
  * @param resource $stream
  *
  * @return array{
- *   timed_out: bool,
- *   blocked: bool,
- *   eof: bool,
+ *   timed_out?: bool,
+ *   blocked?: bool,
+ *   eof?: bool,
  *   unread_bytes: int,
  *   stream_type: string,
  *   wrapper_type?: string,
- *   wrapper_data: mixed,
+ *   wrapper_data?: mixed,
  *   mode: string,
  *   seekable: bool,
- *   uri: string,
- *   crypto: array,
- *   mediatype: string,
+ *   uri?: string,
+ *   crypto?: array{cipher_bits: int, cipher_name: string, cipher_version: string, protocol: string},
+ *   mediatype?: string,
+ *   charset?: string,
+ *   base64?: bool,
  * }
  */
 function stream_get_meta_data($stream): array {}
@@ -3460,14 +3466,8 @@ function scandir(string $directory, int $sorting_order = 0, $context = null): ar
  */
 function glob(string $pattern, int $flags = 0): array|false {}
 
-/**
- * @return int<1750595956, max>|false
- */
 function fileatime(string $filename): int|false {}
 
-/**
- * @return int<1750595956, max>|false
- */
 function filectime(string $filename): int|false {}
 
 /**
@@ -3480,9 +3480,6 @@ function filegroup(string $filename): int|false {}
  */
 function fileinode(string $filename): int|false {}
 
-/**
- * @return int<1750595956, max>|false
- */
 function filemtime(string $filename): int|false {}
 
 /**
@@ -3505,20 +3502,44 @@ function filesize(string $filename): int|false {}
  */
 function filetype(string $filename): string|false {}
 
+/**
+ * @assert-if-true =non-empty-string|Stringable $filename
+ */
 function file_exists(string $filename): bool {}
 
+/**
+ * @assert-if-true =non-empty-string|Stringable $filename
+ */
 function is_writable(string $filename): bool {}
 
+/**
+ * @assert-if-true =non-empty-string|Stringable $filename
+ */
 function is_writeable(string $filename): bool {}
 
+/**
+ * @assert-if-true =non-empty-string|Stringable $filename
+ */
 function is_readable(string $filename): bool {}
 
+/**
+ * @assert-if-true =non-empty-string|Stringable $filename
+ */
 function is_executable(string $filename): bool {}
 
+/**
+ * @assert-if-true =non-empty-string|Stringable $filename
+ */
 function is_file(string $filename): bool {}
 
+/**
+ * @assert-if-true =non-empty-string|Stringable $filename
+ */
 function is_dir(string $filename): bool {}
 
+/**
+ * @assert-if-true =non-empty-string|Stringable $filename
+ */
 function is_link(string $filename): bool {}
 
 /**
@@ -3771,13 +3792,12 @@ function array_pad(array $array, int $length, mixed $value): array {}
 function array_flip(array $array): array {}
 
 /**
- *
+ * @template K of array-key
  * @template V
  *
- * @param array<string, V> $array
- * @param int $case
+ * @param array<K, V> $array
  *
- * @return ($array is non-empty-array|non-empty-list ? non-empty-array<string, V> : array<string, V>)
+ * @return ($array is non-empty-array|non-empty-list ? non-empty-array<(K is int ? int : string), V> : array<(K is int ? int : string), V>)
  *
  * @pure
  */
@@ -4368,22 +4388,24 @@ function shuffle(array &$array): true {}
 function count(Countable|array $value, int $mode = COUNT_NORMAL): int {}
 
 /**
- * @template T
+ * @template K
+ * @template V
  *
- * @param object|array<T> $array
- * @param-out ($array is object ? object : ($array is list<T> ? list<T> : array<array-key, T>)) $array
+ * @param object|array<K, V> $array
+ * @param-out ($array is object ? object : ($array is list<V> ? list<V> : array<K, V>)) $array
  *
- * @return ($array is non-empty-array|non-empty-list ? T : false)
+ * @return ($array is non-empty-array|non-empty-list ? V : false)
  */
 function end(object|array &$array): mixed {}
 
 /**
- * @template T
+ * @template K
+ * @template V
  *
- * @param object|array<T> $array
- * @param-out ($array is object ? object : ($array is list<T> ? list<T> : array<array-key, T>)) $array
+ * @param object|array<K, V> $array
+ * @param-out ($array is object ? object : ($array is list<V> ? list<V> : array<K, V>)) $array
  *
- * @return T|false
+ * @return V|false
  */
 function prev(object|array &$array): mixed {}
 
@@ -4589,7 +4611,7 @@ function array_slice(array $array, int $offset, ?int $length = null, bool $prese
 function array_merge(array ...$arrays): array {}
 
 /**
- * @param (callable(string, null|int): string)|null $callback
+ * @param (callable(string, int): (string|false))|null $callback
  * @param-later-invoked-callable $callback
  */
 function ob_start(?callable $callback = null, int $chunk_size = 0, int $flags = PHP_OUTPUT_HANDLER_STDFLAGS): bool {}
@@ -4706,8 +4728,6 @@ function array_walk(object|array &$array, callable $callback, mixed $arg = null)
 function array_walk_recursive(object|array &$array, callable $callback, mixed $arg = null): true {}
 
 /**
- * @param array<string, mixed> $array
- *
  * @return int<0, max>
  */
 function extract(array $array, int $flags = EXTR_OVERWRITE, string $prefix = ''): int {}

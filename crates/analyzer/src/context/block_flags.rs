@@ -28,6 +28,7 @@ impl BlockContextFlags {
     pub const INSIDE_REFERENCE: u32 = 1 << 19;
     /// Set while analyzing the left side of `??`, which reads magic properties through `__get` without `__isset`.
     pub const INSIDE_COALESCE: u32 = 1 << 20;
+    pub const HAS_EXTRACTED_VARIABLES: u32 = 1 << 21;
 
     #[inline]
     pub const fn new() -> Self {
@@ -264,5 +265,15 @@ impl BlockContextFlags {
     #[inline]
     pub fn set_inside_coalesce(&mut self, value: bool) {
         self.set(Self::INSIDE_COALESCE, value);
+    }
+
+    #[inline(always)]
+    pub const fn has_extracted_variables(&self) -> bool {
+        self.contains(Self::HAS_EXTRACTED_VARIABLES)
+    }
+
+    #[inline]
+    pub fn set_has_extracted_variables(&mut self, value: bool) {
+        self.set(Self::HAS_EXTRACTED_VARIABLES, value);
     }
 }

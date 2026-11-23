@@ -92,10 +92,7 @@ class SimpleXMLElement implements Traversable, ArrayAccess, Countable, Iterator,
 
     public function valid(): bool {}
 
-    /**
-     * @return SimpleXMLElement|null
-     */
-    public function current(): ?static {}
+    public function current(): static {}
 
     public function key(): string {}
 

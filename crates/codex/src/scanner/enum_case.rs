@@ -1,5 +1,6 @@
 use mago_allocator::Arena;
 use mago_names::scope::NamespaceScope;
+use mago_phpdoc_syntax::cst::TagValue;
 use mago_span::HasSpan;
 use mago_syntax::cst::EnumCase;
 use mago_syntax::cst::EnumCaseItem;
@@ -12,6 +13,7 @@ use crate::metadata::enum_case::EnumCaseMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::scanner::Context;
 use crate::scanner::attribute::scan_attribute_lists;
+use crate::scanner::docblock::parse_docblock;
 use crate::scanner::inference::infer_with_class_constants;
 use crate::scanner::version_claim::evaluate_version_attributes;
 
@@ -31,10 +33,15 @@ where
     let span = case.span();
     let verdict = evaluate_version_attributes(&case.attribute_lists, context, context.php_version);
     let attributes = scan_attribute_lists(&case.attribute_lists, context, scope, Some(enum_name));
+    let is_deprecated =
+        attributes.iter().any(|attribute| attribute.name.as_bytes().eq_ignore_ascii_case(b"Deprecated"))
+            || parse_docblock(context, case)
+                .is_some_and(|document| document.tags().any(|tag| matches!(tag.value, TagValue::Deprecated(_))));
+    let deprecated_flag = if is_deprecated { MetadataFlags::DEPRECATED } else { MetadataFlags::empty() };
 
     match &case.item {
         EnumCaseItem::Unit(item) => {
-            let mut flags = MetadataFlags::UNIT_ENUM_CASE;
+            let mut flags = MetadataFlags::UNIT_ENUM_CASE | deprecated_flag;
             flags |= MetadataFlags::origin_flags(context.file.file_type);
 
             let mut meta = EnumCaseMetadata::new(word(item.name.value), item.name.span, span, flags);
@@ -45,7 +52,7 @@ where
             meta
         }
         EnumCaseItem::Backed(item) => {
-            let mut flags = MetadataFlags::BACKED_ENUM_CASE;
+            let mut flags = MetadataFlags::BACKED_ENUM_CASE | deprecated_flag;
             flags |= MetadataFlags::origin_flags(context.file.file_type);
 
             let mut meta = EnumCaseMetadata::new(word(item.name.value), item.name.span, span, flags);

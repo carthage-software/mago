@@ -176,7 +176,7 @@ pub(super) fn is_intersection_shallowly_contained_by(
 
     if codebase.is_instance_of(input_name.as_bytes(), container_name.as_bytes())
         || codebase.class_uses_trait(input_name.as_bytes(), container_name.as_bytes())
-        || codebase.class_uses_trait(container_name.as_bytes(), input_name.as_bytes())
+        || (!inside_assertion && codebase.class_uses_trait(container_name.as_bytes(), input_name.as_bytes()))
     {
         return true;
     }

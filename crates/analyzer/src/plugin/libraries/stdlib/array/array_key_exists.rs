@@ -58,18 +58,25 @@ impl FunctionReturnTypeProvider for ArrayKeyExistsProvider {
         for atomic in array_type.types.as_ref() {
             match atomic {
                 TAtomic::Array(TArray::Keyed(keyed)) => {
-                    if keyed.get_generic_parameters().is_some() {
-                        return None;
+                    match keyed.get_generic_parameters() {
+                        Some((key_parameter, _)) => {
+                            if !matches!(literal_key, ArrayKey::String(_))
+                                || key_parameter.types.iter().any(|key_atomic| !key_atomic.is_int())
+                            {
+                                return None;
+                            }
+                        }
+                        None if keyed.get_known_items().is_none() => return None,
+                        None => {}
                     }
 
-                    match keyed.get_known_items() {
-                        Some(known) if !known.contains_key(&literal_key) => {}
-                        _ => return None,
+                    if keyed.get_known_items().is_some_and(|known| known.contains_key(&literal_key)) {
+                        return None;
                     }
                 }
                 TAtomic::Array(TArray::List(list)) => {
                     let ArrayKey::Integer(i) = literal_key else {
-                        return None;
+                        continue;
                     };
 
                     if i < 0 {

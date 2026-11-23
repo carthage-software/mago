@@ -75,7 +75,7 @@ where
     pub(crate) fn parse_single_generic_parameter_or_none(
         &mut self,
     ) -> Result<Option<SingleGenericParameter<'arena>>, ParseError> {
-        if self.stream.is_at(TokenKind::LeftAngleBracket) {
+        if self.stream.is_at(TokenKind::LeftAngleBracket) && !self.stream.starts_line(0) {
             Ok(Some(self.parse_single_generic_parameter()?))
         } else {
             Ok(None)
@@ -83,7 +83,7 @@ where
     }
 
     pub(crate) fn parse_generic_parameters_or_none(&mut self) -> Result<Option<GenericParameters<'arena>>, ParseError> {
-        if self.stream.is_at(TokenKind::LeftAngleBracket) {
+        if self.stream.is_at(TokenKind::LeftAngleBracket) && !self.stream.starts_line(0) {
             Ok(Some(self.parse_generic_parameters()?))
         } else {
             Ok(None)

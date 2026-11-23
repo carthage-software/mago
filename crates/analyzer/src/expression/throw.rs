@@ -2,7 +2,6 @@ use mago_allocator::Arena;
 use std::rc::Rc;
 
 use mago_codex::ttype::TType;
-use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::get_never;
 use mago_reporting::Annotation;
@@ -19,6 +18,7 @@ use crate::context::block::PossiblyThrownGenericException;
 use crate::error::AnalysisError;
 use crate::utils::exception::get_throw_type_atomics;
 use crate::utils::exception::get_throw_type_object_names;
+use crate::utils::exception::is_structural_throw_type;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Throw<'arena> {
     fn analyze<'ctx, A>(
@@ -62,7 +62,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Throw<'arena> {
                 for thrown_atomic in get_throw_type_atomics(exception_atomic) {
                     if thrown_atomic.extends_or_implements(context.codebase, b"Throwable") {
                         let object_names = get_throw_type_object_names(context.codebase, &thrown_atomic);
-                        if matches!(&thrown_atomic, TAtomic::GenericParameter(_)) {
+                        if is_structural_throw_type(&thrown_atomic) {
                             let thrown_generic = PossiblyThrownGenericException {
                                 atomic_type: thrown_atomic,
                                 span: self.span(),

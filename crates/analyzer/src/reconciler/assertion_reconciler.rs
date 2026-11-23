@@ -792,7 +792,11 @@ fn specialize_from_ancestor(
     descendant: &TNamedObject,
     ancestor: &TNamedObject,
 ) -> Option<TNamedObject> {
-    if descendant.type_parameters.is_some() {
+    if descendant
+        .type_parameters
+        .as_ref()
+        .is_some_and(|parameters| !parameters.iter().all(TUnion::from_unspecified_template))
+    {
         return None;
     }
 
@@ -1103,11 +1107,12 @@ fn intersect_contained_atomic_with_another<A>(
 where
     A: Arena,
 {
-    if let TAtomic::Object(TObject::Enum(TEnum { case: Some(_), .. })) = sub_atomic {
-        return Some(sub_atomic.clone());
-    }
-
     let TAtomic::Object(TObject::Named(named_object)) = sub_atomic else {
+        if let TAtomic::Object(TObject::Enum(TEnum { case: Some(_), .. })) = sub_atomic {
+            return intersect_generic_constraint_with_object(context, super_atomic, sub_atomic)
+                .unwrap_or_else(|| Some(sub_atomic.clone()));
+        }
+
         return Some(sub_atomic.clone());
     };
 
@@ -1185,22 +1190,37 @@ where
         )));
     }
 
+    intersect_generic_constraint_with_object(context, super_atomic, sub_atomic)
+        .unwrap_or_else(|| Some(sub_atomic.clone()))
+}
+
+fn intersect_generic_constraint_with_object<A>(
+    context: &mut Context<'_, '_, A>,
+    super_atomic: &TAtomic,
+    sub_atomic: &TAtomic,
+) -> Option<Option<TAtomic>>
+where
+    A: Arena,
+{
+    let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = super_atomic else {
+        return None;
+    };
+
+    if !constraint.has_object_type() {
+        return None;
+    }
+
     let mut first_type_atomic = super_atomic.clone();
     if let TAtomic::GenericParameter(TGenericParameter { constraint: first_type_constraint, .. }) =
         &mut first_type_atomic
-        && first_type_constraint.has_object_type()
     {
-        let first_type_as = intersect_union_with_atomic(context, first_type_constraint, sub_atomic);
-
-        {
-            let first_type_as = first_type_as?;
-            *Arc::make_mut(first_type_constraint) = first_type_as;
+        match intersect_union_with_atomic(context, constraint, sub_atomic) {
+            Some(first_type_as) => *Arc::make_mut(first_type_constraint) = first_type_as,
+            None => return Some(None),
         }
-
-        return Some(first_type_atomic);
     }
 
-    Some(sub_atomic.clone())
+    Some(Some(first_type_atomic))
 }
 
 fn get_missing_type(assertion: &Assertion, key: Option<&[u8]>, inside_loop: bool) -> TUnion {
@@ -1384,6 +1404,9 @@ where
             TAtomic::Scalar(TScalar::Bool(TBool { value: None })) if is_loose_equality => {
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
+            TAtomic::Null if is_loose_equality && assertion_integer == 0 => {
+                acceptable_types.push(existing_var_atomic_type.clone());
+            }
             TAtomic::GenericParameter(generic_parameter) => {
                 did_remove_type = true;
                 let get_int_literal = || TUnion::from_atomic(literal_asserted_type.clone());
@@ -1469,6 +1492,9 @@ where
                 if is_loose_equality
                     && scalars_can_be_identical_with_coercion(existing_var_atomic_type, &literal_asserted_type) =>
             {
+                acceptable_types.push(existing_var_atomic_type.clone());
+            }
+            TAtomic::Null if is_loose_equality && assertion_str_val.is_empty() => {
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::GenericParameter(generic_parameter) => {
@@ -1609,6 +1635,23 @@ where
 
                 return TUnion::from_atomic(asserted_atomic);
             }
+            TAtomic::GenericParameter(generic_parameter) => {
+                let get_literal = || TUnion::from_atomic(asserted_atomic.clone());
+                if let Some(atomic) = map_generic_constraint_or_else(generic_parameter, get_literal, |constraint| {
+                    handle_literal_equality_with_class_string(
+                        context,
+                        assertion,
+                        assertion_class_string_val,
+                        constraint,
+                        None,
+                        old_var_type_atom,
+                        None,
+                        negated,
+                    )
+                }) {
+                    return TUnion::from_atomic(atomic);
+                }
+            }
             _ => {}
         }
     }
@@ -1638,7 +1681,9 @@ where
     let literal_asserted_type = TAtomic::Scalar(TScalar::literal_float(assertion_float_val));
     let is_loose_equality = matches!(assertion, Assertion::IsEqual(_));
 
-    if existing_var_type.has_scalar() || existing_var_type.has_numeric() || existing_var_type.has_mixed() {
+    if (existing_var_type.has_scalar() || existing_var_type.has_numeric() || existing_var_type.has_mixed())
+        && !existing_var_type.types.iter().any(|atomic| matches!(atomic, TAtomic::GenericParameter(_)))
+    {
         return if is_loose_equality { existing_var_type.clone() } else { TUnion::from_atomic(literal_asserted_type) };
     }
 

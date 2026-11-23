@@ -889,7 +889,18 @@ where
         prop_name,
         true, // `instance_access`
         block_context.scope.get_class_like_name(),
-    );
+    )
+    .filter(|resolution| {
+        !has_magic_method
+            || resolution.is_magic()
+            || resolution.property.flags.is_static()
+            || is_visible_from_scope(
+                context.codebase,
+                resolution.property.read_visibility,
+                resolution.declaring_class.name.as_bytes(),
+                block_context.scope.get_class_like_name(),
+            )
+    });
 
     let Some(resolution) = resolution else {
         for required_class in class_metadata.require_extends.iter().chain(class_metadata.require_implements.iter()) {

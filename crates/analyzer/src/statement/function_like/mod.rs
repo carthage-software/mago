@@ -12,6 +12,7 @@ use mago_word::word;
 
 use mago_codex::context::ScopeContext;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::metadata::parameter::FunctionLikeParameterMetadata;
@@ -241,21 +242,29 @@ where
 
     if let Some(effective_return) = &function_like_metadata.return_type_metadata
         && effective_return.from_docblock
+        && !effective_return.inferred
         && let Some(native_return) = &function_like_metadata.return_type_declaration_metadata
     {
-        let expanded_docblock =
-            expand_type_metadata(context, block_context, &mut artifacts, function_like_metadata, effective_return);
+        let expanded_docblock = expand_type_metadata_with(
+            context,
+            block_context,
+            &mut artifacts,
+            function_like_metadata,
+            effective_return,
+            true,
+        );
         let expanded_native =
             expand_type_metadata(context, block_context, &mut artifacts, function_like_metadata, native_return);
 
-        let is_compatible = union_comparator::is_contained_by_with_erased_template_arguments(
+        let mut docblock_atomics = Vec::with_capacity(expanded_docblock.types.len());
+        flatten_template_conditionals(context.codebase, &expanded_docblock, &mut docblock_atomics);
+
+        if !union_comparator::is_contained_by_with_erased_template_arguments(
             context.codebase,
-            &expanded_docblock,
+            &expanded_docblock.clone_with_types(docblock_atomics),
             &expanded_native,
             &mut ComparisonResult::default(),
-        );
-
-        if !is_compatible {
+        ) {
             let docblock_type_str = effective_return.type_union.get_id();
             let native_type_str = native_return.type_union.get_id();
 
@@ -353,7 +362,7 @@ where
     if let Some(function_metadata) = block_context.scope.get_function_like()
         && !block_context.flags.has_returned()
         && let Some(return_type) = &function_metadata.return_type_metadata
-        && !return_type.type_union.is_void()
+        && !return_type.type_union.types.iter().any(TAtomic::is_void)
         && !function_like_metadata.flags.has_yield()
         && !function_like_metadata
             .return_type_declaration_metadata
@@ -487,6 +496,7 @@ where
                 expand_type_metadata(context, block_context, artifacts, function_like_metadata, parameter_type);
 
             if parameter_type.from_docblock
+                && !parameter_type.inferred
                 && let Some(native_type) = parameter_metadata.get_type_declaration_metadata()
             {
                 let expanded_native =
@@ -590,7 +600,14 @@ where
         let declared_type_is_specific = parameter_metadata.get_type_metadata().is_some_and(|tm| {
             let union = &tm.type_union;
 
-            !union.is_vanilla_array() && !union.is_vanilla_mixed()
+            !union.is_vanilla_array()
+                && !union.is_vanilla_mixed()
+                && !matches!(
+                    union.types.as_ref(),
+                    [TAtomic::Iterable(iterable)] if iterable.key_type.is_vanilla_mixed()
+                        && iterable.value_type.is_vanilla_mixed()
+                        && iterable.intersection_types.is_none()
+                )
         });
 
         let mut final_parameter_type = if declared_type_is_specific {
@@ -732,6 +749,20 @@ fn expand_type_metadata<'ctx, A>(
 where
     A: Arena,
 {
+    expand_type_metadata_with(context, block_context, artifacts, function_like_metadata, type_metadata, false)
+}
+
+fn expand_type_metadata_with<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
+    block_context: &BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    function_like_metadata: &FunctionLikeMetadata,
+    type_metadata: &TypeMetadata,
+    preserve_template_conditionals: bool,
+) -> TUnion
+where
+    A: Arena,
+{
     add_symbol_references(&type_metadata.type_union, &block_context.scope, artifacts);
 
     let mut signature_union = type_metadata.type_union.clone();
@@ -753,11 +784,62 @@ where
             } else {
                 false
             },
+            preserve_template_conditionals,
             ..Default::default()
         },
     );
 
     signature_union
+}
+
+fn flatten_template_conditionals(codebase: &CodebaseMetadata, union: &TUnion, atomics: &mut Vec<TAtomic>) {
+    for atomic in union.types.iter() {
+        let TAtomic::Conditional(conditional) = atomic else {
+            atomics.push(atomic.clone());
+            continue;
+        };
+
+        let narrowed = match conditional.subject.types.as_ref() {
+            [TAtomic::GenericParameter(parameter)]
+                if union_comparator::is_contained_by(
+                    codebase,
+                    &conditional.target,
+                    &parameter.constraint,
+                    false,
+                    false,
+                    false,
+                    &mut ComparisonResult::default(),
+                ) =>
+            {
+                Some(parameter)
+            }
+            _ => None,
+        };
+
+        for (branch, narrows) in
+            [(&conditional.then, !conditional.negated), (&conditional.otherwise, conditional.negated)]
+        {
+            let Some(parameter) = narrowed.filter(|_| narrows) else {
+                flatten_template_conditionals(codebase, branch, atomics);
+                continue;
+            };
+
+            let mut narrowed_types = Vec::with_capacity(branch.types.len());
+            for atomic in branch.types.iter() {
+                match atomic {
+                    TAtomic::GenericParameter(branch_parameter)
+                        if branch_parameter.parameter_name == parameter.parameter_name
+                            && branch_parameter.defining_entity == parameter.defining_entity =>
+                    {
+                        narrowed_types.extend(conditional.target.types.iter().cloned());
+                    }
+                    _ => narrowed_types.push(atomic.clone()),
+                }
+            }
+
+            flatten_template_conditionals(codebase, &branch.clone_with_types(narrowed_types), atomics);
+        }
+    }
 }
 
 pub(super) fn add_properties_to_context<'ctx, A>(

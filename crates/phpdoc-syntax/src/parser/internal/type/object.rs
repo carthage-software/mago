@@ -16,7 +16,7 @@ where
 {
     pub(crate) fn parse_object_type(&mut self) -> Result<Type<'arena>, ParseError> {
         let keyword = self.parse_keyword()?;
-        if !self.stream.is_at(TokenKind::LeftBrace) {
+        if !self.is_at_shape_brace() {
             return Ok(Type::Object(ObjectType { keyword, properties: None }));
         }
 

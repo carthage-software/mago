@@ -22,6 +22,7 @@ use mago_syntax::cst::Statement;
 use mago_syntax::cst::Variable;
 use mago_syntax::cst::WhileBody;
 
+use crate::internal::checker::check_this_variable;
 use crate::internal::context::Context;
 
 mod parameter;
@@ -348,6 +349,12 @@ pub fn check_closure<'arena>(closure: &Closure<'arena>, context: &mut Context<'_
                 )
                 .with_help("Remove the `static` keyword or avoid using `$this` in the closure body."),
         );
+    }
+
+    if let Some(use_clause) = &closure.use_clause {
+        for variable in &use_clause.variables {
+            check_this_variable(&variable.variable, "Cannot use `$this` as a lexical variable.", context);
+        }
     }
 
     if !context.version.is_supported(Feature::TrailingCommaInClosureUseList)

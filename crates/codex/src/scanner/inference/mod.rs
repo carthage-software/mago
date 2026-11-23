@@ -206,6 +206,7 @@ pub fn get_platform_constant_type(name: &[u8]) -> Option<TUnion> {
         | b"PHP_VERSION"
         | b"PHP_SAPI"
         | b"PHP_SYSCONFDIR"
+        | b"PASSWORD_ARGON2_PROVIDER"
         | b"ICONV_IMPL"
         | b"LIBXML_DOTTED_VERSION"
         | b"LIBXML_LOADED_VERSION"

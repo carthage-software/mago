@@ -327,6 +327,8 @@ namespace {
         public ?DOMElement $parentElement;
 
         /**
+         * @var DOMNodeList<DOMNode>
+         *
          * @readonly
          */
         public DOMNodeList $childNodes;

@@ -650,18 +650,22 @@ where
             &mut arm_referenced_ids,
         );
 
+        arm_body_context.clauses.clone_from(&combined_clauses);
         if !reconcilable_types.is_empty() {
+            let mut changed_variable_ids = WordSet::default();
             reconcile_keyed_types(
                 self.context,
                 &reconcilable_types,
                 active_types,
                 &mut arm_body_context,
-                &mut WordSet::default(),
+                &mut changed_variable_ids,
                 &arm_referenced_ids,
                 &arm_condition.span(),
                 false,
                 false,
             );
+
+            BlockContext::retain_unreconciled_clauses(&mut arm_body_context.clauses, &changed_variable_ids);
         }
 
         for condition in &expression_arm.conditions {

@@ -362,23 +362,23 @@ pub fn reconcile_keyed_types<'ctx, A>(
                     negated,
                 );
 
-                if let Some(entry_type) = optional_entry_type {
-                    adjust_array_type(
+                match optional_entry_type {
+                    Some(Some(entry_type)) => adjust_array_type(
                         borrow_path_parts(key_str),
                         block_context,
                         changed_var_ids,
                         &entry_type,
                         context.codebase,
                         true,
-                    );
-                } else {
-                    adjust_array_type_for_missing_key(
+                    ),
+                    Some(None) => {}
+                    None => adjust_array_type_for_missing_key(
                         borrow_path_parts(key_str),
                         block_context,
                         changed_var_ids,
                         context.codebase,
                         has_inverted_isset && !has_inverted_key_exists,
-                    );
+                    ),
                 }
             } else if memchr::memmem::find(key_str, b"->").is_some() && !is_equality {
                 adjust_object_property_type(
@@ -528,7 +528,7 @@ fn reconcile_optional_entry_type<A>(
     inside_loop: bool,
     span: &Span,
     negated: bool,
-) -> Option<TUnion>
+) -> Option<Option<TUnion>>
 where
     A: Arena,
 {
@@ -574,11 +574,11 @@ where
         }
     }
 
-    if !saw_mixed_disjunction {
+    if !saw_mixed_disjunction || result.as_ref().is_none_or(TUnion::is_never) {
         return None;
     }
 
-    result.filter(|entry_type| !entry_type.is_never() && !entry_type.is_mixed())
+    Some(result.filter(|entry_type| !entry_type.is_mixed()))
 }
 
 pub(crate) fn resolve_literal_array_key(array_key: &[u8]) -> Option<ArrayKey> {
@@ -703,7 +703,8 @@ fn adjust_array_type(
                 }));
             }
             _ => {
-                if base_atomic_type.is_object_type()
+                if optional
+                    || base_atomic_type.is_object_type()
                     || base_atomic_type.is_string()
                     || base_atomic_type.is_generic_parameter()
                     || matches!(base_atomic_type, TAtomic::Variable(_))
@@ -1432,6 +1433,8 @@ where
                         } else {
                             new_base_type_candidate = get_mixed();
                         }
+                    } else if has_isset && existing_key_type_part.is_mixed() {
+                        return Some(get_mixed());
                     } else {
                         continue;
                     }

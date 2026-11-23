@@ -424,6 +424,20 @@ fn collect_inheritance_work(
                 (std::cmp::Reverse(depth), *interface)
             });
         }
+        if let Some(first) = candidates.first().or_else(|| interfaces.first()).copied()
+            && let Some(first_method) = codebase.function_likes.get(&(first, *method_name))
+            && has_docblock_types(first_method)
+            && interfaces.iter().any(|other| {
+                *other != first
+                    && !codebase.is_instance_of(first.as_bytes(), other.as_bytes())
+                    && codebase.function_likes.get(&(*other, *method_name)).is_some_and(|other_method| {
+                        has_docblock_types(other_method) && !documents_same_signature(first_method, other_method)
+                    })
+            })
+        {
+            continue;
+        }
+
         candidates.extend(interfaces);
 
         candidates.extend(
@@ -441,6 +455,42 @@ fn collect_inheritance_work(
             inheritance_work.push((depth, class_name, *method_name, parent_class, parent_method));
         }
     }
+}
+
+fn docblock_fits_native(docblock: Option<&TypeMetadata>, native: Option<&TUnion>, codebase: &CodebaseMetadata) -> bool {
+    let (Some(docblock), Some(native)) = (docblock, native) else {
+        return true;
+    };
+
+    docblock.type_union.has_template_types()
+        || docblock.type_union.is_expandable()
+        || union_comparator::is_contained_by(
+            codebase,
+            &docblock.type_union,
+            native,
+            false,
+            false,
+            false,
+            &mut ComparisonResult::new(),
+        )
+}
+
+fn has_docblock_types(method: &FunctionLikeMetadata) -> bool {
+    method.return_type_metadata.as_ref().is_some_and(|metadata| metadata.from_docblock)
+        || method
+            .parameters
+            .iter()
+            .any(|parameter| parameter.get_type_metadata().is_some_and(|metadata| metadata.from_docblock))
+}
+
+fn documents_same_signature(first: &FunctionLikeMetadata, second: &FunctionLikeMetadata) -> bool {
+    first.parameters.len() == second.parameters.len()
+        && first.parameters.iter().zip(&second.parameters).all(|(first_parameter, second_parameter)| {
+            first_parameter.get_type_metadata().map(|metadata| &metadata.type_union)
+                == second_parameter.get_type_metadata().map(|metadata| &metadata.type_union)
+        })
+        && first.return_type_metadata.as_ref().map(|metadata| &metadata.type_union)
+            == second.return_type_metadata.as_ref().map(|metadata| &metadata.type_union)
 }
 
 struct MethodInheritance {
@@ -701,15 +751,18 @@ fn resolve_method_inheritance(
                     return false;
                 };
 
+                let parent_docblock = parent_param.type_metadata.as_ref().filter(|m| m.from_docblock);
+                let child_native = child_param.type_declaration_metadata.as_ref().map(|m| &m.type_union);
+
                 should_inherit_docblock_type(
                     parent_param.type_declaration_metadata.as_ref().map(|m| &m.type_union),
-                    parent_param.type_metadata.as_ref().filter(|m| m.from_docblock),
-                    child_param.type_declaration_metadata.as_ref().map(|m| &m.type_union),
+                    parent_docblock,
+                    child_native,
                     child_param.type_metadata.as_ref().filter(|m| m.from_docblock),
                     false,
                     has_explicit_inherit_doc,
                     codebase,
-                )
+                ) && docblock_fits_native(parent_docblock, child_native, codebase)
             })
             .collect();
 

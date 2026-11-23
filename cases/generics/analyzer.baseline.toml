@@ -11,11 +11,6 @@ start_line = 12
 end_line = 12
 
 [[entries."src/bound_implements_violation.php".issues]]
-code = "docblock-type-mismatch"
-start_line = 15
-end_line = 15
-
-[[entries."src/bound_implements_violation.php".issues]]
 code = "invalid-template-parameter"
 start_line = 13
 end_line = 13

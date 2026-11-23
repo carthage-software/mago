@@ -528,15 +528,13 @@ fn scrape_type_properties(
                 return;
             }
 
-            let has_non_truthy = combination.value_types.values().any(|v| !v.is_truthy())
-                || combination.literal_strings.iter().any(|s| s.is_empty() || s.as_bytes() == b"0");
+            let has_non_truthy = combination.value_types.values().any(|v| !v.is_truthy() && !v.is_never())
+                || combination.literal_strings.iter().any(|s| s.is_empty() || s.as_bytes() == b"0")
+                || combination.integers.iter().any(|integer| !TAtomic::Scalar(TScalar::Integer(*integer)).is_truthy())
+                || combination.literal_floats.iter().any(|float| float.0 == 0.0)
+                || has_array_or_derived_types(combination);
 
-            if has_non_truthy {
-                combination.flags.insert(CombinationFlags::GENERIC_MIXED);
-                return;
-            }
-
-            combination.flags.set_truthy_mixed(Some(true));
+            combination.flags.set_truthy_mixed(Some(!has_non_truthy));
         } else {
             combination.flags.set_truthy_mixed(Some(false));
         }
@@ -559,7 +557,12 @@ fn scrape_type_properties(
             }
 
             let has_non_falsy = combination.value_types.values().any(|v| !v.is_falsy())
-                || combination.literal_strings.iter().any(|s| !s.is_empty() && s.as_bytes() != b"0");
+                || combination.literal_strings.iter().any(|s| !s.is_empty() && s.as_bytes() != b"0")
+                || combination.integers.iter().any(|integer| !TAtomic::Scalar(TScalar::Integer(*integer)).is_falsy())
+                || combination.literal_floats.iter().any(|float| float.0 != 0.0)
+                || !combination.enum_names.is_empty()
+                || !combination.object_type_params.is_empty()
+                || has_array_or_derived_types(combination);
 
             if has_non_falsy {
                 combination.flags.insert(CombinationFlags::GENERIC_MIXED);
@@ -1632,6 +1635,17 @@ fn flush_sealed_keyed_arrays_into_combination(
 }
 
 const COMBINER_KEY_STACK_BUF: usize = 256;
+
+fn has_array_or_derived_types(combination: &TypeCombination) -> bool {
+    combination.flags.contains(CombinationFlags::HAS_EMPTY_ARRAY)
+        || combination.flags.contains(CombinationFlags::HAS_KEYED_ARRAY)
+        || !combination.keyed_array_entries.is_empty()
+        || !combination.list_array_entries.is_empty()
+        || combination.keyed_array_parameters.is_some()
+        || combination.list_array_parameter.is_some()
+        || !combination.sealed_arrays.is_empty()
+        || !combination.derived_types.is_empty()
+}
 
 fn get_combiner_key(name: Word, type_params: &[TUnion], codebase: &CodebaseMetadata) -> Word {
     let covariants = if let Some(class_like_metadata) = codebase.get_class_like(name.as_bytes()) {

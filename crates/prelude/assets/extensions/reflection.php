@@ -1438,7 +1438,7 @@ class ReflectionClass implements Reflector
     /**
      * @pure
      *
-     * @assert-if-true T $object
+     * @assert-if-true =T $object
      */
     public function isInstance(object $object): bool {}
 

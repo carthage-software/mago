@@ -169,7 +169,7 @@ enum NodeKind: string
     case LiteralString = 'LiteralString';
     case MagicConstant = 'MagicConstant';
     case Modifier = 'Modifier';
-    case Namespace = 'Namespace';
+    case Namespace_ = 'Namespace';
     case NamespaceBody = 'NamespaceBody';
     case NamespaceImplicitBody = 'NamespaceImplicitBody';
     case Assignment = 'Assignment';

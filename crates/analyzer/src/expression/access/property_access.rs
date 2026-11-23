@@ -12,8 +12,10 @@ use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::expand_union;
 use mago_codex::ttype::get_mixed;
+use mago_codex::ttype::get_mixed_maybe_from_loop;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_null;
+use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::ClassLikeMemberSelector;
@@ -173,6 +175,10 @@ where
         if resolution_result.has_invalid_path || resolution_result.encountered_null {
             resulting_expression_type =
                 Some(add_optional_union_type(get_null(), resulting_expression_type.as_ref(), context.codebase));
+        }
+
+        if resolution_result.encountered_mixed && is_isset_from_loop_mixed(artifacts.get_expression_type(object)) {
+            resulting_expression_type = Some(get_mixed_maybe_from_loop(true));
         }
     }
 
@@ -384,6 +390,10 @@ where
     }
 
     Ok(())
+}
+
+pub(crate) fn is_isset_from_loop_mixed(object_type: Option<&TUnion>) -> bool {
+    object_type.is_some_and(|object_type| object_type.types.iter().all(TAtomic::is_mixed_isset_from_loop))
 }
 
 #[cfg(test)]
