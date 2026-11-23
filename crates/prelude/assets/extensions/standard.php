@@ -4462,11 +4462,11 @@ function min(mixed $value, mixed ...$values): mixed {}
 function max(mixed $value, mixed ...$values): mixed {}
 
 /**
- * Restrict `$num` to the inclusive range `[$min, $max]`.
+ * Restrict `$value` to the inclusive range `[$min, $max]`.
  *
- * @template T of int|float
+ * @template T
  *
- * @param T $num
+ * @param T $value
  * @param T $min
  * @param T $max
  *
@@ -4475,7 +4475,7 @@ function max(mixed $value, mixed ...$values): mixed {}
  * @pure
  */
 #[Mago\AvailableSince(80600)]
-function clamp(int|float $num, int|float $min, int|float $max): int|float {}
+function clamp(mixed $value, mixed $min, mixed $max): mixed {}
 
 /**
  * @template T

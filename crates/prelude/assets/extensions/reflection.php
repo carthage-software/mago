@@ -659,13 +659,13 @@ class ReflectionProperty implements Reflector
      * @param T $object
      */
     #[Mago\AvailableSince(80600)]
-    public function isReadable(?object $object = null): bool {}
+    public function isReadable(?string $scope, ?object $object = null): bool {}
 
     /**
      * @param T $object
      */
     #[Mago\AvailableSince(80600)]
-    public function isWriteable(?object $object = null): bool {}
+    public function isWritable(?string $scope, ?object $object = null): bool {}
 }
 
 final class ReflectionReference
