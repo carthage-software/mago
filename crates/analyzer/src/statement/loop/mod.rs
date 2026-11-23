@@ -2058,10 +2058,33 @@ impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for ShortCircuitedVariables {
     }
 }
 
-pub(super) fn is_always_true_literal(expression: &Expression<'_>) -> bool {
+pub(super) fn is_always_true_condition<A>(context: &Context<'_, '_, A>, expression: &Expression<'_>) -> bool
+where
+    A: Arena,
+{
     match expression {
+        Expression::Parenthesized(parenthesized) => is_always_true_condition(context, parenthesized.expression),
+        Expression::UnaryPrefix(UnaryPrefix {
+            operator: UnaryPrefixOperator::Negation(_) | UnaryPrefixOperator::Plus(_),
+            operand,
+        }) => {
+            matches!(operand, Expression::Literal(Literal::Integer(_) | Literal::Float(_)))
+                && is_always_true_condition(context, operand)
+        }
         Expression::Literal(Literal::True(_)) => true,
-        Expression::Literal(Literal::Integer(integer)) => integer.value.is_none_or(|value| value > 0),
+        Expression::Literal(Literal::Integer(integer)) => integer.value != Some(0),
+        Expression::Literal(Literal::Float(float)) => *float.value != 0.0,
+        Expression::Literal(Literal::String(string)) => string.value.is_some_and(|value| !matches!(value, b"" | b"0")),
+        Expression::ConstantAccess(constant) => context
+            .codebase
+            .get_constant(context.resolved_names.get(constant))
+            .or_else(|| {
+                (constant.name.is_local() && !context.resolved_names.is_imported(&constant.name))
+                    .then(|| context.codebase.get_constant(constant.name.value()))
+                    .flatten()
+            })
+            .and_then(|metadata| metadata.inferred_type.as_ref())
+            .is_some_and(TUnion::is_always_truthy),
         _ => false,
     }
 }

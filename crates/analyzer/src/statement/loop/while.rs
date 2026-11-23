@@ -28,7 +28,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for While<'arena> {
             &[],
             self.body.statements(),
             self.span(),
-            r#loop::is_always_true_literal(self.condition),
+            r#loop::is_always_true_condition(context, self.condition),
         )
     }
 }
