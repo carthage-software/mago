@@ -268,9 +268,15 @@ const PNG_FILTER_PAETH = 128;
 /** @var int */
 const PNG_ALL_FILTERS = 248;
 
-final class GdImage {}
+final class GdImage
+{
+    private function __construct() {}
+}
 
-final class GdFont {}
+final class GdFont
+{
+    private function __construct() {}
+}
 
 function gd_info(): array {}
 

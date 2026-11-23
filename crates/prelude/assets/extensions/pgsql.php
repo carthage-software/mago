@@ -897,9 +897,18 @@ namespace {
 }
 
 namespace PgSql {
-    final class Connection {}
+    final class Connection
+    {
+        private function __construct() {}
+    }
 
-    final class Result {}
+    final class Result
+    {
+        private function __construct() {}
+    }
 
-    final class Lob {}
+    final class Lob
+    {
+        private function __construct() {}
+    }
 }

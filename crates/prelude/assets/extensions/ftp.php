@@ -202,5 +202,8 @@ namespace {
 }
 
 namespace FTP {
-    final class Connection {}
+    final class Connection
+    {
+        private function __construct() {}
+    }
 }

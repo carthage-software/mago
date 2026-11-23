@@ -86,7 +86,10 @@ namespace FFI {
 
     class ParserException extends Exception {}
 
-    final class CData {}
+    final class CData
+    {
+        private function __construct() {}
+    }
 
     final class CType
     {

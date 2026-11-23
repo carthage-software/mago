@@ -15,4 +15,7 @@ function shmop_write(Shmop $shmop, string $data, int $offset): int {}
 
 function shmop_delete(Shmop $shmop): bool {}
 
-final class Shmop {}
+final class Shmop
+{
+    private function __construct() {}
+}

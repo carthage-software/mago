@@ -1,6 +1,9 @@
 <?php
 
-final class XMLParser {}
+final class XMLParser
+{
+    private function __construct() {}
+}
 
 /**
  * @pure

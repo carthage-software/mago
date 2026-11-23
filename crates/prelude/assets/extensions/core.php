@@ -384,7 +384,7 @@ interface Countable
  */
 final class WeakReference
 {
-    public function __construct() {}
+    private function __construct() {}
 
     /**
      * @template Input of object

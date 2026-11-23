@@ -905,6 +905,8 @@ function sapi_windows_generate_ctrl_event(int $event, int $pid = 0): bool {}
  */
 final class Generator implements Iterator
 {
+    private function __construct() {}
+
     /**
      * @return ?TValue
      *

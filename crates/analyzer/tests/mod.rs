@@ -3720,6 +3720,7 @@ test_case!(nested_loops_in_template_function);
 test_case!(loop_with_truthy_literal_condition_exits_only_by_break);
 test_case!(many_literal_strings_keep_non_empty);
 test_case!(array_product_return_types);
+test_case!(new_of_internal_classes_that_cannot_be_constructed, expected_issue_counts = [("invalid-method-access", 11), ("extend-final-class", 1)]);
 
 #[test]
 #[cfg_attr(miri, ignore)]

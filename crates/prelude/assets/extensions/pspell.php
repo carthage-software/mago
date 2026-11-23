@@ -1,9 +1,15 @@
 <?php
 
 namespace PSpell {
-    final class Dictionary {}
+    final class Dictionary
+    {
+        private function __construct() {}
+    }
 
-    final class Config {}
+    final class Config
+    {
+        private function __construct() {}
+    }
 }
 
 namespace {

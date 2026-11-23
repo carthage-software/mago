@@ -1,9 +1,15 @@
 <?php
 
 namespace Soap {
-    final class Url {}
+    final class Url
+    {
+        private function __construct() {}
+    }
 
-    final class Sdl {}
+    final class Sdl
+    {
+        private function __construct() {}
+    }
 }
 
 namespace {

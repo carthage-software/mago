@@ -135,9 +135,15 @@ const ZLIB_BUF_ERROR = UNKNOWN;
  */
 const ZLIB_VERSION_ERROR = UNKNOWN;
 
-final class InflateContext {}
+final class InflateContext
+{
+    private function __construct() {}
+}
 
-final class DeflateContext {}
+final class DeflateContext
+{
+    private function __construct() {}
+}
 
 function ob_gzhandler(string $data, int $flags): string|false {}
 

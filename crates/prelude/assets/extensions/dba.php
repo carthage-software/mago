@@ -1,7 +1,10 @@
 <?php
 
 namespace Dba {
-    final class Connection {}
+    final class Connection
+    {
+        private function __construct() {}
+    }
 }
 
 namespace {

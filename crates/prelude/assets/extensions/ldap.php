@@ -506,9 +506,18 @@ namespace {
 }
 
 namespace LDAP {
-    final class Connection {}
+    final class Connection
+    {
+        private function __construct() {}
+    }
 
-    final class Result {}
+    final class Result
+    {
+        private function __construct() {}
+    }
 
-    final class ResultEntry {}
+    final class ResultEntry
+    {
+        private function __construct() {}
+    }
 }
