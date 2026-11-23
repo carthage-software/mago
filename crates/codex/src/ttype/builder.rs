@@ -365,21 +365,7 @@ pub fn get_union_from_type(
             TAtomic::Object(TObject::Named(TNamedObject::new(word("Closure")))),
             TAtomic::Object(TObject::new_has_method(word("__invoke"))),
         ]),
-        Type::CallableArray(_) => wrap_atomic(TAtomic::Array(TArray::List(TList {
-            element_type: Arc::new(get_never()),
-            known_elements: Some(Arc::new(BTreeMap::from([
-                (
-                    0,
-                    (
-                        false,
-                        TUnion::from_vec(vec![TAtomic::Object(TObject::Any), TAtomic::Scalar(TScalar::class_string())]),
-                    ),
-                ),
-                (1, (false, get_non_empty_string())),
-            ]))),
-            known_count: None,
-            non_empty: true,
-        }))),
+        Type::CallableArray(_) => wrap_atomic(get_callable_array()),
         Type::StringableObject(_) => {
             wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(word("Stringable")))))
         }

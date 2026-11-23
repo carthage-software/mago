@@ -31,6 +31,7 @@ use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_arraykey;
+use mago_codex::ttype::get_callable_array;
 use mago_codex::ttype::get_closed_resource;
 use mago_codex::ttype::get_float;
 use mago_codex::ttype::get_mixed;
@@ -2005,10 +2006,34 @@ where
             countable_types.push(TAtomic::Object(TObject::Named(countable)));
 
             redundant = false;
+        } else if let TAtomic::Callable(_) = atomic {
+            countable_types.push(get_callable_array());
+
+            let mut countable = TNamedObject::new(word("Countable"));
+            countable.add_intersection_type(atomic.clone());
+            countable_types.push(TAtomic::Object(TObject::Named(countable)));
+
+            redundant = false;
         } else if let TAtomic::Iterable(iterable) = atomic {
-            if iterable.key_type.is_array_key() || iterable.key_type.is_int() || iterable.key_type.is_any_string() {
+            let key_type = iterable.get_key_type();
+            let array_key_type = if key_type.is_mixed() {
+                Some(get_arraykey())
+            } else {
+                union_comparator::is_contained_by(
+                    context.codebase,
+                    key_type,
+                    &get_arraykey(),
+                    false,
+                    false,
+                    false,
+                    &mut ComparisonResult::new(),
+                )
+                .then(|| key_type.clone())
+            };
+
+            if let Some(array_key_type) = array_key_type {
                 countable_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
-                    Arc::new(iterable.get_key_type().clone()),
+                    Arc::new(array_key_type),
                     Arc::new(iterable.get_value_type().clone()),
                 ))));
             }

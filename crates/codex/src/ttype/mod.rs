@@ -749,6 +749,26 @@ pub fn get_non_empty_uppercase_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(NON_EMPTY_UPPERCASE_STRING_ATOMIC))
 }
 
+/// The `callable-array` type: `list{object|class-string, non-empty-string}`.
+#[must_use]
+pub fn get_callable_array() -> TAtomic {
+    TAtomic::Array(TArray::List(TList {
+        element_type: Arc::new(get_never()),
+        known_elements: Some(Arc::new(std::collections::BTreeMap::from([
+            (
+                0,
+                (
+                    false,
+                    TUnion::from_vec(vec![TAtomic::Object(TObject::Any), TAtomic::Scalar(TScalar::class_string())]),
+                ),
+            ),
+            (1, (false, get_non_empty_string())),
+        ]))),
+        known_count: None,
+        non_empty: true,
+    }))
+}
+
 #[inline]
 #[must_use]
 pub fn get_non_empty_string() -> TUnion {

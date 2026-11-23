@@ -3731,6 +3731,7 @@ test_case!(
     expected_issue_counts = [("invalid-return-statement", 3)]
 );
 test_case!(array_entries_keep_ignored_false_and_null);
+test_case!(is_countable_keeps_callable_and_iterable_parts);
 
 #[test]
 #[cfg_attr(miri, ignore)]
