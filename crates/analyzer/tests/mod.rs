@@ -3742,6 +3742,10 @@ test_case!(
 test_case!(static_call_on_this_applies_this_assertions);
 test_case!(two_generic_interfaces_with_same_resolved_signature_document_method);
 test_case!(template_bounded_by_mixed_template_can_be_bool);
+test_case!(
+    loose_comparison_of_string_literals,
+    expected_issue_counts = [("redundant-comparison", 2), ("impossible-condition", 2)]
+);
 
 #[test]
 #[cfg_attr(miri, ignore)]

@@ -336,13 +336,7 @@ where
                     || are_definitely_loosely_equal(context.settings.version, lhs_type, rhs_type)
                 {
                     if !block_context.flags.inside_loop_expressions() {
-                        report_redundant_comparison(
-                            context,
-                            artifacts,
-                            binary,
-                            "never equal to (always false for !=)",
-                            "`false`",
-                        );
+                        report_redundant_comparison(context, artifacts, binary, "always equal to", "`false`");
                     }
 
                     get_false()
@@ -397,13 +391,7 @@ where
                     get_bool()
                 } else if are_expressions_always_identical(binary.lhs, binary.rhs, lhs_type, rhs_type, artifacts) {
                     if !block_context.flags.inside_loop_expressions() {
-                        report_redundant_comparison(
-                            context,
-                            artifacts,
-                            binary,
-                            "never identical to (always false for !==)",
-                            "`false`",
-                        );
+                        report_redundant_comparison(context, artifacts, binary, "always identical to", "`false`");
                     }
 
                     get_false()

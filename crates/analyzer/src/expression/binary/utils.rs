@@ -8,6 +8,7 @@ use mago_codex::ttype::union::TUnion;
 use mago_php_version::PHPVersion;
 
 use crate::utils::php_emulation::numeric_string_equals_int;
+use crate::utils::php_emulation::strings_loosely_equal;
 
 /// A template's value lies within its constraint, so the bounds of `T of int<0, 3>` are those of `int<0, 3>`.
 fn int_bound(union: &TUnion, bound: fn(&TAtomic) -> Option<i64>, pick: fn(i64, i64) -> i64) -> Option<i64> {
@@ -260,6 +261,10 @@ fn compare_literal_int_and_string(php_version: PHPVersion, lhs: &TUnion, rhs: &T
 
     if let (Some(string), Some(integer)) = (lhs.get_single_literal_string_value(), rhs.get_single_literal_int_value()) {
         return Some(numeric_string_equals_int(string, integer));
+    }
+
+    if let (Some(left), Some(right)) = (lhs.get_single_literal_string_value(), rhs.get_single_literal_string_value()) {
+        return strings_loosely_equal(left, right);
     }
 
     None

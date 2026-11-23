@@ -100,6 +100,21 @@ pub fn numeric_string_equals_int(input: &[u8], expected: i64) -> bool {
     )
 }
 
+/// Whether PHP 8 finds two strings loosely equal: numeric strings compare as numbers, others byte by byte.
+pub fn strings_loosely_equal(left: &[u8], right: &[u8]) -> Option<bool> {
+    if !str_is_numeric_bytes(left) || !str_is_numeric_bytes(right) {
+        return Some(left == right);
+    }
+
+    let left = std::str::from_utf8(left.trim_ascii()).ok()?;
+    let right = std::str::from_utf8(right.trim_ascii()).ok()?;
+
+    match (left.parse::<i64>(), right.parse::<i64>()) {
+        (Ok(left), Ok(right)) => Some(left == right),
+        _ => Some(left.parse::<f64>().ok()? == right.parse::<f64>().ok()?),
+    }
+}
+
 /// Increments an alphanumeric string.
 ///
 /// Rust implementation based on PHP's `str_increment` function from php-src:
