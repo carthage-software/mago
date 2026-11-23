@@ -106,5 +106,6 @@ pub enum Feature {
     CloneWith,
     PartialFunctionApplication,
     ReadonlyPropertyDefaultValues,
+    EnumDebugInfoMagicMethod,
     SwitchSemicolonSeparators,
 }
