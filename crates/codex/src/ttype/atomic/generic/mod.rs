@@ -56,6 +56,7 @@ impl TGenericParameter {
     #[must_use]
     pub fn is_constrained_as_mixed(&self) -> bool {
         self.constraint.is_mixed()
+            || matches!(self.constraint.types.as_ref(), [TAtomic::GenericParameter(parameter)] if parameter.is_constrained_as_mixed())
     }
 
     #[must_use]

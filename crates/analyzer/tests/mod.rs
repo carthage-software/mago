@@ -3741,6 +3741,7 @@ test_case!(
 );
 test_case!(static_call_on_this_applies_this_assertions);
 test_case!(two_generic_interfaces_with_same_resolved_signature_document_method);
+test_case!(template_bounded_by_mixed_template_can_be_bool);
 
 #[test]
 #[cfg_attr(miri, ignore)]
