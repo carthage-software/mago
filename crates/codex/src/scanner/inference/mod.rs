@@ -876,7 +876,9 @@ fn infer_constant<'ctx, 'arena>(
         return Some(t);
     }
 
-    if let Some(t) = get_platform_constant_type(short_name) {
+    if fqn.trim_prefix(b"\\") == short_name
+        && let Some(t) = get_platform_constant_type(short_name)
+    {
         return Some(t);
     }
 

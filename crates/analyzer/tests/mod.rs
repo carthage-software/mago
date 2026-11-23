@@ -3721,6 +3721,7 @@ test_case!(loop_with_truthy_literal_condition_exits_only_by_break);
 test_case!(many_literal_strings_keep_non_empty);
 test_case!(array_product_return_types);
 test_case!(new_of_internal_classes_that_cannot_be_constructed, expected_issue_counts = [("invalid-method-access", 11), ("extend-final-class", 1)]);
+test_case!(namespaced_constant_shadows_builtin_in_class_constant);
 
 #[test]
 #[cfg_attr(miri, ignore)]
