@@ -54,7 +54,7 @@ fn just_over_default_string_threshold_generalises() {
     let inputs: Vec<TAtomic> = (0..n).map(|i| t_lit_string(&format!("s{i}"))).collect();
     let result = combine_default(inputs);
     assert_eq!(result.len(), 1);
-    assert_eq!(atomic_id_string(&result[0]), "string");
+    assert_eq!(atomic_id_string(&result[0]), "truthy-lowercase-string");
 }
 
 #[test]
@@ -63,7 +63,7 @@ fn many_string_thresholds_walk() {
         let inputs: Vec<TAtomic> = (0..200usize).map(|i| t_lit_string(&format!("s{i}"))).collect();
         let result = combine_with_string_threshold(inputs, threshold);
         assert_eq!(result.len(), 1);
-        assert_eq!(atomic_id_string(&result[0]), "string");
+        assert_eq!(atomic_id_string(&result[0]), "truthy-lowercase-string");
     }
 }
 
@@ -98,7 +98,7 @@ fn string_threshold_zero_with_two_inputs_generalises() {
     let inputs = vec![t_lit_string("a"), t_lit_string("b")];
     let result = combine_with_string_threshold(inputs, 0);
     assert_eq!(result.len(), 1);
-    assert_eq!(atomic_id_string(&result[0]), "string");
+    assert_eq!(atomic_id_string(&result[0]), "truthy-lowercase-string");
 }
 
 #[test]

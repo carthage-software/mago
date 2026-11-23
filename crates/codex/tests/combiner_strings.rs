@@ -226,6 +226,14 @@ fn many_distinct_literals_exceed_threshold_generalise() {
     let inputs: Vec<TAtomic> = (0..n).map(|i| t_lit_string(&format!("s{i}"))).collect();
     let result = combine_default(inputs);
     assert_eq!(result.len(), 1);
+    assert_eq!(atomic_id_string(&result[0]), "truthy-lowercase-string");
+}
+
+#[test]
+fn literals_past_threshold_keep_only_shared_properties() {
+    let inputs = vec![t_lit_string("a"), t_lit_string(""), t_lit_string("B")];
+    let result = combine_with_string_threshold(inputs, 1);
+    assert_eq!(result.len(), 1);
     assert_eq!(atomic_id_string(&result[0]), "string");
 }
 
@@ -242,7 +250,7 @@ fn custom_low_threshold_generalises_quickly() {
     let inputs: Vec<TAtomic> = (0..20usize).map(|i| t_lit_string(&format!("s{i}"))).collect();
     let result = combine_with_string_threshold(inputs, 5);
     assert_eq!(result.len(), 1);
-    assert_eq!(atomic_id_string(&result[0]), "string");
+    assert_eq!(atomic_id_string(&result[0]), "truthy-lowercase-string");
 }
 
 #[test]
@@ -250,7 +258,7 @@ fn threshold_zero_immediate_generalisation_when_two_or_more() {
     let inputs = vec![t_lit_string("x"), t_lit_string("y")];
     let result = combine_with_string_threshold(inputs, 0);
     assert_eq!(result.len(), 1);
-    assert_eq!(atomic_id_string(&result[0]), "string");
+    assert_eq!(atomic_id_string(&result[0]), "truthy-lowercase-string");
 }
 
 #[test]

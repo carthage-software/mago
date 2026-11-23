@@ -1296,9 +1296,11 @@ fn scrape_type_properties(
         } else if let Some(atom) = string_scalar.get_known_literal_atom() {
             // Check threshold before adding literal string
             if combination.literal_strings.len() >= options.string_combination_threshold as usize {
-                // Exceeded threshold - generalize to base string type
-                combination.literal_strings.clear();
-                combination.value_types.insert(*ATOM_STRING, TAtomic::Scalar(TScalar::string()));
+                let general =
+                    combination.literal_strings.drain().fold(string_scalar.without_literal(), |general, literal| {
+                        combine_string_scalars(&general, TString::known_literal(literal).without_literal())
+                    });
+                combination.value_types.insert(*ATOM_STRING, TAtomic::Scalar(TScalar::String(general)));
             } else {
                 combination.literal_strings.insert(atom);
             }

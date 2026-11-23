@@ -3718,6 +3718,7 @@ test_case!(nested_loops_over_mixed_values);
 test_case!(template_intersection_of_class_and_method_templates);
 test_case!(nested_loops_in_template_function);
 test_case!(loop_with_truthy_literal_condition_exits_only_by_break);
+test_case!(many_literal_strings_keep_non_empty);
 
 #[test]
 #[cfg_attr(miri, ignore)]
