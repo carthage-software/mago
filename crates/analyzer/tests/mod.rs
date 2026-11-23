@@ -3726,6 +3726,10 @@ test_case!(
 );
 test_case!(namespaced_constant_shadows_builtin_in_class_constant);
 test_case!(isset_string_offset_narrows_to_non_empty);
+test_case!(
+    ignored_falsable_return_does_not_excuse_only_false,
+    expected_issue_counts = [("invalid-return-statement", 3)]
+);
 
 #[test]
 #[cfg_attr(miri, ignore)]

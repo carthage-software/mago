@@ -349,14 +349,16 @@ pub fn handle_return_value<'ctx, A>(
             return;
         }
 
+        let ignore_nullable = inferred_return_type.ignore_nullable_issues() && !inferred_return_type.is_null();
+        let ignore_falsable = inferred_return_type.ignore_falsable_issues() && !inferred_return_type.is_false();
         let mut union_comparison_result = ComparisonResult::new();
 
         let is_contained_by = is_contained_by(
             context.codebase,
             &inferred_return_type,
             &expected_return_type,
-            inferred_return_type.ignore_nullable_issues(),
-            inferred_return_type.ignore_falsable_issues(),
+            ignore_nullable,
+            ignore_falsable,
             false,
             &mut union_comparison_result,
         );
@@ -369,7 +371,7 @@ pub fn handle_return_value<'ctx, A>(
         let inferred_return_type_str = inferred_return_type.get_id();
 
         if inferred_return_type.is_nullable()
-            && !inferred_return_type.ignore_nullable_issues()
+            && !ignore_nullable
             && !expected_return_type.is_nullable()
             && !expected_return_type.has_template()
         {
@@ -397,7 +399,7 @@ pub fn handle_return_value<'ctx, A>(
         }
 
         if inferred_return_type.is_falsable()
-            && !inferred_return_type.ignore_falsable_issues()
+            && !ignore_falsable
             && !expected_return_type.is_falsable()
             && !expected_return_type.types.iter().any(TAtomic::is_general_bool)
             && !expected_return_type.has_template()
@@ -600,13 +602,15 @@ fn handle_property_hook_return<'ctx, A>(
         return;
     }
 
+    let ignore_nullable = inferred_return_type.ignore_nullable_issues() && !inferred_return_type.is_null();
+    let ignore_falsable = inferred_return_type.ignore_falsable_issues() && !inferred_return_type.is_false();
     let mut comparison_result = ComparisonResult::new();
     if is_contained_by(
         context.codebase,
         &inferred_return_type,
         &expected_return_type,
-        inferred_return_type.ignore_nullable_issues(),
-        inferred_return_type.ignore_falsable_issues(),
+        ignore_nullable,
+        ignore_falsable,
         false,
         &mut comparison_result,
     ) {
@@ -617,7 +621,7 @@ fn handle_property_hook_return<'ctx, A>(
     let inferred_str = inferred_return_type.get_id();
 
     if inferred_return_type.is_nullable()
-        && !inferred_return_type.ignore_nullable_issues()
+        && !ignore_nullable
         && !expected_return_type.is_nullable()
         && !expected_return_type.has_template()
     {
@@ -636,7 +640,7 @@ fn handle_property_hook_return<'ctx, A>(
     }
 
     if inferred_return_type.is_falsable()
-        && !inferred_return_type.ignore_falsable_issues()
+        && !ignore_falsable
         && !expected_return_type.is_falsable()
         && !expected_return_type.types.iter().any(TAtomic::is_general_bool)
         && !expected_return_type.has_template()
