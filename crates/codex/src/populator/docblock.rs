@@ -431,7 +431,13 @@ fn collect_inheritance_work(
                 *other != first
                     && !codebase.is_instance_of(first.as_bytes(), other.as_bytes())
                     && codebase.function_likes.get(&(*other, *method_name)).is_some_and(|other_method| {
-                        has_docblock_types(other_method) && !documents_same_signature(first_method, other_method)
+                        has_docblock_types(other_method)
+                            && !documents_same_signature(
+                                codebase,
+                                class_metadata,
+                                (first, first_method),
+                                (*other, other_method),
+                            )
                     })
             })
         {
@@ -483,14 +489,51 @@ fn has_docblock_types(method: &FunctionLikeMetadata) -> bool {
             .any(|parameter| parameter.get_type_metadata().is_some_and(|metadata| metadata.from_docblock))
 }
 
-fn documents_same_signature(first: &FunctionLikeMetadata, second: &FunctionLikeMetadata) -> bool {
+fn documents_same_signature(
+    codebase: &CodebaseMetadata,
+    class_metadata: &crate::metadata::class_like::ClassLikeMetadata,
+    (first_class, first): (Word, &FunctionLikeMetadata),
+    (second_class, second): (Word, &FunctionLikeMetadata),
+) -> bool {
+    let template_result = |owner: Word| {
+        class_metadata.template_extended_parameters.get(&owner).filter(|parameters| !parameters.is_empty()).map(
+            |parameters| {
+                let mut result = TemplateResult::default();
+                for (name, concrete_type) in parameters {
+                    result.add_lower_bound(*name, GenericParent::ClassLike(owner), concrete_type.clone());
+                }
+
+                result
+            },
+        )
+    };
+
+    let first_result = template_result(first_class);
+    let second_result = template_result(second_class);
+    let same = |first_type: Option<&TypeMetadata>, second_type: Option<&TypeMetadata>| match (first_type, second_type) {
+        (Some(first_type), Some(second_type)) => {
+            localize(&first_type.type_union, first_result.as_ref(), codebase)
+                == localize(&second_type.type_union, second_result.as_ref(), codebase)
+        }
+        (first_type, second_type) => first_type.is_none() && second_type.is_none(),
+    };
+
     first.parameters.len() == second.parameters.len()
         && first.parameters.iter().zip(&second.parameters).all(|(first_parameter, second_parameter)| {
-            first_parameter.get_type_metadata().map(|metadata| &metadata.type_union)
-                == second_parameter.get_type_metadata().map(|metadata| &metadata.type_union)
+            same(first_parameter.get_type_metadata(), second_parameter.get_type_metadata())
         })
-        && first.return_type_metadata.as_ref().map(|metadata| &metadata.type_union)
-            == second.return_type_metadata.as_ref().map(|metadata| &metadata.type_union)
+        && same(first.return_type_metadata.as_ref(), second.return_type_metadata.as_ref())
+}
+
+fn localize<'union>(
+    union: &'union TUnion,
+    result: Option<&TemplateResult>,
+    codebase: &CodebaseMetadata,
+) -> Cow<'union, TUnion> {
+    match result {
+        Some(result) => Cow::Owned(inferred_type_replacer::replace(union, result, codebase)),
+        None => Cow::Borrowed(union),
+    }
 }
 
 struct MethodInheritance {

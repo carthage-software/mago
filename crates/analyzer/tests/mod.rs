@@ -3740,6 +3740,7 @@ test_case!(
     expected_issue_counts = [("invalid-param-tag", 1), ("unused-template-parameter", 1)]
 );
 test_case!(static_call_on_this_applies_this_assertions);
+test_case!(two_generic_interfaces_with_same_resolved_signature_document_method);
 
 #[test]
 #[cfg_attr(miri, ignore)]
