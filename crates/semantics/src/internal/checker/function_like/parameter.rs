@@ -164,6 +164,16 @@ pub fn check_parameter_list(
                 );
             }
 
+            if parameter.is_promoted_property() {
+                context.report(
+                    Issue::error("Promoted properties cannot be variadic.")
+                        .with_annotation(
+                            Annotation::primary(parameter.span()).with_message("Variadic promoted property used here."),
+                        )
+                        .with_help("Remove the `...` from the parameter, or remove the promotion."),
+                );
+            }
+
             last_variadic = Some((name_bytes, parameter.span()));
             continue;
         }
