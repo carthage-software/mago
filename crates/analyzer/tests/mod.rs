@@ -3739,6 +3739,7 @@ test_case!(
     class_string_of_template_keeps_only_object_bounds,
     expected_issue_counts = [("invalid-param-tag", 1), ("unused-template-parameter", 1)]
 );
+test_case!(static_call_on_this_applies_this_assertions);
 
 #[test]
 #[cfg_attr(miri, ignore)]

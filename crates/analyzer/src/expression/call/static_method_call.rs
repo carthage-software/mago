@@ -176,6 +176,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
         }
 
         let class_has_nullsafe_null = artifacts.get_expression_type(self.class).is_some_and(|t| t.has_nullsafe_null());
+        let calls_instance_method = !invocation_targets.is_empty()
+            && invocation_targets.iter().all(|target| {
+                matches!(target, InvocationTarget::FunctionLike { metadata, .. } if metadata.method_metadata.as_ref().is_some_and(|method| !method.is_static))
+            });
+        let this_variable = (calls_instance_method
+            && matches!(self.class, Expression::Self_(_) | Expression::Static(_) | Expression::Parent(_)))
+        .then(|| mago_word::word("$this"))
+        .filter(|this| block_context.locals.contains_key(this));
 
         if has_resolved_methods || method_resolution.undocumented_methods.is_empty() {
             analyze_invocation_targets(
@@ -186,7 +194,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
                 invocation_targets,
                 InvocationArgumentsSource::ArgumentList(&self.argument_list),
                 self.span(),
-                None,
+                this_variable,
                 method_resolution.encountered_mixed,
                 expression_is_nullsafe(self.class) || method_resolution.encountered_null,
                 class_has_nullsafe_null,
