@@ -893,7 +893,7 @@ fn integer_overflow_result(op: &BinaryOperator<'_>, left: TInteger, right: TInte
 }
 
 /// `int ** int` is a float when the exponent is negative or the result overflows.
-fn integer_power_result(base: TInteger, exponent: TInteger) -> Vec<TAtomic> {
+pub(crate) fn integer_power_result(base: TInteger, exponent: TInteger) -> Vec<TAtomic> {
     if let (Some(base), Some(exponent)) = (base.get_literal_value(), exponent.get_literal_value()) {
         let value = (base as f64).powf(exponent as f64);
 

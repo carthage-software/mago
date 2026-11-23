@@ -2,11 +2,13 @@ mod abs;
 mod intdiv;
 mod max;
 mod min;
+mod pow;
 
 pub use abs::AbsProvider;
 pub use intdiv::IntdivHook;
 pub use max::MaxProvider;
 pub use min::MinProvider;
+pub use pow::PowProvider;
 
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;

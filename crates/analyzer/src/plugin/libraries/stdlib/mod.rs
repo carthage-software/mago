@@ -39,6 +39,7 @@ impl Plugin for StdlibPlugin {
 
     fn register(&self, registry: &mut PluginRegistry) {
         registry.register_function_provider(string::StrlenProvider);
+        registry.register_function_provider(string::ChangeCaseProvider);
         registry.register_function_provider(string::StrvalProvider);
         registry.register_function_provider(string::ImplodeProvider);
         registry.register_function_provider(string::SprintfProvider);
@@ -66,6 +67,7 @@ impl Plugin for StdlibPlugin {
         registry.register_function_provider(math::MinProvider);
         registry.register_function_provider(math::MaxProvider);
         registry.register_function_provider(math::AbsProvider);
+        registry.register_function_provider(math::PowProvider);
         registry.register_function_provider(array::RangeProvider);
         registry.register_function_provider(pcre::PregMatchPatternProvider);
 
