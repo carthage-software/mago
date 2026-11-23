@@ -207,21 +207,31 @@ fn replace_template_parameter(
 
         if let Some(intersection_types) = intersection_types {
             if template_type_inner.types.iter().any(TType::can_be_intersected) {
-                let replaced_intersection_parts: Vec<TAtomic> = intersection_types
-                    .iter()
-                    .cloned()
-                    .map(|part| replace_atomic(part, template_result, codebase, Variance::Covariant))
-                    .collect();
+                for part in intersection_types {
+                    let replaced_part = match part {
+                        TAtomic::GenericParameter(_) => replace(&wrap_atomic(part.clone()), template_result, codebase),
+                        _ => wrap_atomic(replace_atomic(part.clone(), template_result, codebase, Variance::Covariant)),
+                    };
 
-                for atomic_template_type in template_type_inner.types.to_mut() {
-                    if matches!(
-                        atomic_template_type,
-                        TAtomic::Object(TObject::Named(_)) | TAtomic::Iterable(_) | TAtomic::GenericParameter(_)
-                    ) {
-                        for part in &replaced_intersection_parts {
-                            atomic_template_type.add_intersection_type(part.clone());
+                    // Distribute a union part over its members, so `T&(A|B)` becomes `(T&A)|(T&B)`.
+                    let mut distributed_types = Vec::with_capacity(template_type_inner.types.len());
+                    for atomic_template_type in template_type_inner.types.iter() {
+                        if !matches!(
+                            atomic_template_type,
+                            TAtomic::Object(TObject::Named(_)) | TAtomic::Iterable(_) | TAtomic::GenericParameter(_)
+                        ) {
+                            distributed_types.push(atomic_template_type.clone());
+                            continue;
+                        }
+
+                        for part_member in replaced_part.types.iter() {
+                            let mut intersected_type = atomic_template_type.clone();
+                            intersected_type.add_intersection_type(part_member.clone());
+                            distributed_types.push(intersected_type);
                         }
                     }
+
+                    template_type_inner = template_type_inner.clone_with_types(distributed_types);
                 }
             } else {
                 for part in intersection_types {

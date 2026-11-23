@@ -3684,6 +3684,7 @@ test_case!(excluded_offset_value_is_not_rechecked);
 test_case!(array_merge_with_mixed_argument);
 test_case!(reference_to_property_of_mixed_reports_once);
 test_case!(nested_loops_over_mixed_values);
+test_case!(template_intersection_of_class_and_method_templates);
 
 #[test]
 #[cfg_attr(miri, ignore)]
