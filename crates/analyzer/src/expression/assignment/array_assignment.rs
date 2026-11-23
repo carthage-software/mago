@@ -150,6 +150,10 @@ where
                 PropertyWriteKind::Mutation
             },
         )?;
+
+        if !root_is_array_access_object {
+            property_assignment::record_initialization(block_context, property_access);
+        }
     } else if let Expression::Access(Access::StaticProperty(property_access)) = &root_array_expression
         && root_is_array
     {

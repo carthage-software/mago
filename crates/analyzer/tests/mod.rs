@@ -3732,6 +3732,7 @@ test_case!(
 );
 test_case!(array_entries_keep_ignored_false_and_null);
 test_case!(is_countable_keeps_callable_and_iterable_parts);
+test_case!(array_write_initializes_property);
 
 #[test]
 #[cfg_attr(miri, ignore)]

@@ -287,8 +287,15 @@ where
         block_context.definitely_uninitialized_property_ids.remove(&property_access_id);
     }
 
-    if matches!(write_kind, PropertyWriteKind::Direct | PropertyWriteKind::Coalesce)
-        && block_context.flags.collect_initializations()
+    if matches!(write_kind, PropertyWriteKind::Direct | PropertyWriteKind::Coalesce) {
+        record_initialization(block_context, property_access);
+    }
+
+    Ok(())
+}
+
+pub(crate) fn record_initialization(block_context: &mut BlockContext<'_>, property_access: &PropertyAccess<'_>) {
+    if block_context.flags.collect_initializations()
         && let Expression::Variable(Variable::Direct(var)) = property_access.object
         && var.name == b"$this"
         && let ClassLikeMemberSelector::Identifier(ident) = &property_access.property
@@ -297,8 +304,6 @@ where
         block_context.definitely_initialized_properties.insert(property_name);
         block_context.possibly_initialized_properties.insert(property_name);
     }
-
-    Ok(())
 }
 
 #[cfg(test)]
