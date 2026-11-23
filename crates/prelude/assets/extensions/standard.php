@@ -3907,7 +3907,9 @@ function array_diff_assoc(array $array, array ...$arrays): array {}
 function array_sum(array $array): int|float {}
 
 /**
- * @param array<int|float> $array
+ * @param array<int|float|bool> $array
+ *
+ * @return ($array is array<true> ? 1 : ($array is array<bool> ? 0|1 : ($array is array<int> ? int : ($array is array<float> ? float : int|float))))
  *
  * @pure
  */
