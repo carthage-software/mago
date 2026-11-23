@@ -3730,6 +3730,7 @@ test_case!(
     ignored_falsable_return_does_not_excuse_only_false,
     expected_issue_counts = [("invalid-return-statement", 3)]
 );
+test_case!(array_entries_keep_ignored_false_and_null);
 
 #[test]
 #[cfg_attr(miri, ignore)]

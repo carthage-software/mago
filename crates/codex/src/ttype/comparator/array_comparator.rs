@@ -133,12 +133,10 @@ pub(crate) fn is_array_contained_by_array(
                     return false;
                 }
 
-                if !union_comparator::is_contained_by(
+                if !entry_is_contained_by(
                     codebase,
                     input_item_value_type,
                     container_item_value_type,
-                    false,
-                    false,
                     inside_assertion,
                     atomic_comparison_result,
                 ) {
@@ -153,12 +151,10 @@ pub(crate) fn is_array_contained_by_array(
                     false,
                     inside_assertion,
                     atomic_comparison_result,
-                ) || !union_comparator::is_contained_by(
+                ) || !entry_is_contained_by(
                     codebase,
                     input_item_value_type,
                     cv_type,
-                    false,
-                    false,
                     inside_assertion,
                     atomic_comparison_result,
                 ) {
@@ -198,12 +194,10 @@ pub(crate) fn is_array_contained_by_array(
                         return false;
                     }
 
-                    if !union_comparator::is_contained_by(
+                    if !entry_is_contained_by(
                         codebase,
                         &input_value_type,
                         container_item_value_type,
-                        false,
-                        false,
                         inside_assertion,
                         atomic_comparison_result,
                     ) {
@@ -212,12 +206,10 @@ pub(crate) fn is_array_contained_by_array(
                 }
             } else if !input_has_key
                 && !input_value_type.is_never()
-                && !union_comparator::is_contained_by(
+                && !entry_is_contained_by(
                     codebase,
                     &input_value_type,
                     container_item_value_type,
-                    false,
-                    false,
                     inside_assertion,
                     atomic_comparison_result,
                 )
@@ -242,15 +234,31 @@ pub(crate) fn is_array_contained_by_array(
     }
 
     input_value_type.is_never()
-        || union_comparator::is_contained_by(
+        || entry_is_contained_by(
             codebase,
             &input_value_type,
             &container_value_type,
-            false,
-            input_value_type.ignore_falsable_issues(),
             inside_assertion,
             atomic_comparison_result,
         )
+}
+
+fn entry_is_contained_by(
+    codebase: &CodebaseMetadata,
+    input: &TUnion,
+    container: &TUnion,
+    inside_assertion: bool,
+    result: &mut ComparisonResult,
+) -> bool {
+    union_comparator::is_contained_by(
+        codebase,
+        input,
+        container,
+        input.ignore_nullable_issues() && !input.is_null(),
+        input.ignore_falsable_issues() && !input.is_false(),
+        inside_assertion,
+        result,
+    )
 }
 
 #[cfg(test)]
