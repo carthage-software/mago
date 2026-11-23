@@ -1244,13 +1244,34 @@ fn get_class_string_type(
                         constraint: nested_constraint,
                         ..
                     }) => {
+                        let class_strings_before = class_strings.len();
                         for constraint_atomic in Arc::unwrap_or_clone(nested_constraint).types.into_owned() {
+                            if matches!(
+                                constraint_atomic,
+                                TAtomic::Null
+                                    | TAtomic::Void
+                                    | TAtomic::Never
+                                    | TAtomic::Scalar(_)
+                                    | TAtomic::Array(_)
+                                    | TAtomic::Resource(_)
+                            ) {
+                                continue;
+                            }
+
                             class_strings.push(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::generic(
                                 kind,
                                 parameter_name,
                                 defining_entity,
                                 constraint_atomic,
                             ))));
+                        }
+
+                        if class_strings.len() == class_strings_before {
+                            return Err(TypeError::InvalidType(
+                                kind.to_string(),
+                                format!("class string parameter must target an object type, found `{parameter_name}`."),
+                                span,
+                            ));
                         }
                     }
                     _ => {
