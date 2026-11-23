@@ -327,6 +327,7 @@ pub fn check_class<'ast, 'arena>(class: &'ast Class<'arena>, context: &mut Conte
                     class_fqcn_bytes,
                     "class",
                     false,
+                    false,
                     context,
                 );
             }
@@ -510,6 +511,7 @@ pub fn check_interface<'ast, 'arena>(interface: &'ast Interface<'arena>, context
                     interface_fqcn_bytes,
                     "interface",
                     true,
+                    false,
                     context,
                 );
             }
@@ -783,6 +785,7 @@ pub fn check_trait<'ast, 'arena>(r#trait: &'ast Trait<'arena>, context: &mut Con
                     class_like_fqcn_bytes,
                     "trait",
                     false,
+                    true,
                     context,
                 );
             }
@@ -993,6 +996,7 @@ pub fn check_enum<'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Contex
                     enum_name_bytes,
                     enum_fqcn_bytes,
                     "enum",
+                    false,
                     false,
                     context,
                 );
@@ -1227,6 +1231,7 @@ pub fn check_anonymous_class<'ast, 'arena>(
                     ANONYMOUS_CLASS_NAME,
                     ANONYMOUS_CLASS_NAME,
                     "class",
+                    false,
                     false,
                     context,
                 );
