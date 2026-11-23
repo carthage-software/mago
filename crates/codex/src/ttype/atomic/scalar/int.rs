@@ -1027,13 +1027,13 @@ impl Mul for TInteger {
                 Ordering::Less => Range(l.saturating_mul(t), l.saturating_mul(f)),
                 Ordering::Equal => Literal(0),
             },
-            (From(f1), From(f2)) => {
-                if f1 >= 0 && f2 >= 0 {
-                    From(f1.saturating_mul(f2))
-                } else {
-                    Unspecified
-                }
-            }
+            (From(f1), From(f2)) if f1 >= 0 && f2 >= 0 => From(f1.saturating_mul(f2)),
+            (From(f), To(t)) | (To(t), From(f)) if f >= 0 && t <= 0 => To(f.saturating_mul(t)),
+            (To(t1), To(t2)) if t1 <= 0 && t2 <= 0 => From(t1.saturating_mul(t2)),
+            (From(f), Range(a, _)) | (Range(a, _), From(f)) if f >= 0 && a >= 0 => From(f.saturating_mul(a)),
+            (From(f), Range(_, b)) | (Range(_, b), From(f)) if f >= 0 && b <= 0 => To(f.saturating_mul(b)),
+            (To(t), Range(a, _)) | (Range(a, _), To(t)) if t <= 0 && a >= 0 => To(t.saturating_mul(a)),
+            (To(t), Range(_, b)) | (Range(_, b), To(t)) if t <= 0 && b <= 0 => From(t.saturating_mul(b)),
             (Range(f1, t1), Range(f2, t2)) => {
                 let p1 = f1.saturating_mul(f2);
                 let p2 = f1.saturating_mul(t2);

@@ -734,6 +734,10 @@ fn determine_numeric_result(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAt
 
     match (left, right) {
         (TAtomic::Scalar(TScalar::Integer(left_int)), TAtomic::Scalar(TScalar::Integer(right_int))) => {
+            if let Some(overflow) = integer_overflow_result(op, *left_int, *right_int) {
+                return vec![TAtomic::Scalar(TScalar::Integer(overflow))];
+            }
+
             let result = calculate_int_arithmetic(op, *left_int, *right_int);
 
             match result {
@@ -858,6 +862,34 @@ fn string_bitwise_result(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAtomi
         Ok(text) => TAtomic::Scalar(TScalar::literal_string(mago_word::word(text))),
         Err(_) => TAtomic::Scalar(TScalar::string()),
     }
+}
+
+/// `int + int`, `int - int` and `int * int` on bounded operands: a bound that leaves the int range is open.
+fn integer_overflow_result(op: &BinaryOperator<'_>, left: TInteger, right: TInteger) -> Option<TInteger> {
+    let apply: fn(i128, i128) -> i128 = match op {
+        BinaryOperator::Addition(_) => |a, b| a + b,
+        BinaryOperator::Subtraction(_) => |a, b| a - b,
+        BinaryOperator::Multiplication(_) => |a, b| a * b,
+        _ => return None,
+    };
+
+    let (Some(left_min), Some(left_max)) = left.get_bounds() else { return None };
+    let (Some(right_min), Some(right_max)) = right.get_bounds() else { return None };
+
+    let corners = [
+        apply(i128::from(left_min), i128::from(right_min)),
+        apply(i128::from(left_min), i128::from(right_max)),
+        apply(i128::from(left_max), i128::from(right_min)),
+        apply(i128::from(left_max), i128::from(right_max)),
+    ];
+
+    let (minimum, maximum) = (corners.iter().min()?, corners.iter().max()?);
+    let (minimum, maximum) = (i64::try_from(*minimum).ok(), i64::try_from(*maximum).ok());
+    if minimum.is_some() && maximum.is_some() {
+        return None;
+    }
+
+    Some(TInteger::from_bounds(minimum, maximum))
 }
 
 /// `int ** int` is a float when the exponent is negative or the result overflows.
