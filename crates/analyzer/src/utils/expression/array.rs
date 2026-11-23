@@ -1713,11 +1713,14 @@ where
     A: Arena,
 {
     let mut non_empty = false;
+    let mut is_literal = false;
 
     let valid_index_type = if let TAtomic::Scalar(TScalar::String(scalar_string)) = string {
         non_empty = scalar_string.is_non_empty();
 
         if let Some(TStringLiteral::Value(val)) = scalar_string.literal {
+            is_literal = true;
+
             if val.is_empty() {
                 get_never()
             } else {
@@ -1730,7 +1733,7 @@ where
         get_int()
     };
 
-    if is_contained_by(
+    let index_is_valid = is_contained_by(
         context.codebase,
         index_type,
         &valid_index_type,
@@ -1738,14 +1741,19 @@ where
         false,
         false,
         &mut ComparisonResult::new(),
-    ) {
+    );
+
+    if index_is_valid {
         *has_valid_expected_index = true;
     } else {
         expected_index_types.push(valid_index_type);
     }
 
+    let definitely_set = non_empty
+        && if is_literal { index_is_valid } else { matches!(index_type.get_single_literal_int_value(), Some(0 | -1)) };
+
     let mut result = if non_empty { get_non_empty_string() } else { get_string() };
-    if !non_empty {
+    if !definitely_set {
         result.set_possibly_undefined(true, None);
     }
 

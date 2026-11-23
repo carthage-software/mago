@@ -2509,9 +2509,21 @@ where
             TAtomic::Object(TObject::Named(_) | TObject::Any) => {
                 acceptable_types.push(atomic);
             }
-            TAtomic::Scalar(TScalar::String(s)) if !s.is_known_literal() => {
-                if let ArrayKey::Integer(_) = key_name {
-                    acceptable_types.push(atomic);
+            TAtomic::Scalar(TScalar::String(s)) => {
+                if let ArrayKey::Integer(offset) = key_name {
+                    let min_length = if offset < 0 { offset.unsigned_abs() } else { offset.unsigned_abs() + 1 };
+                    let keep = match s.get_known_literal_value() {
+                        Some(value) => value.len() as u64 >= min_length,
+                        None => {
+                            s.is_non_empty = true;
+                            s.is_truthy |= min_length > 1;
+                            true
+                        }
+                    };
+
+                    if keep {
+                        acceptable_types.push(atomic);
+                    }
                 }
             }
             TAtomic::Scalar(TScalar::Generic | TScalar::ArrayKey) if matches!(key_name, ArrayKey::Integer(_)) => {
