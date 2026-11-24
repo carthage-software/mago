@@ -38,6 +38,9 @@ use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::Access;
+use mago_syntax::cst::ArrayElement;
+use mago_syntax::cst::Assignment;
+use mago_syntax::cst::AssignmentOperator;
 use mago_syntax::cst::BinaryOperator;
 use mago_syntax::cst::Call;
 use mago_syntax::cst::ClassConstantAccess;
@@ -92,6 +95,9 @@ where
     }
 
     match expression {
+        Expression::Assignment(Assignment { lhs, operator: AssignmentOperator::Assign(_), rhs }) => {
+            if_types.extend(get_destructuring_assertions(lhs, rhs, artifacts, assertion_context));
+        }
         Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Not(_), operand }) => {
             let assertions = scrape_assertions(operand, artifacts, assertion_context);
             // Negating facts about multiple variables requires an OR across variable IDs.
@@ -279,6 +285,85 @@ where
     }
 
     if if_types.is_empty() { vec![] } else { vec![if_types] }
+}
+
+/// A destructuring that is truthy had an array for its source: a variable whose item every array
+/// of the source has, and never as null, is not null.
+fn get_destructuring_assertions<A>(
+    target: &Expression,
+    source: &Expression,
+    artifacts: &AnalysisArtifacts,
+    assertion_context: AssertionContext<'_, '_, A>,
+) -> WordMap<AssertionSet>
+where
+    A: Arena,
+{
+    let mut if_types = WordMap::default();
+    let elements = match unwrap_expression(target) {
+        Expression::Array(array) => &array.elements,
+        Expression::List(list) => &list.elements,
+        Expression::LegacyArray(array) => &array.elements,
+        _ => return if_types,
+    };
+
+    let Some(source_type) = artifacts.get_expression_type(source) else {
+        return if_types;
+    };
+
+    let mut arrays = vec![];
+    let mut may_be_null = false;
+    for atomic in source_type.types.as_ref() {
+        match atomic {
+            TAtomic::Null => may_be_null = true,
+            TAtomic::Scalar(scalar) if scalar.is_false() => may_be_null = true,
+            TAtomic::Array(array) => arrays.push(array),
+            _ => return if_types,
+        }
+    }
+
+    if !may_be_null || arrays.is_empty() {
+        return if_types;
+    }
+
+    for (offset, element) in elements.iter().enumerate() {
+        let (key, value) = match element {
+            ArrayElement::Value(element) => (ArrayKey::Integer(offset as i64), element.value),
+            ArrayElement::KeyValue(element) => {
+                let Some(key_type) = artifacts.get_expression_type(element.key) else {
+                    continue;
+                };
+
+                match (key_type.get_single_literal_int_value(), key_type.get_single_literal_string_value()) {
+                    (Some(key), _) => (ArrayKey::Integer(key), element.value),
+                    (_, Some(key)) => (ArrayKey::String(word(key)), element.value),
+                    _ => continue,
+                }
+            }
+            _ => continue,
+        };
+
+        let Some(variable_id) = assertion_context.get_expression_id(value) else {
+            continue;
+        };
+
+        let always_set = arrays.iter().all(|array| {
+            let item = match (array, key) {
+                (TArray::List(list), ArrayKey::Integer(index)) => {
+                    usize::try_from(index).ok().and_then(|index| list.known_elements.as_ref()?.get(&index))
+                }
+                (TArray::Keyed(keyed), key) => keyed.known_items.as_ref().and_then(|items| items.get(&key)),
+                _ => None,
+            };
+
+            item.is_some_and(|(optional, item_type)| !optional && !item_type.has_null() && !item_type.has_mixed())
+        });
+
+        if always_set {
+            if_types.insert(variable_id, vec![vec![Assertion::IsNotType(TAtomic::Null)]]);
+        }
+    }
+
+    if_types
 }
 
 fn process_custom_assertions(expression_span: Span, artifacts: &AnalysisArtifacts) -> WordMap<AssertionSet> {

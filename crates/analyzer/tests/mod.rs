@@ -3755,6 +3755,10 @@ test_case!(
     finally_partial_assignment_keeps_post_try_state,
     expected_issue_counts = [("possibly-undefined-variable", 3)]
 );
+test_case!(
+    destructuring_condition_rules_out_null_source,
+    expected_issue_counts = [("possibly-null-destructuring-source", 6), ("possibly-null-operand", 1)]
+);
 
 #[test]
 #[cfg_attr(miri, ignore)]
