@@ -721,6 +721,7 @@ class mysqli
 
     public function debug(string $options): true {}
 
+    #[Deprecated(since: '8.6', message: 'did you mean mysqli_character_set_name()?')]
     public function get_charset(): ?object {}
 
     public function execute_query(string $query, ?array $params = null): mysqli_result|bool {}
@@ -819,6 +820,7 @@ class mysqli
 
     public function stat(): string|false {}
 
+    #[Deprecated(since: '8.6', message: 'use mysqli::prepare() instead')]
     public function stmt_init(): mysqli_stmt|false {}
 
     public function store_result(int $mode = 0): mysqli_result|false {}
@@ -1141,6 +1143,7 @@ function mysqli_get_connection_stats(mysqli $mysql): array {}
  */
 function mysqli_get_client_stats(): array {}
 
+#[Deprecated(since: '8.6', message: 'did you mean mysqli_character_set_name()?')]
 function mysqli_get_charset(mysqli $mysql): ?object {}
 
 function mysqli_get_client_info(?mysqli $mysql = null): string {}
@@ -1269,6 +1272,7 @@ function mysqli_stmt_get_result(mysqli_stmt $statement): mysqli_result|false {}
 
 function mysqli_stmt_get_warnings(mysqli_stmt $statement): mysqli_warning|false {}
 
+#[Deprecated(since: '8.6', message: 'use mysqli_prepare() instead')]
 function mysqli_stmt_init(mysqli $mysql): mysqli_stmt|false {}
 
 function mysqli_stmt_insert_id(mysqli_stmt $statement): int|string {}

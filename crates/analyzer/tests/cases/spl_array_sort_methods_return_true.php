@@ -20,10 +20,16 @@ function sort_spl_arrays(ArrayObject $object, ArrayIterator $iterator): void
     take_true($object->uksort($compare));
     take_true($object->natsort());
     take_true($object->natcasesort());
+    /** @mago-expect analysis:deprecated-method */
     take_true($iterator->asort());
+    /** @mago-expect analysis:deprecated-method */
     take_true($iterator->ksort());
+    /** @mago-expect analysis:deprecated-method */
     take_true($iterator->uasort($compare));
+    /** @mago-expect analysis:deprecated-method */
     take_true($iterator->uksort($compare));
+    /** @mago-expect analysis:deprecated-method */
     take_true($iterator->natsort());
+    /** @mago-expect analysis:deprecated-method */
     take_true($iterator->natcasesort());
 }

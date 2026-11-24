@@ -1026,6 +1026,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
     /**
      * @return int
      */
+    #[Deprecated(since: '8.6')]
     public function getFlags() {}
 
     /**
@@ -1033,6 +1034,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      *
      * @return void
      */
+    #[Deprecated(since: '8.6')]
     public function setFlags($flags) {}
 
     /**
@@ -1040,6 +1042,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      *
      * @return true
      */
+    #[Deprecated(since: '8.6')]
     public function asort($flags = 0) {}
 
     /**
@@ -1047,6 +1050,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      *
      * @return true
      */
+    #[Deprecated(since: '8.6')]
     public function ksort($flags = 0) {}
 
     /**
@@ -1054,6 +1058,7 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      *
      * @return true
      */
+    #[Deprecated(since: '8.6')]
     public function uasort($callback) {}
 
     /**
@@ -1061,16 +1066,19 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      *
      * @return true
      */
+    #[Deprecated(since: '8.6')]
     public function uksort($callback) {}
 
     /**
      * @return true
      */
+    #[Deprecated(since: '8.6')]
     public function natsort() {}
 
     /**
      * @return true
      */
+    #[Deprecated(since: '8.6')]
     public function natcasesort() {}
 
     /**
@@ -1078,11 +1086,13 @@ class ArrayIterator implements SeekableIterator, ArrayAccess, Serializable, Coun
      *
      * @return void
      */
+    #[Deprecated(since: '8.6')]
     public function unserialize($data) {}
 
     /**
      * @return string
      */
+    #[Deprecated(since: '8.6')]
     public function serialize() {}
 
     /**
@@ -1467,8 +1477,10 @@ class SplFileObject extends SplFileInfo implements RecursiveIterator, SeekableIt
     /**
      * @return array|false|null
      */
+    #[Deprecated(since: '8.6')]
     public function fgetcsv(string $separator = ',', string $enclosure = "\"", string $escape = "\\") {}
 
+    #[Deprecated(since: '8.6')]
     public function fputcsv(
         array $fields,
         string $separator = ',',
@@ -1477,8 +1489,10 @@ class SplFileObject extends SplFileInfo implements RecursiveIterator, SeekableIt
         string $eol = PHP_EOL,
     ): int|false {}
 
+    #[Deprecated(since: '8.6')]
     public function setCsvControl(string $separator = ',', string $enclosure = "\"", string $escape = "\\"): void {}
 
+    #[Deprecated(since: '8.6')]
     public function getCsvControl(): array {}
 
     public function flock(int $operation, int &$wouldBlock = null): bool {}
@@ -2181,6 +2195,7 @@ class MultipleIterator implements Iterator
 /**
  * @return list<class-string>
  */
+#[Deprecated(since: '8.6', message: 'use ReflectionExtension::getClassNames() instead')]
 function spl_classes(): array {}
 
 /**
@@ -2215,6 +2230,7 @@ function spl_autoload_call(string $class): void {}
 /**
  * @pure
  */
+#[Deprecated(since: '8.6', message: 'consider using spl_object_id() instead')]
 function spl_object_hash(object $object): string {}
 
 /**
