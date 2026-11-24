@@ -1194,6 +1194,7 @@ where
     // so we can compare their inferred values
     check_class_like_constants(context, class_like_metadata, members);
     check_ambiguous_inherited_constants(context, class_like_metadata, extends_ast, implements_ast, members);
+    constant::check_self_referencing_constants(context, class_like_metadata, members);
 
     if has_complete_hierarchy {
         crate::readonly::finalize_class_writes(context, artifacts, class_like_metadata);

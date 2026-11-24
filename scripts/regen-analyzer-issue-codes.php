@@ -348,6 +348,7 @@ final class AnalyzerCodeModuleGenerator
         'experimental-usage',
         'side-effects-in-condition',
         'unresolvable-class-constant',
+        'self-referencing-constant',
         'invalid-parameter-default-value',
         'invalid-constant-value',
         'invalid-property-default-value',

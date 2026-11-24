@@ -3747,6 +3747,10 @@ test_case!(
     expected_issue_counts = [("redundant-comparison", 2), ("impossible-condition", 2)]
 );
 test_case!(ambiguous_constant_inheritance, expected_issue_counts = [("ambiguous-constant-inheritance", 8)]);
+test_case!(
+    self_referencing_constants,
+    expected_issue_counts = [("self-referencing-constant", 12), ("unresolvable-class-constant", 1)]
+);
 
 #[test]
 #[cfg_attr(miri, ignore)]

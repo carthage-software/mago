@@ -12,14 +12,16 @@ class StaticRef
     const int b = static::b;
 }
 
-// Multi-step cycle: must not crash, even though we don't (yet) report it.
+// Multi-step cycle: must not crash, and is reported.
 class CycleA
 {
+    /** @mago-expect analysis:self-referencing-constant */
     const int x = CycleB::y;
 }
 
 class CycleB
 {
+    /** @mago-expect analysis:self-referencing-constant */
     const int y = CycleA::x;
 }
 
