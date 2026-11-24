@@ -13,6 +13,7 @@ use mago_syntax::cst::Declare;
 use mago_syntax::cst::Enum;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::For;
+use mago_syntax::cst::ForeachTarget;
 use mago_syntax::cst::Function;
 use mago_syntax::cst::FunctionLikeParameterList;
 use mago_syntax::cst::FunctionLikeReturnTypeHint;
@@ -266,6 +267,15 @@ impl<'ast, 'arena> Walker<'ast, 'arena, Context<'_, 'ast, 'arena>> for CheckingW
     #[inline]
     fn walk_in_list(&self, list: &'ast List<'arena>, context: &mut Context<'_, 'ast, 'arena>) {
         checker::array::check_list(list, context);
+    }
+
+    #[inline]
+    fn walk_in_foreach_target(
+        &self,
+        foreach_target: &'ast ForeachTarget<'arena>,
+        context: &mut Context<'_, 'ast, 'arena>,
+    ) {
+        checker::array::check_destructuring_target(foreach_target.value(), context);
     }
 
     fn walk_in_call(&self, call: &'ast Call<'arena>, context: &mut Context<'_, 'ast, 'arena>) {

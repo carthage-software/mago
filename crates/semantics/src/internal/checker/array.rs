@@ -11,6 +11,32 @@ use mago_syntax::cst::UnaryPrefixOperator;
 
 use crate::internal::context::Context;
 
+pub fn check_destructuring_target(target: &Expression, context: &mut Context<'_, '_, '_>) {
+    let elements = match target {
+        Expression::Array(array) => &array.elements,
+        Expression::List(list) => &list.elements,
+        _ => return,
+    };
+
+    if elements.iter().all(|element| matches!(element, ArrayElement::Missing(_))) {
+        context.report(
+            Issue::error("Cannot use empty list.")
+                .with_annotation(Annotation::primary(target.span()).with_message("Empty list used here."))
+                .with_help("Add at least one element to the list."),
+        );
+    }
+
+    for element in elements.iter() {
+        let value = match element {
+            ArrayElement::KeyValue(kv) => kv.value,
+            ArrayElement::Value(v) => v.value,
+            _ => continue,
+        };
+
+        check_destructuring_target(value, context);
+    }
+}
+
 #[inline]
 pub fn check_list(list: &List, context: &mut Context<'_, '_, '_>) {
     if !context.version.is_supported(Feature::TrailingCommaInListSyntax)
