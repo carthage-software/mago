@@ -2198,8 +2198,7 @@ where
                 .filter(|variable_id| {
                     !loop_parent_context.locals.contains_key(*variable_id)
                         && !variable_id.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':'))
-                        && (!short_circuited.sometimes.contains(*variable_id)
-                            || short_circuited.always.contains(*variable_id))
+                        && short_circuited.always.contains(*variable_id)
                 })
                 .copied(),
         );

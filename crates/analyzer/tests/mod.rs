@@ -3763,6 +3763,10 @@ test_case!(
     foreach_by_reference_over_property_writes_back,
     expected_issue_counts = [("invalid-property-assignment-value", 2)]
 );
+test_case!(
+    for_leading_condition_assignment_is_possibly_undefined,
+    expected_issue_counts = [("possibly-undefined-variable", 2)]
+);
 
 #[test]
 #[cfg_attr(miri, ignore)]
