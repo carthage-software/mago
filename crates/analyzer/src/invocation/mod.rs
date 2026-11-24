@@ -333,7 +333,10 @@ impl<'ctx> InvocationTarget<'ctx> {
     /// Keeps a closure's bound types alongside its original parameter metadata.
     pub(crate) fn bind_closure_parameters(&mut self, signature: &TCallableSignature) {
         let Self::FunctionLike {
-            identifier: FunctionLikeIdentifier::Closure(_), metadata, effective_signature, ..
+            identifier: FunctionLikeIdentifier::Closure(_) | FunctionLikeIdentifier::Method(..),
+            metadata,
+            effective_signature,
+            ..
         } = self
         else {
             return;

@@ -3771,6 +3771,7 @@ test_case!(
     inherited_property_resolves_composed_parent_template,
     expected_issue_counts = [("invalid-property-assignment-value", 2)]
 );
+test_case!(generic_invokable_binds_class_templates, expected_issue_counts = [("invalid-argument", 1)]);
 
 #[test]
 #[cfg_attr(miri, ignore)]

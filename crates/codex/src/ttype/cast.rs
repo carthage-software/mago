@@ -1,6 +1,9 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
+use foldhash::HashMap;
+use indexmap::IndexMap;
+
 use mago_word::Word;
 use mago_word::word;
 
@@ -18,9 +21,13 @@ use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::callable::TCallableSignature;
 use crate::ttype::atomic::derived::TDerived;
 use crate::ttype::atomic::object::TObject;
+use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::scalar::TScalar;
+use crate::ttype::expander::StaticClassType;
+use crate::ttype::expander::TypeExpansionOptions;
 use crate::ttype::expander::get_signature_of_function_like_identifier;
+use crate::ttype::expander::get_signature_of_function_like_metadata;
 use crate::ttype::template::GenericTemplate;
 use crate::ttype::template::TemplateResult;
 use crate::ttype::template::inferred_type_replacer;
@@ -83,6 +90,10 @@ pub fn cast_atomic_to_callable<'atomic>(
             method_identifier.get_class_name().as_bytes(),
             method_identifier.get_method_name().as_bytes(),
         ) {
+            if let Some(signature) = get_generic_invokable_signature(codebase, named_object, method_identifier) {
+                return Some(Cow::Owned(TCallable::Signature(signature)));
+            }
+
             populate_template_result(
                 template_result.as_deref_mut(),
                 codebase,
@@ -263,6 +274,79 @@ fn try_object_method(
     }
 
     None
+}
+
+/// The signature of `__invoke` on a generic class, with the class templates bound to what the object
+/// passes them, directly or through `@extends`. `None` when there is nothing to bind or when
+/// `__invoke` has templates of its own.
+fn get_generic_invokable_signature(
+    codebase: &CodebaseMetadata,
+    object: &TNamedObject,
+    method_identifier: MethodIdentifier,
+) -> Option<TCallableSignature> {
+    let declaring_class = codebase.get_class_like(method_identifier.get_class_name().as_bytes())?;
+    if declaring_class.template_types.is_empty() {
+        return None;
+    }
+
+    let method = codebase.get_method_by_id(&method_identifier)?;
+    if !method.template_types.is_empty() {
+        return None;
+    }
+
+    let object_class = codebase.get_class_like(object.get_name().as_bytes())?;
+    let object_parameters = object.get_type_parameters().unwrap_or_default();
+    let own_parameters: HashMap<Word, HashMap<GenericParent, TUnion>> = object_class
+        .template_types
+        .iter()
+        .zip(object_parameters)
+        .map(|((name, _), parameter)| {
+            (*name, HashMap::from_iter([(GenericParent::ClassLike(object_class.name), parameter.clone())]))
+        })
+        .collect();
+
+    let bindings: HashMap<Word, HashMap<GenericParent, TUnion>> = if object_class.name == declaring_class.name {
+        own_parameters
+    } else {
+        let own_parameters = TemplateResult::new(IndexMap::default(), own_parameters);
+        let extended_parameters = object_class.template_extended_parameters.get(&declaring_class.name)?;
+
+        declaring_class
+            .template_types
+            .keys()
+            .filter_map(|name| {
+                let bound = inferred_type_replacer::replace(extended_parameters.get(name)?, &own_parameters, codebase);
+
+                Some((*name, HashMap::from_iter([(GenericParent::ClassLike(declaring_class.name), bound)])))
+            })
+            .collect()
+    };
+
+    if bindings.is_empty() {
+        return None;
+    }
+
+    let signature = get_signature_of_function_like_metadata(
+        &method_identifier.into(),
+        method,
+        codebase,
+        &TypeExpansionOptions {
+            self_class: Some(declaring_class.original_name),
+            static_class_type: StaticClassType::Object(TObject::Named(object.clone())),
+            ..Default::default()
+        },
+    );
+
+    match inferred_type_replacer::replace(
+        &TUnion::from_atomic(TAtomic::Callable(TCallable::Signature(signature))),
+        &TemplateResult::new(IndexMap::default(), bindings),
+        codebase,
+    )
+    .get_single_owned()
+    {
+        TAtomic::Callable(TCallable::Signature(signature)) => Some(signature),
+        _ => None,
+    }
 }
 
 fn populate_template_result(
