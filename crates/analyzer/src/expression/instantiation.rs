@@ -332,7 +332,11 @@ where
                     invocation_kind: MethodInvocationKind::Instance,
                     declaring_method_id: Some(constructor_declraing_id),
                     class_like_metadata: metadata,
-                    class_type: StaticClassType::Exact(metadata.original_name),
+                    class_type: if classname.is_static() && !metadata.flags.is_final() {
+                        StaticClassType::Name(metadata.original_name)
+                    } else {
+                        StaticClassType::Exact(metadata.original_name)
+                    },
                     declaring_object_type: None,
                 }),
                 span: instantiation_span,

@@ -3772,6 +3772,10 @@ test_case!(
     expected_issue_counts = [("invalid-property-assignment-value", 2)]
 );
 test_case!(generic_invokable_binds_class_templates, expected_issue_counts = [("invalid-argument", 1)]);
+test_case!(
+    static_in_assertion_is_late_static_for_open_receivers,
+    expected_issue_counts = [("redundant-type-comparison", 1)]
+);
 
 #[test]
 #[cfg_attr(miri, ignore)]

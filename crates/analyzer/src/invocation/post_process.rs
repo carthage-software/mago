@@ -17,6 +17,7 @@ use mago_codex::assertion::Assertion;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::TType;
+use mago_codex::ttype::TypeRef;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
@@ -24,12 +25,14 @@ use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
+use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::resource::TResource;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
+use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::expand_union;
 use mago_codex::ttype::get_array_parameters;
@@ -1448,6 +1451,41 @@ fn is_superglobal_name(name: &[u8]) -> bool {
     )
 }
 
+/// `static` in an assertion of a call through an object whose class may have subclasses is the
+/// runtime class of that object, not the class itself.
+fn keep_late_static<A>(
+    context: &Context<'_, '_, A>,
+    invocation: &Invocation<'_, '_, '_>,
+    assertion_atomic: &TAtomic,
+    mut resolved: TUnion,
+) -> TUnion
+where
+    A: Arena,
+{
+    let is_late_static = |atomic: &TAtomic| matches!(atomic, TAtomic::Object(TObject::Named(named)) if named.is_static);
+    if let Some(method_context) = invocation.target.get_method_context()
+        && let StaticClassType::Object(TObject::Named(receiver)) = &method_context.class_type
+        && !receiver.is_static
+        && (is_late_static(assertion_atomic)
+            || assertion_atomic
+                .any_child_node(|node| matches!(node, TypeRef::Atomic(atomic) if is_late_static(atomic))))
+        && context
+            .codebase
+            .get_class_like(receiver.name.as_bytes())
+            .is_some_and(|class| !class.flags.is_final() && !class.kind.is_enum())
+    {
+        for atomic in resolved.types.to_mut() {
+            if let TAtomic::Object(TObject::Named(named)) = atomic
+                && named.name.as_bytes().eq_ignore_ascii_case(receiver.name.as_bytes())
+            {
+                named.is_static = true;
+            }
+        }
+    }
+
+    resolved
+}
+
 fn resolve_invocation_assertion<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
@@ -1516,12 +1554,17 @@ where
                         continue;
                     };
 
-                    let resolved_assertion_type = resolve_invocation_type(
+                    let resolved_assertion_type = keep_late_static(
                         context,
                         invocation,
-                        template_result,
-                        parameters,
-                        TUnion::from_atomic(assertion_atomic.to_owned()),
+                        assertion_atomic,
+                        resolve_invocation_type(
+                            context,
+                            invocation,
+                            template_result,
+                            parameters,
+                            TUnion::from_atomic(assertion_atomic.to_owned()),
+                        ),
                     );
 
                     if !resolved_assertion_type.is_never() {
@@ -1543,11 +1586,18 @@ where
                         let assertion_loses_template_precision =
                             derived_assertion_loses_template_precision(assertion_atomic);
 
+                        let has_late_static = |union: &TUnion| {
+                            union.types.iter().any(
+                                |atomic| matches!(atomic, TAtomic::Object(TObject::Named(named)) if named.is_static),
+                            )
+                        };
+
                         if always_redundant
                             && let Some(asserted_type) = &asserted_type
                             && !asserted_type.is_mixed()
                             && !resolved_assertion_type.has_template()
                             && !assertion_loses_template_precision
+                            && (has_late_static(asserted_type) || !has_late_static(&resolved_assertion_type))
                         {
                             let mut comparison_result = ComparisonResult::default();
                             let is_subtype = is_contained_by(
