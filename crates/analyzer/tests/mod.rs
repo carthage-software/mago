@@ -3746,6 +3746,7 @@ test_case!(
     loose_comparison_of_string_literals,
     expected_issue_counts = [("redundant-comparison", 2), ("impossible-condition", 2)]
 );
+test_case!(ambiguous_constant_inheritance, expected_issue_counts = [("ambiguous-constant-inheritance", 8)]);
 
 #[test]
 #[cfg_attr(miri, ignore)]

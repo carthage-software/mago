@@ -1193,6 +1193,7 @@ where
     // Check trait constant overrides AFTER constants have been analyzed
     // so we can compare their inferred values
     check_class_like_constants(context, class_like_metadata, members);
+    check_ambiguous_inherited_constants(context, class_like_metadata, extends_ast, implements_ast, members);
 
     if has_complete_hierarchy {
         crate::readonly::finalize_class_writes(context, artifacts, class_like_metadata);
@@ -3943,6 +3944,76 @@ fn check_class_like_properties<'ctx, A>(
                 );
             }
         }
+    }
+}
+
+fn check_ambiguous_inherited_constants<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
+    class_like_metadata: &'ctx ClassLikeMetadata,
+    extends_ast: Option<&Extends<'arena>>,
+    implements_ast: Option<&Implements<'arena>>,
+    members: &[ClassLikeMember<'arena>],
+) where
+    A: Arena,
+{
+    let codebase = context.codebase;
+    let interface_names = if class_like_metadata.kind.is_interface() {
+        extends_ast.map(|e| &e.types)
+    } else {
+        implements_ast.map(|i| &i.types)
+    };
+    let parent = class_like_metadata.direct_parent_class.and_then(|name| codebase.get_class_like_by_name(name));
+    let interfaces = interface_names
+        .into_iter()
+        .flatten()
+        .filter_map(|name| codebase.get_class_like(context.resolved_names.get(name)))
+        .filter(|metadata| metadata.kind.is_interface());
+
+    let declared: Vec<Word> = members
+        .iter()
+        .filter_map(|member| if let ClassLikeMember::Constant(constant) = member { Some(constant) } else { None })
+        .flat_map(|constant| constant.items.iter().map(|item| word(item.name.value)))
+        .collect();
+
+    let mut inherited: HashMap<Word, (&ClassLikeMetadata, Span)> = HashMap::default();
+    let mut conflicts: Vec<(Word, &ClassLikeMetadata, Span, &ClassLikeMetadata, Span)> = Vec::new();
+    for source in parent.into_iter().chain(interfaces) {
+        for (name, constant) in &source.constants {
+            if constant.visibility == Visibility::Private
+                || declared.contains(name)
+                || class_like_metadata.trait_constant_ids.contains_key(name)
+                || class_like_metadata.enum_cases.contains_key(name)
+            {
+                continue;
+            }
+
+            let (first_source, first_span) = *inherited.entry(*name).or_insert((source, constant.span));
+            if first_span != constant.span && !conflicts.iter().any(|(conflict, ..)| conflict == name) {
+                conflicts.push((*name, first_source, first_span, source, constant.span));
+            }
+        }
+    }
+
+    let kind = class_like_metadata.kind.as_str();
+    let kind = format!("{}{}", kind[..1].to_ascii_uppercase(), &kind[1..]);
+    let class_name = class_like_metadata.original_name;
+    for (name, first_source, first_span, second_source, second_span) in conflicts {
+        let first = first_source.original_name;
+        let second = second_source.original_name;
+
+        context.collector.report_with_code(
+            IssueCode::AmbiguousConstantInheritance,
+            Issue::error(format!(
+                "{kind} `{class_name}` inherits two different constants named `{name}`, through `{first}` and `{second}`."
+            ))
+            .with_annotation(
+                Annotation::primary(class_like_metadata.name_span.unwrap_or(class_like_metadata.span))
+                    .with_message("PHP stops with a fatal error when it loads this class-like"),
+            )
+            .with_annotation(Annotation::secondary(first_span).with_message(format!("Inherited through `{first}`")))
+            .with_annotation(Annotation::secondary(second_span).with_message(format!("Inherited through `{second}`")))
+            .with_help(format!("Declare `{name}` in `{class_name}` to override both, or stop inheriting one of them.")),
+        );
     }
 }
 

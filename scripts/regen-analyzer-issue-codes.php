@@ -219,6 +219,7 @@ final class AnalyzerCodeModuleGenerator
         'string-constant-selector',
         'invalid-constant-selector',
         'ambiguous-class-like-constant-access',
+        'ambiguous-constant-inheritance',
         'invalid-class-constant-on-string',
         'unknown-member-selector-type',
         'string-member-selector',
