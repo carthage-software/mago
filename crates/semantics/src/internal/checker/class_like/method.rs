@@ -9,6 +9,7 @@ use mago_syntax::cst::Hint;
 use mago_syntax::cst::Method;
 use mago_syntax::cst::MethodBody;
 use mago_syntax::cst::Modifier;
+use mago_syntax::cst::ModifierSequenceExt;
 
 use crate::internal::checker::MAGIC_METHOD_SEMANTICS;
 use crate::internal::checker::MAGIC_METHOD_TYPES;
@@ -30,6 +31,7 @@ pub fn check_method<'ast, 'arena>(
     class_like_fqcn: &[u8],
     class_like_kind: &str,
     class_like_is_interface: bool,
+    class_like_is_trait: bool,
     context: &mut Context<'_, 'ast, 'arena>,
 ) {
     check_parameter_list_trailing_comma(&method.parameter_list, context);
@@ -217,6 +219,27 @@ pub fn check_method<'ast, 'arena>(
                 );
             }
         }
+    }
+
+    if !class_like_is_interface
+        && !class_like_is_trait
+        && let Some(abstract_modifier) = last_abstract
+        && let Some(private_modifier) = method.modifiers.get_private()
+    {
+        context.report(
+            Issue::error(format!("Abstract method `{class_like_name}::{method_name}` cannot be private."))
+                .with_annotation(Annotation::primary(private_modifier.span()).with_message("`private` modifier"))
+                .with_annotation(Annotation::primary(abstract_modifier).with_message("`abstract` modifier"))
+                .with_annotation(
+                    Annotation::secondary(method.span())
+                        .with_message(format!("Method `{class_like_name}::{method_name}` defined here.")),
+                )
+                .with_annotation(
+                    Annotation::secondary(class_like_span)
+                        .with_message(format!("{class_like_kind} `{class_like_fqcn}` is defined here.")),
+                )
+                .with_help("Make the method `protected` or `public`, or remove the `abstract` modifier."),
+        );
     }
 
     for (magic_method, parameter_count, must_be_public, must_be_static, can_have_return_type) in MAGIC_METHOD_SEMANTICS
