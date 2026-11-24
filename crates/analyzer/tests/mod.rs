@@ -3759,6 +3759,10 @@ test_case!(
     destructuring_condition_rules_out_null_source,
     expected_issue_counts = [("possibly-null-destructuring-source", 6), ("possibly-null-operand", 1)]
 );
+test_case!(
+    foreach_by_reference_over_property_writes_back,
+    expected_issue_counts = [("invalid-property-assignment-value", 2)]
+);
 
 #[test]
 #[cfg_attr(miri, ignore)]

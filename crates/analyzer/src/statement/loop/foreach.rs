@@ -4,12 +4,15 @@ use std::sync::Arc;
 use mago_allocator::Arena;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::comparator::ComparisonResult;
+use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
+use mago_syntax::cst::Access;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Foreach;
 use mago_syntax::cst::ForeachTarget;
@@ -87,6 +90,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
         }
 
         let source_value_type = value_type.clone();
+        let property_item_type = (is_by_reference && reaches_property(iterator)).then(|| source_value_type.clone());
         let assigned = assign_to_expression(
             context,
             &mut loop_block_context,
@@ -168,8 +172,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
             None
         };
 
+        let iterates_property = reaches_property(iterator);
         let reference_entry = if is_by_reference
-            && matches!(iterator, Expression::Variable(Variable::Direct(_)))
+            && (iterates_property || matches!(iterator, Expression::Variable(Variable::Direct(_))))
             && matches!(value_expression, Expression::Variable(Variable::Direct(_)))
         {
             iterator_variable_id.zip(value_expression_id)
@@ -251,13 +256,49 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
         // Refine after inheriting the loop context so a non-empty iterator's
         // widened type does not overwrite the fully transformed value type.
         if let Some((iterator_id, entry_type)) = refined_entry
-            && let Some(iterator_type) = block_context.locals.get(&iterator_id)
+            && let Some(iterator_type) =
+                block_context.locals.get(&iterator_id).or_else(|| artifacts.get_rc_expression_type(iterator))
             && let Some(refined) = refine_foreach_array_values(iterator_type, &entry_type)
         {
-            block_context.locals.insert(iterator_id, Rc::new(refined));
+            if let Some(property_item_type) = property_item_type {
+                let keeps_item_type = union_comparator::is_contained_by(
+                    context.codebase,
+                    &entry_type,
+                    &property_item_type,
+                    false,
+                    false,
+                    false,
+                    &mut ComparisonResult::default(),
+                );
+
+                if !keeps_item_type {
+                    assign_to_expression(
+                        context,
+                        block_context,
+                        artifacts,
+                        iterator,
+                        Some(iterator_id),
+                        None,
+                        Rc::new(refined),
+                        false,
+                        PropertyWriteKind::Mutation,
+                    )?;
+                }
+            } else {
+                block_context.locals.insert(iterator_id, Rc::new(refined));
+            }
         }
 
         Ok(())
+    }
+}
+
+fn reaches_property(expression: &Expression<'_>) -> bool {
+    match expression {
+        Expression::Parenthesized(parenthesized) => reaches_property(parenthesized.expression),
+        Expression::Access(Access::Property(_) | Access::StaticProperty(_)) => true,
+        Expression::ArrayAccess(array_access) => reaches_property(array_access.array),
+        _ => false,
     }
 }
 
