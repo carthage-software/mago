@@ -1497,33 +1497,34 @@ fn update_template_types<A>(
         }
     }
 
-    for (type_name, v) in template_types.iter_mut() {
-        if let Some(mapped_type) = property_class_metadata
-            .template_extended_parameters
-            .get(&property_declaring_class_metadata.name)
-            .unwrap_or(&IndexMap::default())
-            .get(type_name)
-        {
-            for mapped_type_atomic in mapped_type.types.as_ref() {
-                if let TAtomic::GenericParameter(TGenericParameter { parameter_name, .. }) = &mapped_type_atomic {
-                    let position = property_class_metadata
-                        .template_types
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, (k, _))| *k == parameter_name)
-                        .map(|(i, _)| i)
-                        .next();
+    let Some(extended_parameters) =
+        property_class_metadata.template_extended_parameters.get(&property_declaring_class_metadata.name)
+    else {
+        return;
+    };
 
-                    if let Some(position) = position
-                        && let Some(mapped_param) = lhs_type_params.get(position)
-                    {
-                        v.insert(
-                            GenericParent::ClassLike(property_declaring_class_metadata.name),
-                            mapped_param.clone(),
-                        );
-                    }
-                }
-            }
+    let own_parameters: HashMap<Word, HashMap<GenericParent, TUnion>> = property_class_metadata
+        .template_types
+        .iter()
+        .zip(lhs_type_params)
+        .map(|((name, _), parameter)| {
+            (*name, HashMap::from_iter([(GenericParent::ClassLike(property_class_metadata.name), parameter.clone())]))
+        })
+        .collect();
+
+    if own_parameters.is_empty() {
+        return;
+    }
+
+    let own_parameters = TemplateResult::new(IndexMap::default(), own_parameters);
+    for (type_name, v) in template_types.iter_mut() {
+        if let Some(mapped_type) = extended_parameters.get(type_name)
+            && mapped_type.has_template_types()
+        {
+            v.insert(
+                GenericParent::ClassLike(property_declaring_class_metadata.name),
+                inferred_type_replacer::replace(mapped_type, &own_parameters, context.codebase),
+            );
         }
     }
 }

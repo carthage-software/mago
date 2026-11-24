@@ -3767,6 +3767,10 @@ test_case!(
     for_leading_condition_assignment_is_possibly_undefined,
     expected_issue_counts = [("possibly-undefined-variable", 2)]
 );
+test_case!(
+    inherited_property_resolves_composed_parent_template,
+    expected_issue_counts = [("invalid-property-assignment-value", 2)]
+);
 
 #[test]
 #[cfg_attr(miri, ignore)]
