@@ -31,6 +31,7 @@ use mago_syntax::cst::Try;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::CheckpointAction;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
@@ -548,6 +549,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 }
 
                 block_context.variables_possibly_in_scope.extend(catch_block_context.variables_possibly_in_scope);
+                block_context
+                    .possibly_assigned_variable_ids
+                    .extend(catch_block_context.possibly_assigned_variable_ids.iter().copied());
             } else if self.finally_clause.is_some() {
                 block_context.variables_possibly_in_scope.extend(catch_block_context.variables_possibly_in_scope);
             }
@@ -637,6 +641,41 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             inherit_thrown_exceptions(context, block_context, &finally_block_context);
 
             finally_has_returned = finally_block_context.flags.has_returned();
+
+            let finally_assigned_variable_ids: Vec<Word> = finally_block_context
+                .possibly_assigned_variable_ids
+                .iter()
+                .filter(|variable_id| !variable_id.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':')))
+                .copied()
+                .collect();
+
+            let completion_locals = if finally_assigned_variable_ids.is_empty() || finally_has_returned {
+                None
+            } else {
+                let mut completion_context = block_context.clone();
+                completion_context.assigned_variable_ids = WordMap::default();
+                completion_context.possibly_assigned_variable_ids = WordSet::default();
+                completion_context.flags.set_has_returned(false);
+
+                artifacts.begin_expression_type_checkpoint();
+                let (result, _) = context.record(|context| {
+                    analyze_statements(
+                        finally_clause.block.statements.as_slice(),
+                        context,
+                        &mut completion_context,
+                        artifacts,
+                    )
+                });
+                artifacts.finish_expression_type_checkpoint(if result.is_ok() {
+                    CheckpointAction::Rollback
+                } else {
+                    CheckpointAction::Keep
+                });
+                result?;
+
+                Some(completion_context.locals)
+            };
+
             block_context.possibly_undefined_variable_ids.extend(finally_block_context.possibly_undefined_variable_ids);
 
             for variable_id in &finally_block_context.possibly_assigned_variable_ids {
@@ -684,6 +723,17 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 let finally_variable_type = finally_block_context.locals.remove(&variable_id);
                 if let Some(finally_variable_type) = finally_variable_type {
                     block_context.locals.insert(variable_id, finally_variable_type);
+                }
+            }
+
+            if let Some(mut completion_locals) = completion_locals {
+                for variable_id in finally_assigned_variable_ids {
+                    match completion_locals.remove(&variable_id) {
+                        Some(variable_type) => {
+                            block_context.locals.insert(variable_id, variable_type);
+                        }
+                        None => block_context.remove_variable(variable_id.as_bytes(), true, context),
+                    }
                 }
             }
         }

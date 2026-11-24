@@ -3751,6 +3751,10 @@ test_case!(
     self_referencing_constants,
     expected_issue_counts = [("self-referencing-constant", 12), ("unresolvable-class-constant", 1)]
 );
+test_case!(
+    finally_partial_assignment_keeps_post_try_state,
+    expected_issue_counts = [("possibly-undefined-variable", 3)]
+);
 
 #[test]
 #[cfg_attr(miri, ignore)]
