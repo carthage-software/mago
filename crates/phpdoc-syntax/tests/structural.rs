@@ -395,6 +395,31 @@ fn parses_type_alias() {
 }
 
 #[test]
+fn parses_prefixed_callable_alias_with_named_parameter_without_equals() {
+    let arena = LocalArena::new();
+    for source in [
+        &b"/** @phpstan-type Handler callable(string $value): bool */"[..],
+        b"/** @psalm-type Handler callable(string $value): bool */",
+    ] {
+        let document = parse(&arena, source);
+        let tag = first_tag(&document);
+
+        let TagValue::TypeAlias(alias) = &tag.value else { panic!("expected type alias, got {:?}", tag.value) };
+        assert_eq!(alias.alias.value, b"Handler");
+        assert!(matches!(alias.r#type, Type::Callable(_)));
+    }
+}
+
+#[test]
+fn parses_unprefixed_wordpress_hash_item_as_generic_tag() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** @type string $key Description. */");
+    let tag = first_tag(&document);
+
+    assert!(matches!(tag.value, TagValue::Generic(_)));
+}
+
+#[test]
 fn parses_type_alias_import() {
     let arena = LocalArena::new();
     let document = parse(&arena, b"/** @phpstan-import-type UserId from User as Id */");
