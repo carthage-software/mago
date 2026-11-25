@@ -143,7 +143,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
 
         let inferred_parameter_types = artifacts.inferred_parameter_types.take();
         let inferred_return_type = artifacts.inferred_return_type.take();
-        let inner_artifacts = analyze_function_like(
+        let mut inner_artifacts = analyze_function_like(
             context,
             artifacts,
             &mut inner_block_context,
@@ -156,6 +156,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
 
         if block_context.flags.inside_call() {
             inherit_too_wide_thrown_exceptions(context, block_context, &inner_block_context);
+        }
+        if !inner_block_context.possibly_thrown_exceptions.is_empty()
+            || !inner_block_context.possibly_thrown_generic_exceptions.is_empty()
+        {
+            artifacts.register_pending_immediate_callback_throws(
+                function_metadata.name,
+                std::mem::take(&mut inner_block_context.possibly_thrown_exceptions),
+                std::mem::take(&mut inner_block_context.possibly_thrown_generic_exceptions),
+                std::mem::take(&mut inner_artifacts.deferred_thrown_type_issues),
+            );
         }
 
         let resulting_closure = resolve_closure_like_type(

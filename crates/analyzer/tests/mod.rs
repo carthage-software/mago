@@ -137,6 +137,8 @@ test_case!(list_destructure_with_holes_no_warn);
 test_case!(loops_foreach_union_cast_not_always_entered);
 test_case!(do_while_iteration_dependent_conditions);
 test_case!(array_map_non_empty_array);
+test_case!(issue_2504_immediate_builtin_callback_throws);
+test_case!(issue_2568_immediate_callable_tag_catches);
 test_case!(array_map_non_empty_list);
 test_case!(array_shape_fields);
 test_case!(array_shape_discriminant_match);

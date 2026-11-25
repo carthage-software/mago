@@ -55,6 +55,8 @@ impl MetadataFlags {
     pub const USES_FUNC_GET_ARGS: MetadataFlags = MetadataFlags(1 << 44);
     pub const ALLOWS_DYNAMIC_PROPERTIES: MetadataFlags = MetadataFlags(1 << 45);
     pub const CALLS_PARENT_CONSTRUCTOR: MetadataFlags = MetadataFlags(1 << 46);
+    pub const IMMEDIATELY_INVOKED_CALLABLE: MetadataFlags = MetadataFlags(1 << 48);
+    pub const LATER_INVOKED_CALLABLE: MetadataFlags = MetadataFlags(1 << 49);
     pub const PUBLIC_SET: MetadataFlags = MetadataFlags(1 << 47);
 }
 
