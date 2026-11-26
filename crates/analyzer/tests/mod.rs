@@ -739,6 +739,7 @@ test_case!(isset_refinement_on_object_properties);
 test_case!(array_shape_reconciliation);
 test_case!(retain_possibly_undefined_in_array_access);
 test_case!(static_return_generic_override);
+test_case!(static_mixin_cycle_through_traits);
 test_case!(default_parameter_inference);
 test_case!(infer_class_string_on_generic_object);
 test_case!(redefined_loop_variables);

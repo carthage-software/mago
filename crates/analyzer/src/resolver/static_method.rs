@@ -1,3 +1,4 @@
+use foldhash::HashSet;
 use mago_allocator::Arena;
 use std::sync::Arc;
 
@@ -327,6 +328,9 @@ where
         && !class_metadata.mixins.is_empty()
     {
         let host = TObject::Named(TNamedObject::new(class_metadata.original_name));
+        // The host was searched already: a mixin of itself, as a trait of it can declare, adds nothing.
+        let mut visited = HashSet::default();
+        visited.insert(class_metadata.original_name.to_ascii_lowercase());
         let mixin_methods = find_static_method_in_mixins(
             context,
             block_context,
@@ -336,6 +340,7 @@ where
             selector,
             access_span,
             0,
+            &mut visited,
         );
 
         if let Some(mixin_classname) = mixin_methods.first().map(|resolved_method| resolved_method.classname)
@@ -917,6 +922,11 @@ fn report_non_existent_mixin_static_method<A>(
 
 /// Searches for a static method in mixin types, binding `static` to the host class like an
 /// instance call does. A generic parameter mixin falls back to its constraint.
+///
+/// Each mixin class is searched once, as `collect_mixin_types` does for instance calls:
+/// without that, a class whose traits each declare `@mixin` of it is searched again
+/// through every one of them, at every depth, which grows exponentially.
+#[allow(clippy::too_many_arguments)]
 fn find_static_method_in_mixins<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
@@ -926,6 +936,7 @@ fn find_static_method_in_mixins<'ctx, 'arena, A>(
     selector: &ClassLikeMemberSelector<'arena>,
     access_span: Span,
     depth: usize,
+    visited: &mut HashSet<Word>,
 ) -> Vec<ResolvedMethod>
 where
     A: Arena,
@@ -943,6 +954,12 @@ where
                     continue;
                 };
 
+                if let Some(name) = mixin_object.get_name()
+                    && !visited.insert(name.to_ascii_lowercase())
+                {
+                    continue;
+                }
+
                 resolved_methods.extend(find_static_method_in_single_mixin(
                     context,
                     block_context,
@@ -952,6 +969,7 @@ where
                     selector,
                     access_span,
                     depth,
+                    visited,
                 ));
             }
         }
@@ -961,6 +979,7 @@ where
 }
 
 /// Searches for a static method in a single mixin class.
+#[allow(clippy::too_many_arguments)]
 fn find_static_method_in_single_mixin<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
@@ -970,6 +989,7 @@ fn find_static_method_in_single_mixin<'ctx, 'arena, A>(
     selector: &ClassLikeMemberSelector<'arena>,
     access_span: Span,
     depth: usize,
+    visited: &mut HashSet<Word>,
 ) -> Vec<ResolvedMethod>
 where
     A: Arena,
@@ -995,6 +1015,7 @@ where
             selector,
             access_span,
             depth + 1,
+            visited,
         );
     };
 
