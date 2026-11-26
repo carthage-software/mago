@@ -1895,6 +1895,7 @@ test_case!(property_hook_generic_write_tracking);
 test_case!(property_hook_symmetric_write_tracking);
 test_case!(property_hook_backing_store_write);
 test_case!(classes_asymmetric_visibility_private_set);
+test_case!(classes_private_set_implicitly_final);
 test_case!(classes_asymmetric_visibility_violation);
 test_case!(classes_asymmetric_protected_set);
 test_case!(classes_class_const_self_ref);

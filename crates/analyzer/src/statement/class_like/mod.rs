@@ -3569,7 +3569,24 @@ fn check_class_like_properties<'ctx, A>(
             let declaring_class_name = class_like_metadata.original_name;
             let parent_class_name = parent_metadata.original_name;
 
-            if parent_property.flags.is_final() {
+            let is_implicitly_final =
+                !parent_property.flags.is_final() && parent_property.write_visibility.is_private();
+
+            if parent_property.flags.is_final() || is_implicitly_final {
+                let (parent_message, note, modifier) = if is_implicitly_final {
+                    (
+                        format!("Property `{parent_class_name}::{property_name}` is declared with `private(set)`"),
+                        "A `private(set)` property is implicitly final and cannot be overridden in child classes.",
+                        "the `private(set)` modifier",
+                    )
+                } else {
+                    (
+                        format!("Property `{parent_class_name}::{property_name}` is declared as final"),
+                        "Final properties cannot be overridden in child classes.",
+                        "the final modifier",
+                    )
+                };
+
                 context.collector.report_with_code(
                     IssueCode::OverrideFinalProperty,
                     Issue::error(format!(
@@ -3579,13 +3596,10 @@ fn check_class_like_properties<'ctx, A>(
                         Annotation::primary(property_span)
                             .with_message("Attempting to override final property here"),
                     )
-                    .with_annotation(
-                        Annotation::secondary(parent_property_span)
-                            .with_message(format!("Property `{parent_class_name}::{property_name}` is declared as final")),
-                    )
-                    .with_note("Final properties cannot be overridden in child classes.")
+                    .with_annotation(Annotation::secondary(parent_property_span).with_message(parent_message))
+                    .with_note(note)
                     .with_help(format!(
-                        "Remove the property `{property_name}` from `{declaring_class_name}`, or remove the final modifier from the parent property.",
+                        "Remove the property `{property_name}` from `{declaring_class_name}`, or remove {modifier} from the parent property.",
                     )),
                 );
             }
