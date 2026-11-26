@@ -1356,6 +1356,29 @@ mod parser {
         "($a == (($b = (& $c)) > $d))"
     );
     smoke_test!(reference_assignment_comparison_chain, "<?php $a[] =& $a == $a =& $b > gc_collect_cycles();");
+
+    // `?>` consumes one directly following newline, so nothing sits between the switch and its first case.
+    smoke_test!(
+        issue_2806_switch_colon_close_tag_newline,
+        "<?php switch ($t): ?>\n<?php case 'a': ?>x<?php endswitch ?>"
+    );
+    smoke_test!(
+        issue_2806_switch_colon_close_tag_crlf,
+        "<?php switch ($t): ?>\r\n<?php case 'a': ?>x<?php endswitch ?>"
+    );
+    smoke_test!(
+        issue_2806_switch_brace_close_tag_newline,
+        "<?php switch ($t) { ?>\n<?php case 'a': ?>x<?php } ?>"
+    );
+    smoke_test!(issue_2806_switch_colon_close_tag_short_open_tag, "<?php switch ($t): ?>\n<? case 'a': endswitch;");
+    parse_error_test!(
+        issue_2806_switch_colon_close_tag_two_newlines,
+        "<?php switch ($t): ?>\n\n<?php case 'a': ?>x<?php endswitch ?>"
+    );
+    parse_error_test!(
+        issue_2806_switch_colon_close_tag_space_newline,
+        "<?php switch ($t): ?> \n<?php case 'a': ?>x<?php endswitch ?>"
+    );
 }
 
 mod semantics {
