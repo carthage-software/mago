@@ -21,6 +21,7 @@ const MB_CASE_TITLE_SIMPLE = 6;
 #[Mago\AvailableSince(70300)]
 const MB_CASE_FOLD_SIMPLE = 7;
 
+#[Deprecated(since: '8.6', message: 'because the underlying library is no longer maintained')]
 const MB_ONIGURUMA_VERSION = '6.9.9';
 
 /**
@@ -310,23 +311,28 @@ function mb_get_info(string $type = 'all'): array|string|int|false|null {}
  */
 function mb_check_encoding(array|string|null $value = null, ?string $encoding = null): bool {}
 
+#[Deprecated(since: '8.6', message: 'because the underlying library is no longer maintained')]
 function mb_regex_encoding(?string $encoding = null): string|bool {}
 
+#[Deprecated(since: '8.6', message: 'because the underlying library is no longer maintained')]
 function mb_regex_set_options(?string $options = null): string {}
 
 /**
  * @param string[] &$matches
  */
+#[Deprecated(since: '8.6', message: 'because the underlying library is no longer maintained')]
 function mb_ereg(string $pattern, string $string, &$matches = null): bool {}
 
 /**
  * @param string[] &$matches
  */
+#[Deprecated(since: '8.6', message: 'because the underlying library is no longer maintained')]
 function mb_eregi(string $pattern, string $string, &$matches = null): bool {}
 
 /**
  * @pure
  */
+#[Deprecated(since: '8.6', message: 'because the underlying library is no longer maintained')]
 function mb_ereg_replace(
     string $pattern,
     string $replacement,
@@ -334,6 +340,7 @@ function mb_ereg_replace(
     ?string $options = null,
 ): string|false|null {}
 
+#[Deprecated(since: '8.6', message: 'because the underlying library is no longer maintained')]
 function mb_ereg_replace_callback(
     string $pattern,
     callable $callback,
@@ -344,6 +351,7 @@ function mb_ereg_replace_callback(
 /**
  * @pure
  */
+#[Deprecated(since: '8.6', message: 'because the underlying library is no longer maintained')]
 function mb_eregi_replace(
     string $pattern,
     string $replacement,
@@ -355,16 +363,19 @@ function mb_eregi_replace(
  * @return string[]|false
  * @pure
  */
+#[Deprecated(since: '8.6', message: 'because the underlying library is no longer maintained')]
 function mb_split(string $pattern, string $string, int $limit = -1): array|false {}
 
 /**
  * @pure
  */
+#[Deprecated(since: '8.6', message: 'because the underlying library is no longer maintained')]
 function mb_ereg_match(string $pattern, string $string, ?string $options = null): bool {}
 
 /**
  * @pure
  */
+#[Deprecated(since: '8.6', message: 'because the underlying library is no longer maintained')]
 function mb_ereg_search(?string $pattern = null, ?string $options = null): bool {}
 
 /**
@@ -372,6 +383,7 @@ function mb_ereg_search(?string $pattern = null, ?string $options = null): bool 
  *
  * @pure
  */
+#[Deprecated(since: '8.6', message: 'because the underlying library is no longer maintained')]
 function mb_ereg_search_pos(?string $pattern = null, ?string $options = null): array|false {}
 
 /**
@@ -379,8 +391,10 @@ function mb_ereg_search_pos(?string $pattern = null, ?string $options = null): a
  *
  * @pure
  */
+#[Deprecated(since: '8.6', message: 'because the underlying library is no longer maintained')]
 function mb_ereg_search_regs(?string $pattern = null, ?string $options = null): array|false {}
 
+#[Deprecated(since: '8.6', message: 'because the underlying library is no longer maintained')]
 function mb_ereg_search_init(string $string, ?string $pattern = null, ?string $options = null): bool {}
 
 /**
@@ -388,16 +402,19 @@ function mb_ereg_search_init(string $string, ?string $pattern = null, ?string $o
  *
  * @pure
  */
+#[Deprecated(since: '8.6', message: 'because the underlying library is no longer maintained')]
 function mb_ereg_search_getregs(): array|false {}
 
 /**
  * @pure
  */
+#[Deprecated(since: '8.6', message: 'because the underlying library is no longer maintained')]
 function mb_ereg_search_getpos(): int {}
 
 /**
  * @pure
  */
+#[Deprecated(since: '8.6', message: 'because the underlying library is no longer maintained')]
 function mb_ereg_search_setpos(int $offset): bool {}
 
 /**

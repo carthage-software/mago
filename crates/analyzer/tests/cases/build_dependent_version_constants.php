@@ -13,6 +13,7 @@ function openssl3(): bool
 
 function oniguruma(): bool
 {
+    /** @mago-expect analysis:deprecated-constant */
     if (MB_ONIGURUMA_VERSION === '6.9.10') {
         return true;
     }

@@ -463,6 +463,7 @@ const SORT_NUMERIC = 1;
 
 const SORT_STRING = 2;
 
+#[Deprecated(since: '8.6', message: 'use one of the Collator::*sort*() methods instead')]
 const SORT_LOCALE_STRING = 5;
 
 const CASE_LOWER = 0;
@@ -1375,6 +1376,7 @@ function substr_compare(
 /**
  * @pure
  */
+#[Deprecated(since: '8.6', message: 'use Collator::compare() instead')]
 function strcoll(string $string1, string $string2): int {}
 
 /**
@@ -2351,6 +2353,7 @@ function floatval(mixed $value): float {}
 /**
  * @pure
  */
+#[Deprecated(since: '8.6', message: 'use floatval() instead')]
 function doubleval(mixed $value): float {}
 
 function strval(mixed $value): string {}
@@ -2401,6 +2404,7 @@ function is_bool(mixed $value): bool {}
  *
  * @pure
  */
+#[Deprecated(since: '8.6', message: 'use is_int() instead')]
 function is_long(mixed $value): bool {}
 
 /**
@@ -2428,6 +2432,7 @@ function is_int(mixed $value): bool {}
  *
  * @pure
  */
+#[Deprecated(since: '8.6', message: 'use is_int() instead')]
 function is_integer(mixed $value): bool {}
 
 /**
@@ -2437,6 +2442,7 @@ function is_integer(mixed $value): bool {}
  *
  * @pure
  */
+#[Deprecated(since: '8.6', message: 'use is_float() instead')]
 function is_double(mixed $value): bool {}
 
 /**
@@ -4670,6 +4676,7 @@ function stream_set_chunk_size($stream, int $size): int {}
 /**
  * @pure
  */
+#[Deprecated(since: '8.6', message: 'use a userland phonetic matching library instead')]
 function metaphone(string $string, int $max_phonemes = 0): string {}
 
 /**
