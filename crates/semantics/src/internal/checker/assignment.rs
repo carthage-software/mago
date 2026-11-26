@@ -5,10 +5,15 @@ use mago_span::HasSpan;
 use mago_syntax::cst::Assignment;
 use mago_syntax::cst::AssignmentOperator;
 
+use crate::internal::checker::array::check_destructuring_target;
 use crate::internal::context::Context;
 
 #[inline]
 pub fn check_assignment(assignment: &Assignment, context: &mut Context<'_, '_, '_>) {
+    if assignment.operator.is_assign() {
+        check_destructuring_target(assignment.lhs, context);
+    }
+
     if context.version.is_supported(Feature::NullCoalesceAssign) {
         return;
     }
