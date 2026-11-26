@@ -17,6 +17,7 @@ use crate::internal::checker::MAY_BE_NEVER;
 use crate::internal::checker::MAY_BE_OBJECT;
 use crate::internal::checker::MAY_BE_STATIC;
 use crate::internal::checker::function_like::check_for_promoted_properties_outside_constructor;
+use crate::internal::checker::function_like::check_no_discard_return_type;
 use crate::internal::checker::function_like::check_parameter_list_trailing_comma;
 use crate::internal::checker::hint_type_mask;
 use crate::internal::checker::returns_generator;
@@ -38,6 +39,7 @@ pub fn check_method<'ast, 'arena>(
     if !method_name.eq_ignore_ascii_case(b"__construct") {
         check_for_promoted_properties_outside_constructor(&method.parameter_list, context);
     }
+    check_no_discard_return_type(&method.attribute_lists, method.return_type_hint.as_ref(), "method", context);
 
     let method_name_bytes = method_name;
     let method_name = BytesDisplay(method_name);

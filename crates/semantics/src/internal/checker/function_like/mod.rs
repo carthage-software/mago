@@ -7,6 +7,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::Access;
 use mago_syntax::cst::ArrowFunction;
+use mago_syntax::cst::AttributeList;
 use mago_syntax::cst::Block;
 use mago_syntax::cst::Call;
 use mago_syntax::cst::Closure;
@@ -18,6 +19,7 @@ use mago_syntax::cst::FunctionLikeParameterList;
 use mago_syntax::cst::FunctionLikeReturnTypeHint;
 use mago_syntax::cst::Hint;
 use mago_syntax::cst::IfBody;
+use mago_syntax::cst::Sequence;
 use mago_syntax::cst::Statement;
 use mago_syntax::cst::Variable;
 use mago_syntax::cst::WhileBody;
@@ -198,9 +200,49 @@ fn contains_this_in_statement(statement: &Statement<'_>) -> Option<Span> {
 }
 
 #[inline]
+pub fn check_no_discard_return_type(
+    attribute_lists: &Sequence<'_, AttributeList<'_>>,
+    return_type_hint: Option<&FunctionLikeReturnTypeHint<'_>>,
+    kind: &str,
+    context: &mut Context<'_, '_, '_>,
+) {
+    if !context.version.is_supported(Feature::NoDiscardAttribute) {
+        return;
+    }
+
+    let Some(return_type_hint) = return_type_hint else {
+        return;
+    };
+
+    let return_type = match &return_type_hint.hint {
+        Hint::Void(_) => "void",
+        Hint::Never(_) => "never",
+        _ => return,
+    };
+
+    for attribute in attribute_lists.iter().flat_map(|attribute_list| attribute_list.attributes.iter()) {
+        if !context.get_name(attribute.name.span().start).eq_ignore_ascii_case(b"NoDiscard") {
+            continue;
+        }
+
+        context.report(
+            Issue::error(format!("A {kind} with return type `{return_type}` cannot be marked `#[\\NoDiscard]`."))
+                .with_annotation(Annotation::primary(attribute.span()).with_message("`#[\\NoDiscard]` applied here."))
+                .with_annotation(
+                    Annotation::secondary(return_type_hint.hint.span())
+                        .with_message(format!("Return type `{return_type}` declared here.")),
+                )
+                .with_note(format!("`#[\\NoDiscard]` requires a return value, but a `{return_type}` {kind} has none."))
+                .with_help("Remove the `#[\\NoDiscard]` attribute, or change the return type."),
+        );
+    }
+}
+
+#[inline]
 pub fn check_function<'arena>(function: &Function<'arena>, context: &mut Context<'_, '_, 'arena>) {
     check_parameter_list_trailing_comma(&function.parameter_list, context);
     check_for_promoted_properties_outside_constructor(&function.parameter_list, context);
+    check_no_discard_return_type(&function.attribute_lists, function.return_type_hint.as_ref(), "function", context);
     let Some(return_hint) = &function.return_type_hint else {
         return;
     };
@@ -274,6 +316,12 @@ pub fn check_arrow_function(arrow_function: &ArrowFunction, context: &mut Contex
 
     check_parameter_list_trailing_comma(&arrow_function.parameter_list, context);
     check_for_promoted_properties_outside_constructor(&arrow_function.parameter_list, context);
+    check_no_discard_return_type(
+        &arrow_function.attribute_lists,
+        arrow_function.return_type_hint.as_ref(),
+        "function",
+        context,
+    );
 
     // Check for $this usage in static arrow functions
     if let Some(static_) = arrow_function.r#static.as_ref()
@@ -334,6 +382,7 @@ pub fn check_arrow_function(arrow_function: &ArrowFunction, context: &mut Contex
 pub fn check_closure<'arena>(closure: &Closure<'arena>, context: &mut Context<'_, '_, 'arena>) {
     check_parameter_list_trailing_comma(&closure.parameter_list, context);
     check_for_promoted_properties_outside_constructor(&closure.parameter_list, context);
+    check_no_discard_return_type(&closure.attribute_lists, closure.return_type_hint.as_ref(), "function", context);
 
     // Check for $this usage in static closures
     if let Some(static_) = closure.r#static.as_ref()
