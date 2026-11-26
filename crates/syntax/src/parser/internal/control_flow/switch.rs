@@ -78,7 +78,7 @@ where
 
     /// Parses the optional terminator that may follow the opening `{` or `:` of a switch body.
     ///
-    /// PHP's `?>` consumes a single newline (`\n` or `\r\n`) directly after it, so
+    /// PHP's `?>` consumes a single newline (`\n`, `\r\n` or `\r`) directly after it, so
     /// `switch ($x): ?>` followed by a newline and `<?php case ...` contains nothing between
     /// the switch and its first case. Such a newline is treated as part of the tag pair.
     fn parse_switch_optional_terminator(&mut self) -> Result<Option<Terminator<'arena>>, ParseError> {
@@ -89,7 +89,7 @@ where
 
         let is_newline = matches!(
             self.stream.lookahead(0)?,
-            Some(token) if token.kind == T![InlineText] && matches!(token.value, b"\n" | b"\r\n")
+            Some(token) if token.kind == T![InlineText] && matches!(token.value, b"\n" | b"\r\n" | b"\r")
         );
 
         if is_newline && matches!(self.stream.peek_kind(1)?, Some(T!["<?php" | "<?"])) {

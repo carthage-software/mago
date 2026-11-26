@@ -1366,6 +1366,7 @@ mod parser {
         issue_2806_switch_colon_close_tag_crlf,
         "<?php switch ($t): ?>\r\n<?php case 'a': ?>x<?php endswitch ?>"
     );
+    smoke_test!(issue_2806_switch_colon_close_tag_cr, "<?php switch ($t): ?>\r<?php case 'a': ?>x<?php endswitch ?>");
     smoke_test!(issue_2806_switch_brace_close_tag_newline, "<?php switch ($t) { ?>\n<?php case 'a': ?>x<?php } ?>");
     smoke_test!(issue_2806_switch_colon_close_tag_short_open_tag, "<?php switch ($t): ?>\n<? case 'a': endswitch;");
     parse_error_test!(
@@ -1729,5 +1730,29 @@ mod semantics {
                 "the ` d` line should keep one leading space"
             );
         });
+    }
+
+    #[test]
+    fn issue_2806_switch_close_tag_newline_is_tag_pair() {
+        let arena = LocalArena::new();
+        let code = "<?php switch ($t): ?>\n<?php case 'a': ?>x<?php endswitch ?>";
+        let file = File::ephemeral(Cow::Borrowed(b"issue_2806".as_slice()), Cow::Borrowed(code.as_bytes()));
+        let program = parse_file(&arena, &file);
+
+        assert!(program.errors.is_empty(), "failed to parse: {:?}", program.errors);
+
+        let Some(Statement::Switch(switch)) = program.statements.get(1) else {
+            panic!("expected a switch statement, got {:?}", program.statements.get(1));
+        };
+
+        let SwitchBody::ColonDelimited(body) = &switch.body else {
+            panic!("expected a colon-delimited switch body, got {:?}", switch.body);
+        };
+
+        assert!(
+            matches!(body.optional_terminator, Some(Terminator::TagPair(..))),
+            "expected a tag pair terminator, got {:?}",
+            body.optional_terminator
+        );
     }
 }
