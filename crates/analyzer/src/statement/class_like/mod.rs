@@ -4148,6 +4148,13 @@ fn check_class_like_constants<'ctx, 'arena, A>(
                 continue;
             };
 
+            let codebase = context.codebase;
+            let has_final_constant = |fqcn: &Word| {
+                codebase.get_class_like_by_name(*fqcn).is_some_and(|metadata| {
+                    metadata.constants.get(&constant_name).is_some_and(|constant| constant.flags.is_final())
+                })
+            };
+
             for interface_fqcn in &class_like_metadata.all_parent_interfaces {
                 let Some(interface_metadata) = context.codebase.get_class_like_by_name(*interface_fqcn) else {
                     continue;
@@ -4156,6 +4163,34 @@ fn check_class_like_constants<'ctx, 'arena, A>(
                 let Some(interface_constant) = interface_metadata.constants.get(&constant_name) else {
                     continue;
                 };
+
+                if interface_constant.flags.is_final()
+                    && !class_like_metadata.kind.is_trait()
+                    && !interface_metadata.all_parent_interfaces.iter().any(has_final_constant)
+                    && !class_like_metadata.all_parent_classes.iter().any(has_final_constant)
+                {
+                    let child_span = item.name.span();
+                    let interface_span = interface_constant.span;
+                    let class_name = class_like_metadata.original_name;
+                    let interface_name = interface_metadata.original_name;
+
+                    context.collector.report_with_code(
+                        IssueCode::OverrideFinalConstant,
+                        Issue::error(format!(
+                            "Constant `{class_name}::{constant_name}` cannot override final constant `{interface_name}::{constant_name}`."
+                        ))
+                        .with_annotation(
+                            Annotation::primary(child_span)
+                                .with_message("This constant attempts to override a final constant"),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(interface_span)
+                                .with_message(format!("The constant is declared as final in interface `{interface_name}` here")),
+                        )
+                        .with_note("PHP 8.1+ allows interface constants to be marked as final to prevent overriding in implementing classes and extending interfaces.")
+                        .with_help(format!("Remove this constant declaration from `{class_name}` or remove the final modifier from the interface constant.")),
+                    );
+                }
 
                 if child_constant.visibility != Visibility::Public {
                     let child_span = item.name.span();
