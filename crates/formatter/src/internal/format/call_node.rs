@@ -189,6 +189,7 @@ where
                 selector.format(f),
                 print_call_arguments(f, CallLikeNode::Call(node)),
             ]),
+            Document::BreakParent,
         ]))
     } else {
         Document::Group(Group::new(vec_in![f.arena;
