@@ -2238,6 +2238,11 @@ test_case!(inheritance_extends_final_class);
 test_case!(inheritance_extends_nonexistent_class);
 test_case!(inheritance_extends_simple_class);
 test_case!(inheritance_final_constant_override);
+test_case!(inheritance_interface_final_constant_override);
+test_case!(
+    inheritance_interface_final_constant_override_once,
+    expected_issue_counts = [("override-final-constant", 5)]
+);
 test_case!(inheritance_final_method_override_bad);
 test_case!(inheritance_iface_with_two_iface_signatures_conflict);
 test_case!(inheritance_implements_basic);
