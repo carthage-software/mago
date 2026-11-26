@@ -1366,10 +1366,7 @@ mod parser {
         issue_2806_switch_colon_close_tag_crlf,
         "<?php switch ($t): ?>\r\n<?php case 'a': ?>x<?php endswitch ?>"
     );
-    smoke_test!(
-        issue_2806_switch_brace_close_tag_newline,
-        "<?php switch ($t) { ?>\n<?php case 'a': ?>x<?php } ?>"
-    );
+    smoke_test!(issue_2806_switch_brace_close_tag_newline, "<?php switch ($t) { ?>\n<?php case 'a': ?>x<?php } ?>");
     smoke_test!(issue_2806_switch_colon_close_tag_short_open_tag, "<?php switch ($t): ?>\n<? case 'a': endswitch;");
     parse_error_test!(
         issue_2806_switch_colon_close_tag_two_newlines,

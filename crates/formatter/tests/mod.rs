@@ -591,6 +591,7 @@ test_case!(idempotency_operator_at_line_end);
 test_case!(idempotency_pint_preset);
 test_case!(idempotency_preserved_chain_first_method);
 test_case!(idempotency_sort_class_methods);
+test_case!(issue_2806);
 
 #[test]
 fn issue_2475_2491_and_2524_settings() {
