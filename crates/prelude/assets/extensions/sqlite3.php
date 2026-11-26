@@ -201,14 +201,20 @@ class SQLite3Stmt
 
     public function reset(): bool {}
 
+    #[Mago\AvailableSince(80500)]
     public function busy(): bool {}
 
+    #[Mago\AvailableSince(80500)]
     public const int EXPLAIN_MODE_PREPARED = 0;
+    #[Mago\AvailableSince(80500)]
     public const int EXPLAIN_MODE_EXPLAIN = 1;
+    #[Mago\AvailableSince(80500)]
     public const int EXPLAIN_MODE_EXPLAIN_QUERY_PLAN = 2;
 
+    #[Mago\AvailableSince(80500)]
     public function explain(): int {}
 
+    #[Mago\AvailableSince(80500)]
     public function setExplain(int $mode): bool {}
 }
 

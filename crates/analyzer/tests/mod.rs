@@ -100,6 +100,11 @@ test_case!(attribute_target_constant_php84, {
     settings.version = mago_php_version::PHPVersion::PHP84;
     settings
 });
+test_case!(sqlite3_stmt_explain_php84, {
+    let mut settings = default_test_settings();
+    settings.version = mago_php_version::PHPVersion::PHP84;
+    settings
+});
 test_case!(unavailable_symbols, {
     let mut settings = default_test_settings();
     settings.version = mago_php_version::PHPVersion::PHP85;
