@@ -789,6 +789,30 @@ namespace Pdo {
         public const int ATTR_OPEN_FLAGS = 0;
         public const int ATTR_READONLY_STATEMENT = 0;
         public const int ATTR_EXTENDED_RESULT_CODES = 0;
+        #[Mago\AvailableSince(80500)]
+        public const int ATTR_BUSY_STATEMENT = 1003;
+        #[Mago\AvailableSince(80500)]
+        public const int ATTR_EXPLAIN_STATEMENT = 1004;
+        #[Mago\AvailableSince(80500)]
+        public const int ATTR_TRANSACTION_MODE = 1005;
+        #[Mago\AvailableSince(80500)]
+        public const int TRANSACTION_MODE_DEFERRED = 0;
+        #[Mago\AvailableSince(80500)]
+        public const int TRANSACTION_MODE_IMMEDIATE = 1;
+        #[Mago\AvailableSince(80500)]
+        public const int TRANSACTION_MODE_EXCLUSIVE = 2;
+        #[Mago\AvailableSince(80500)]
+        public const int EXPLAIN_MODE_PREPARED = 0;
+        #[Mago\AvailableSince(80500)]
+        public const int EXPLAIN_MODE_EXPLAIN = 1;
+        #[Mago\AvailableSince(80500)]
+        public const int EXPLAIN_MODE_EXPLAIN_QUERY_PLAN = 2;
+        #[Mago\AvailableSince(80500)]
+        public const int OK = 0;
+        #[Mago\AvailableSince(80500)]
+        public const int DENY = 1;
+        #[Mago\AvailableSince(80500)]
+        public const int IGNORE = 2;
 
         public function createAggregate(string $name, callable $step, callable $finalize, int $numArgs = -1): bool {}
 
@@ -811,6 +835,9 @@ namespace Pdo {
             ?string $dbname = 'main',
             int $flags = \Pdo\Sqlite::OPEN_READONLY,
         ) {}
+
+        #[Mago\AvailableSince(80500)]
+        public function setAuthorizer(?callable $callback): void {}
     }
 
     #[Mago\AvailableSince(80400)]
