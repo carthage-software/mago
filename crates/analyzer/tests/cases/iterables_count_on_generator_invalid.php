@@ -5,7 +5,7 @@ declare(strict_types=1);
 /**
  * @param Generator<int, string> $g
  *
- * @mago-expect analysis:possibly-invalid-argument
+ * @mago-expect analysis:invalid-argument
  */
 function bad(Generator $g): int
 {
