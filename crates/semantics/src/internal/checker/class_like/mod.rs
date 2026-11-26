@@ -970,6 +970,28 @@ pub fn check_enum<'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Contex
                     );
                 }
 
+                if method_name_bytes.eq_ignore_ascii_case(b"cases")
+                    || (enum_is_backed
+                        && (method_name_bytes.eq_ignore_ascii_case(b"from")
+                            || method_name_bytes.eq_ignore_ascii_case(b"tryFrom")))
+                {
+                    context.report(
+                        Issue::error(format!("Cannot redeclare enum method `{enum_name}::{method_name}()`."))
+                            .with_annotation(
+                                Annotation::primary(method.name.span)
+                                    .with_message(format!("Method `{method_name}` declared here.")),
+                            )
+                            .with_annotation(
+                                Annotation::secondary(r#enum.name.span())
+                                    .with_message(format!("Enum `{enum_fqcn}` declared here.")),
+                            )
+                            .with_note(
+                                "PHP adds `cases()` to every enum, and `from()` and `tryFrom()` to every backed enum.",
+                            )
+                            .with_help(format!("Rename the method `{method_name}` in the enum `{enum_name}`.")),
+                    );
+                }
+
                 if let Some(abstract_modifier) = method.modifiers.get_abstract() {
                     context.report(
                         Issue::error(format!("Enum method `{enum_name}::{method_name}` must not be abstract."))
