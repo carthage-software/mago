@@ -331,6 +331,7 @@ define_rules! {
     FileName(file_name @ FileNameRule),
     FunctionName(function_name @ FunctionNameRule),
     ExplicitOctal(explicit_octal @ ExplicitOctalRule),
+    ExplicitVisibility(explicit_visibility @ ExplicitVisibilityRule),
     ReadableLiteral(readable_literal @ ReadableLiteralRule),
     ExplicitNullableParam(explicit_nullable_param @ ExplicitNullableParamRule),
     PreferArrowFunction(prefer_arrow_function @ PreferArrowFunctionRule),
