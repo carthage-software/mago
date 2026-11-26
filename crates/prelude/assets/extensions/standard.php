@@ -903,7 +903,7 @@ function sapi_windows_generate_ctrl_event(int $event, int $pid = 0): bool {}
  *
  * @template-implements Iterator<TKey, TValue>
  */
-class Generator implements Iterator
+final class Generator implements Iterator
 {
     /**
      * @return ?TValue
