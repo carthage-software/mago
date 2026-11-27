@@ -147,6 +147,7 @@ fn count_code(issues: &IssueCollection, code: &str) -> usize {
 
 fn assert_issue_cardinality(issues: &IssueCollection, unused_methods: usize) {
     assert_eq!(count_code(issues, "unused-method"), unused_methods);
+    assert_eq!(count_code(issues, "unused-class"), FILE_COUNT);
     assert_eq!(count_code(issues, "unfulfilled-expect"), 0);
     for plugin in PLUGINS {
         assert_eq!(count_code(issues, &format!("{plugin}/before")), 1);
@@ -267,7 +268,10 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
         .issues
         .iter()
         .filter(|issue| {
-            issue.code.as_deref().is_none_or(|code| !code.starts_with("lifecycle-") && code != "unused-method")
+            issue
+                .code
+                .as_deref()
+                .is_none_or(|code| !code.starts_with("lifecycle-") && !matches!(code, "unused-method" | "unused-class"))
         })
         .map(|issue| (issue.code.as_deref(), issue.message.as_ref()))
         .collect::<Vec<_>>();

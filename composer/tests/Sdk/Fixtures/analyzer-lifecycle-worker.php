@@ -376,7 +376,7 @@ final class LifecycleProofPlugin implements
         $lateReferenceEnabled = $context->codebase->getConstant('ENABLE_LATE_FRAMEWORK_ACTION') !== null;
         $project = $context->analysis;
         $expectedIssueCount =
-            3 + ($frameworkReferenceEnabled ? 0 : 1) + ($lateReferenceEnabled ? 0 : 1) + (count($project->files) * 2)
+            3 + ($frameworkReferenceEnabled ? 0 : 1) + ($lateReferenceEnabled ? 0 : 1) + (count($project->files) * 3)
             - 1;
         if ($project->issueCount !== $expectedIssueCount) {
             throw new RuntimeException(

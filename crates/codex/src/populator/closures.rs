@@ -68,7 +68,7 @@ fn append_scopes(codebase: &CodebaseMetadata, signature: &FileSignature, entries
                 entries.push((function.span, Entry::Scope(ReferenceSource::Symbol(false, node.name))));
             }
         } else if let Some(class) = codebase.class_likes.get(&node.name) {
-            entries.push((class.span, Entry::Scope(ReferenceSource::Symbol(false, node.name))));
+            entries.push((class.span, Entry::Scope(ReferenceSource::ClassLike(false, node.name))));
             for child in &node.children {
                 if child.is_function
                     && let Some(method) = codebase.function_likes.get(&(node.name, child.name))

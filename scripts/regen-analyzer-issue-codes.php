@@ -327,6 +327,7 @@ final class AnalyzerCodeModuleGenerator
         'invalid-override-attribute',
         'unused-parameter',
         'unused-template-parameter',
+        'unused-class',
         'unused-method',
         'unused-property',
         'reference-reused-from-confusing-scope',

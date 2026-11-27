@@ -839,7 +839,7 @@ where
     let mut caught_classes: WordSet =
         WordSet::with_capacity_and_hasher(caught_identifiers.len(), foldhash::fast::FixedState::default());
     for (caught_type, caught_span) in caught_identifiers {
-        artifacts.symbol_references.add_reference_to_symbol(
+        artifacts.symbol_references.add_reference_to_class_like(
             &block_context.scope,
             caught_type.to_ascii_lowercase(),
             false,

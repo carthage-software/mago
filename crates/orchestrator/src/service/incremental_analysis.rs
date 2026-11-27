@@ -1622,7 +1622,7 @@ impl IncrementalAnalysisService {
                 if let Some(requirements) = node_analysis_requirements.as_ref() {
                     analyzer = analyzer.with_node_analysis_requirements(requirements);
                 }
-                if after_file || after_analysis {
+                if settings.find_unused_definitions || after_file || after_analysis {
                     analyzer = analyzer.with_deferred_pragmas();
                 }
                 if let Some(session) = external_session.as_deref() {
@@ -1784,6 +1784,12 @@ impl IncrementalAnalysisService {
         aggregated_result.symbol_references.extend(external_symbol_references.clone());
         aggregated_result.symbol_references.extend(late_symbol_references.clone());
 
+        if settings.find_unused_definitions {
+            aggregated_result.issues.extend(pragma_reconciler.reconcile(
+                mago_analyzer::analysis_result::find_unused_classes(codebase, &aggregated_result.symbol_references),
+            )?);
+        }
+
         let codebase_issues = codebase.take_issues(true);
         if after_analysis {
             let analyzed = snapshots.iter().map(|snapshot| snapshot.file_id()).collect::<HashSet<_>>();
@@ -1917,6 +1923,294 @@ mod tests {
             ParserSettings::default(),
             Arc::clone(&PLUGIN_REGISTRY),
         )
+    }
+
+    fn unused_class_names(issues: &IssueCollection) -> Vec<String> {
+        let mut names = issues
+            .iter()
+            .filter(|issue| issue.code.as_deref() == Some("unused-class"))
+            .map(|issue| issue.message.to_string())
+            .collect::<Vec<_>>();
+        names.sort();
+        names
+    }
+
+    #[test]
+    fn test_unused_classes_project_references_and_exemptions() {
+        let db = make_database(vec![
+            (
+                "src/classes.php",
+                "<?php
+final class Unreferenced {}
+class SelfReferenced { public function copy(): self { return new self(); } }
+/** @api */
+class Exported {}
+/** @mago-ignore analysis:unused-class */
+class EntryPoint {}
+/** @mago-expect analysis:unused-class */
+class ExpectedUnused {}
+class Constructed {}
+class Typed {}
+class StaticCall { public static function run(): void {} }
+class ConstantUsed { public const int VALUE = 1; }
+class ParentClass {}
+class ChildClass extends ParentClass {}
+class AttributeClass {}
+#[AttributeClass]
+class Attributed {}
+interface UnusedInterface {}
+trait UnusedTrait {}
+enum UnusedEnum {}
+$anonymous = new class {};
+",
+            ),
+            (
+                "src/use.php",
+                "<?php
+new Constructed();
+function accept(Typed $value): Typed { return $value; }
+StaticCall::run();
+echo ConstantUsed::VALUE;
+",
+            ),
+        ]);
+        let mut service = make_service(&db);
+        let result = service.analyze().unwrap();
+        assert_eq!(
+            unused_class_names(&result.issues),
+            vec![
+                "Class `Attributed` is never referenced.",
+                "Class `ChildClass` is never referenced.",
+                "Class `SelfReferenced` is never referenced.",
+                "Class `Unreferenced` is never referenced.",
+            ]
+        );
+        assert!(
+            !result
+                .issues
+                .iter()
+                .any(|issue| matches!(issue.code.as_deref(), Some("unused-ignore" | "unfulfilled-expect")))
+        );
+
+        let result = crate::service::analysis::AnalysisService::new(
+            db.read_only(),
+            CodebaseMetadata::new(),
+            SymbolReferences::new(),
+            Settings::default(),
+            ParserSettings::default(),
+            false,
+            Arc::clone(&PLUGIN_REGISTRY),
+        )
+        .run_issues()
+        .unwrap();
+        assert_eq!(unused_class_names(&result), unused_class_names(&service.last_issues().unwrap()));
+
+        service.settings.find_unused_definitions = false;
+        assert!(unused_class_names(&service.analyze().unwrap().issues).is_empty());
+    }
+
+    #[test]
+    fn test_unused_classes_update_when_cross_file_references_change() {
+        let mut db = make_database(vec![
+            ("src/class.php", "<?php final class Example {}"),
+            ("src/use.php", "<?php function run(): void {}"),
+        ]);
+        let mut service = make_service(&db);
+        assert_eq!(unused_class_names(&service.analyze().unwrap().issues).len(), 1);
+
+        for (source, expected) in
+            [("<?php function run(): void { new Example(); }", 0), ("<?php function run(): void {}", 1)]
+        {
+            db.update(FileId::new(b"src/use.php"), Cow::Owned(source.as_bytes().to_vec()));
+            service.update_database(db.read_only());
+            let result = service.analyze_incremental(None).unwrap();
+            assert_eq!(unused_class_names(&result.issues).len(), expected);
+            assert_eq!(
+                unused_class_names(&make_service(&db).analyze().unwrap().issues),
+                unused_class_names(&result.issues)
+            );
+        }
+    }
+
+    #[test]
+    fn test_unused_classes_skip_dependencies_and_support_oneshot() {
+        let mut db = make_database(vec![("src/class.php", "<?php final class Unreferenced {}")]);
+        db.add(File::new(
+            Cow::Borrowed(b"vendor/library.php"),
+            FileType::Vendored,
+            None,
+            Cow::Borrowed(b"<?php class Dependency {}"),
+        ));
+        let result = crate::service::analysis::AnalysisService::new(
+            db.read_only(),
+            CodebaseMetadata::new(),
+            SymbolReferences::new(),
+            Settings::default(),
+            ParserSettings::default(),
+            false,
+            Arc::clone(&PLUGIN_REGISTRY),
+        )
+        .run()
+        .unwrap();
+        assert_eq!(unused_class_names(&result.issues), vec!["Class `Unreferenced` is never referenced."]);
+
+        let result = crate::service::analysis::AnalysisService::new(
+            db.read_only(),
+            CodebaseMetadata::new(),
+            SymbolReferences::new(),
+            Settings::default(),
+            ParserSettings::default(),
+            false,
+            Arc::clone(&PLUGIN_REGISTRY),
+        )
+        .oneshot(FileId::new(b"src/class.php"))
+        .unwrap();
+        assert_eq!(unused_class_names(&result), vec!["Class `Unreferenced` is never referenced."]);
+    }
+
+    #[test]
+    fn test_unused_classes_distinguish_function_and_constant_names() {
+        let db = make_database(vec![(
+            "src/classes.php",
+            "<?php
+class FunctionOnly {}
+function FunctionOnly(): void {}
+FunctionOnly();
+class MissingFunctionName {}
+MissingFunctionName();
+class ConstantOnly {}
+const constantonly = 1;
+echo constantonly;
+class SameNamedFactory {}
+function SameNamedFactory(): SameNamedFactory { return new SameNamedFactory(); }
+class SelfOnly { public function copy(): self { return new self(); } }
+function SelfOnly(): void {}
+class StaticFactory { public static function make(): void {} }
+function StaticFactory(): void { StaticFactory::make(); }
+",
+        )]);
+        let result = make_service(&db).analyze().unwrap();
+        assert_eq!(
+            unused_class_names(&result.issues),
+            vec![
+                "Class `ConstantOnly` is never referenced.",
+                "Class `FunctionOnly` is never referenced.",
+                "Class `MissingFunctionName` is never referenced.",
+                "Class `SelfOnly` is never referenced.",
+            ]
+        );
+    }
+
+    #[test]
+    fn test_unused_classes_same_named_function_body_edits() {
+        let mut db = make_database(vec![
+            ("src/class.php", "<?php class Example { public function copy(): self { return new self(); } }"),
+            ("src/use.php", "<?php function Example(): void {}"),
+        ]);
+        let mut service = make_service(&db);
+        assert_eq!(unused_class_names(&service.analyze().unwrap().issues).len(), 1);
+        for (source, expected) in
+            [("<?php function Example(): void { new Example(); }", 0), ("<?php function Example(): void {}", 1)]
+        {
+            db.update(FileId::new(b"src/use.php"), Cow::Owned(source.as_bytes().to_vec()));
+            service.update_database(db.read_only());
+            let result = service.analyze_incremental(None).unwrap();
+            assert_eq!(unused_class_names(&result.issues).len(), expected);
+            assert_eq!(
+                unused_class_names(&make_service(&db).analyze().unwrap().issues),
+                unused_class_names(&result.issues)
+            );
+        }
+    }
+
+    #[test]
+    fn test_unused_classes_preserve_same_named_class_outgoing_references() {
+        let mut db = make_database(vec![
+            ("src/class.php", "<?php class Example { public $dependency = new Dependency(); } class Dependency {}"),
+            ("src/function.php", "<?php function Example(): void {}"),
+        ]);
+        let mut service = make_service(&db);
+        let initial = service.analyze().unwrap();
+        db.update(FileId::new(b"src/function.php"), Cow::Borrowed(b"<?php function Example(): void { echo 1; }"));
+        service.update_database(db.read_only());
+        let incremental = service.analyze_incremental(None).unwrap();
+        let fresh = make_service(&db).analyze().unwrap();
+        assert_eq!(unused_class_names(&initial.issues), vec!["Class `Example` is never referenced."]);
+        assert_eq!(unused_class_names(&incremental.issues), unused_class_names(&fresh.issues));
+    }
+
+    #[test]
+    fn test_unused_classes_count_wildcard_constants_and_imported_aliases() {
+        let db = make_database(vec![(
+            "src/types.php",
+            "<?php
+class AllConstants { public const int VALUE = 1; }
+class PrefixedConstants { public const int PREFIX_VALUE = 1; }
+/** @param AllConstants::* $value */
+function acceptAll($value): void {}
+/** @param PrefixedConstants::PREFIX_* $value */
+function acceptPrefixed($value): void {}
+/** @phpstan-type Data = array{id: int} */
+class Types {}
+/** @phpstan-import-type Data from Types */
+class Consumer {
+    /** @param Data $value */
+    public function accept(array $value): void {}
+}
+new Consumer();
+",
+        )]);
+        let result = make_service(&db).analyze().unwrap();
+        assert!(unused_class_names(&result.issues).is_empty(), "{:?}", result.issues);
+    }
+
+    #[test]
+    fn test_unused_classes_recognize_test_and_benchmark_entry_points() {
+        let mut db = make_database(vec![(
+            "src/tests.php",
+            r"<?php
+class ExampleTest extends PHPUnit\Framework\TestCase {}
+abstract class ProjectTestCase extends PHPUnit\Framework\TestCase {}
+class IndirectTest extends ProjectTestCase {}
+class UnusedTest {}
+class ConventionBenchmark { public function benchExample(): void {} }
+trait BenchmarkSubjects { protected function measure(): void {} }
+class AliasedBenchmark { use BenchmarkSubjects { measure as public benchExample; } }
+trait HiddenBenchmarkSubjects { public function benchHidden(): void {} }
+class UnusedHiddenBenchmark { use HiddenBenchmarkSubjects { benchHidden as private; } }
+class AttributeBenchmark {
+    #[PhpBench\Attributes\Subject]
+    public function measure(): void {}
+}
+class UnusedBenchmark { private function benchPrivate(): void {} }
+",
+        )]);
+        db.add(File::new(
+            Cow::Borrowed(b"vendor/frameworks.php"),
+            FileType::Vendored,
+            None,
+            Cow::Borrowed(
+                br"<?php
+namespace PHPUnit\Framework { abstract class TestCase {} }
+namespace PhpBench\Benchmark\Metadata { class MetadataFactory {} }
+namespace PhpBench\Attributes { #[\Attribute] class Subject {} }
+",
+            ),
+        ));
+        let result = make_service(&db).analyze().unwrap();
+        assert_eq!(
+            unused_class_names(&result.issues),
+            vec![
+                "Class `UnusedBenchmark` is never referenced.",
+                "Class `UnusedHiddenBenchmark` is never referenced.",
+                "Class `UnusedTest` is never referenced.",
+            ]
+        );
+        db.delete(FileId::new(b"vendor/frameworks.php"));
+        let result = make_service(&db).analyze().unwrap();
+        assert!(
+            unused_class_names(&result.issues).contains(&"Class `ConventionBenchmark` is never referenced.".to_owned())
+        );
     }
 
     #[test]

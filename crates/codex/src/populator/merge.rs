@@ -63,7 +63,8 @@ fn merge_interface_metadata(
     inherit_constants: bool,
     seeds: &mut OverrideSeeds,
 ) {
-    symbol_references.add_symbol_reference_to_symbol(metadata.name, interface, true);
+    symbol_references
+        .add_class_like_reference(crate::reference::ReferenceSource::ClassLike(true, metadata.name), interface);
 
     let Some(parent_interface_metadata) = codebase.get_class_like_by_word(interface) else {
         metadata.invalid_dependencies.insert(interface);
@@ -110,7 +111,8 @@ pub fn merge_metadata_from_parent_class_like(
     symbol_references: &mut SymbolReferences,
     seeds: &mut OverrideSeeds,
 ) {
-    symbol_references.add_symbol_reference_to_symbol(metadata.name, parent_class, true);
+    symbol_references
+        .add_class_like_reference(crate::reference::ReferenceSource::ClassLike(true, metadata.name), parent_class);
 
     let Some(parent_metadata) = codebase.get_class_like_by_word(parent_class) else {
         metadata.invalid_dependencies.insert(parent_class);
@@ -171,7 +173,8 @@ pub fn merge_metadata_from_required_class_like(
     parent_class: Word,
     symbol_references: &mut SymbolReferences,
 ) {
-    symbol_references.add_symbol_reference_to_symbol(metadata.name, parent_class, true);
+    symbol_references
+        .add_class_like_reference(crate::reference::ReferenceSource::ClassLike(true, metadata.name), parent_class);
 
     let Some(parent_metadata) = codebase.get_class_like_by_word(parent_class) else {
         metadata.invalid_dependencies.insert(parent_class);
@@ -195,7 +198,8 @@ pub fn merge_metadata_from_trait(
     symbol_references: &mut SymbolReferences,
     seeds: &mut OverrideSeeds,
 ) {
-    symbol_references.add_symbol_reference_to_symbol(metadata.name, trait_name, true);
+    symbol_references
+        .add_class_like_reference(crate::reference::ReferenceSource::ClassLike(true, metadata.name), trait_name);
 
     let Some(trait_metadata) = codebase.get_class_like_by_word(trait_name) else {
         metadata.invalid_dependencies.insert(trait_name);

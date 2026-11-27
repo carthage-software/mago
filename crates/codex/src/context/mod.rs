@@ -155,7 +155,11 @@ impl<'ctx> ScopeContext<'ctx> {
     pub fn get_reference_source(&self) -> Option<ReferenceSource> {
         match self.reference_origin {
             ReferenceOrigin::Symbol((symbol, member)) if member.is_empty() => {
-                Some(ReferenceSource::Symbol(false, symbol))
+                Some(if self.class_like.is_some() && self.function_like.is_none() {
+                    ReferenceSource::ClassLike(false, symbol)
+                } else {
+                    ReferenceSource::Symbol(false, symbol)
+                })
             }
             ReferenceOrigin::Symbol((symbol, member)) => Some(ReferenceSource::ClassLikeMember(false, symbol, member)),
             ReferenceOrigin::File(file) => Some(ReferenceSource::File(false, file)),

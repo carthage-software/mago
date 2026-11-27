@@ -108,7 +108,7 @@ where
         let attribute_name_bytes = context.resolved_names.get(&attribute.name);
         let attribute_name = BytesDisplay(attribute_name_bytes);
         let attribute_class = mago_word::ascii_lowercase_word(attribute_name_bytes);
-        artifacts.symbol_references.add_reference_to_symbol(&block_context.scope, attribute_class, false);
+        artifacts.symbol_references.add_reference_to_class_like(&block_context.scope, attribute_class, false);
 
         let Some(metadata) = context.codebase.get_class_like_by_name(attribute_class) else {
             context.collector.report_with_code(
