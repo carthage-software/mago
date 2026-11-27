@@ -1139,86 +1139,103 @@ namespace Dom {
     use IteratorAggregate;
     use Mago;
 
+    #[Mago\AvailableSince(80400)]
     /**
      * @var int
      */
     const INDEX_SIZE_ERR = UNKNOWN;
 
+    #[Mago\AvailableSince(80400)]
     /**
      * @var int
      */
     const STRING_SIZE_ERR = UNKNOWN;
 
+    #[Mago\AvailableSince(80400)]
     /**
      * @var int
      */
     const HIERARCHY_REQUEST_ERR = UNKNOWN;
 
+    #[Mago\AvailableSince(80400)]
     /**
      * @var int
      */
     const WRONG_DOCUMENT_ERR = UNKNOWN;
 
+    #[Mago\AvailableSince(80400)]
     /**
      * @var int
      */
     const INVALID_CHARACTER_ERR = UNKNOWN;
 
+    #[Mago\AvailableSince(80400)]
     /**
      * @var int
      */
     const NO_DATA_ALLOWED_ERR = UNKNOWN;
 
+    #[Mago\AvailableSince(80400)]
     /**
      * @var int
      */
     const NO_MODIFICATION_ALLOWED_ERR = UNKNOWN;
 
+    #[Mago\AvailableSince(80400)]
     /**
      * @var int
      */
     const NOT_FOUND_ERR = UNKNOWN;
 
+    #[Mago\AvailableSince(80400)]
     /**
      * @var int
      */
     const NOT_SUPPORTED_ERR = UNKNOWN;
 
+    #[Mago\AvailableSince(80400)]
     /**
      * @var int
      */
     const INUSE_ATTRIBUTE_ERR = UNKNOWN;
 
+    #[Mago\AvailableSince(80400)]
     /**
      * @var int
      */
     const INVALID_STATE_ERR = UNKNOWN;
 
+    #[Mago\AvailableSince(80400)]
     /**
      * @var int
      */
     const SYNTAX_ERR = UNKNOWN;
 
+    #[Mago\AvailableSince(80400)]
     /**
      * @var int
      */
     const INVALID_MODIFICATION_ERR = UNKNOWN;
 
+    #[Mago\AvailableSince(80400)]
     /**
      * @var int
      */
     const NAMESPACE_ERR = UNKNOWN;
 
+    #[Mago\AvailableSince(80400)]
     /**
      * @var int
      */
     const VALIDATION_ERR = UNKNOWN;
 
+    #[Mago\AvailableSince(80400)]
     /**
      * @var int
      */
     const HTML_NO_DEFAULT_NS = UNKNOWN;
 
+    #[Mago\AvailableSince(80400)]
     interface ParentNode
     {
         public function append(Node|string ...$nodes): void;
@@ -1232,6 +1249,7 @@ namespace Dom {
         public function querySelectorAll(string $selectors): NodeList;
     }
 
+    #[Mago\AvailableSince(80400)]
     interface ChildNode
     {
         public function remove(): void;
@@ -1246,6 +1264,7 @@ namespace Dom {
     /**
      * @strict-properties
      */
+    #[Mago\AvailableSince(80400)]
     class Implementation
     {
         public function createDocumentType(string $qualifiedName, string $publicId, string $systemId): DocumentType {}
@@ -1260,6 +1279,7 @@ namespace Dom {
     }
 
     /** @strict-properties */
+    #[Mago\AvailableSince(80400)]
     class Node
     {
         final private function __construct() {}
@@ -1394,6 +1414,7 @@ namespace Dom {
      *
      * @template-implements IteratorAggregate<int, TNode>
      */
+    #[Mago\AvailableSince(80400)]
     class NodeList implements IteratorAggregate, Countable
     {
         /**
@@ -1442,6 +1463,7 @@ namespace Dom {
     /**
      * @implements IteratorAggregate<string, Entity|Notation>
      */
+    #[Mago\AvailableSince(80400)]
     class DtdNamedNodeMap implements IteratorAggregate, Countable
     {
         /**
@@ -1486,6 +1508,7 @@ namespace Dom {
         public function getIterator(): Iterator {}
     }
 
+    #[Mago\AvailableSince(80400)]
     enum AdjacentPosition: string
     {
         case BeforeBegin = 'beforebegin';
@@ -1494,16 +1517,19 @@ namespace Dom {
         case AfterEnd = 'afterend';
     }
 
+    #[Mago\AvailableSince(80400)]
     class Element extends Node implements ParentNode, ChildNode
     {
         /**
          * @readonly
          */
+        #[\Mago\AvailableSince(80500)]
         public HTMLCollection $children;
 
         #[\Mago\AvailableSince(80500)]
         public string $outerHTML;
 
+        #[\Mago\AvailableSince(80500)]
         public function getElementsByClassName(string $classNames): HTMLCollection {}
 
         #[\Mago\AvailableSince(80500)]
@@ -1651,6 +1677,7 @@ namespace Dom {
     #[Mago\AvailableSince(80400)]
     class HTMLElement extends Element {}
 
+    #[Mago\AvailableSince(80400)]
     class Attr extends Node
     {
         /**
@@ -1690,6 +1717,7 @@ namespace Dom {
         public function rename(?string $namespaceURI, string $qualifiedName): void {}
     }
 
+    #[Mago\AvailableSince(80400)]
     class CharacterData extends Node implements ChildNode
     {
         /**
@@ -1728,6 +1756,7 @@ namespace Dom {
         public function replaceWith(Node|string ...$nodes): void {}
     }
 
+    #[Mago\AvailableSince(80400)]
     class Text extends CharacterData
     {
         public function splitText(int $offset): Text {}
@@ -1738,8 +1767,10 @@ namespace Dom {
         public string $wholeText;
     }
 
+    #[Mago\AvailableSince(80400)]
     class CDATASection extends Text {}
 
+    #[Mago\AvailableSince(80400)]
     class ProcessingInstruction extends CharacterData
     {
         /**
@@ -1748,8 +1779,10 @@ namespace Dom {
         public string $target;
     }
 
+    #[Mago\AvailableSince(80400)]
     class Comment extends CharacterData {}
 
+    #[Mago\AvailableSince(80400)]
     class DocumentType extends Node implements ChildNode
     {
         /**
@@ -1791,11 +1824,13 @@ namespace Dom {
         public function replaceWith(Node|string ...$nodes): void {}
     }
 
+    #[Mago\AvailableSince(80400)]
     class DocumentFragment extends Node implements ParentNode
     {
         /**
          * @readonly
          */
+        #[\Mago\AvailableSince(80500)]
         public HTMLCollection $children;
 
         /**
@@ -1826,6 +1861,7 @@ namespace Dom {
         public function querySelectorAll(string $selectors): NodeList {}
     }
 
+    #[Mago\AvailableSince(80400)]
     class Entity extends Node
     {
         /**
@@ -1844,8 +1880,10 @@ namespace Dom {
         public ?string $notationName;
     }
 
+    #[Mago\AvailableSince(80400)]
     class EntityReference extends Node {}
 
+    #[Mago\AvailableSince(80400)]
     class Notation extends Node
     {
         /**
@@ -1859,13 +1897,16 @@ namespace Dom {
         public string $systemId;
     }
 
+    #[Mago\AvailableSince(80400)]
     abstract class Document extends Node implements ParentNode
     {
         /**
          * @readonly
          */
+        #[\Mago\AvailableSince(80500)]
         public HTMLCollection $children;
 
+        #[\Mago\AvailableSince(80500)]
         public function getElementsByClassName(string $classNames): HTMLCollection {}
 
         /**
@@ -2065,6 +2106,7 @@ namespace Dom {
         public function getIterator(): Iterator {}
     }
 
+    #[Mago\AvailableSince(80400)]
     final readonly class NamespaceInfo
     {
         public ?string $prefix;
@@ -2074,6 +2116,7 @@ namespace Dom {
         private function __construct() {}
     }
 
+    #[Mago\AvailableSince(80400)]
     final class XPath
     {
         /**
@@ -2099,8 +2142,10 @@ namespace Dom {
 
         public function registerPhpFunctionNS(string $namespaceURI, string $name, callable $callable): void {}
 
+        #[Mago\AvailableSince(80400)]
         public static function quote(string $str): string {}
     }
 
+    #[Mago\AvailableSince(80400)]
     function import_simplexml(object $node): Element {}
 }
