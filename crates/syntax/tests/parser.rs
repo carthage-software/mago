@@ -1384,6 +1384,8 @@ mod semantics {
 
     use mago_allocator::LocalArena;
     use mago_database::file::File;
+    use mago_span::Position;
+    use mago_span::Span;
     use mago_syntax::cst::*;
     use mago_syntax::parser::parse_file;
 
@@ -1733,26 +1735,45 @@ mod semantics {
     }
 
     #[test]
-    fn issue_2806_switch_close_tag_newline_is_tag_pair() {
-        let arena = LocalArena::new();
-        let code = "<?php switch ($t): ?>\n<?php case 'a': ?>x<?php endswitch ?>";
-        let file = File::ephemeral(Cow::Borrowed(b"issue_2806".as_slice()), Cow::Borrowed(code.as_bytes()));
-        let program = parse_file(&arena, &file);
+    fn issue_2806_switch_tag_pair_preserves_newline_span() {
+        let colon = "<?php switch ($t): ?>";
+        let brace = "<?php switch ($t) { ?>";
+        let endswitch = "<?php case 'a': ?>x<?php endswitch ?>";
 
-        assert!(program.errors.is_empty(), "failed to parse: {:?}", program.errors);
+        for (prefix, newline, suffix) in [
+            (colon, "\n", endswitch),
+            (colon, "\r\n", endswitch),
+            (colon, "\r", endswitch),
+            (colon, "\n", "<? case 'a': endswitch;"),
+            (brace, "\n", "<?php case 'a': ?>x<?php } ?>"),
+            (colon, "", endswitch),
+        ] {
+            let arena = LocalArena::new();
+            let code = format!("{prefix}{newline}{suffix}");
+            let file = File::ephemeral(Cow::Borrowed(b"issue_2806".as_slice()), Cow::Owned(code.into_bytes()));
+            let program = parse_file(&arena, &file);
 
-        let Some(Statement::Switch(switch)) = program.statements.get(1) else {
-            panic!("expected a switch statement, got {:?}", program.statements.get(1));
-        };
+            assert!(program.errors.is_empty(), "failed to parse with separator {newline:?}: {:?}", program.errors);
 
-        let SwitchBody::ColonDelimited(body) = &switch.body else {
-            panic!("expected a colon-delimited switch body, got {:?}", switch.body);
-        };
+            let Some(Statement::Switch(switch)) = program.statements.get(1) else {
+                panic!("expected a switch statement, got {:?}", program.statements.get(1));
+            };
+            let terminator = match &switch.body {
+                SwitchBody::ColonDelimited(body) => body.optional_terminator,
+                SwitchBody::BraceDelimited(body) => body.optional_terminator,
+            };
+            let Some(Terminator::TagPair(_, _, separator)) = terminator else {
+                panic!("expected a tag pair terminator, got {terminator:?}");
+            };
 
-        assert!(
-            matches!(body.optional_terminator, Some(Terminator::TagPair(..))),
-            "expected a tag pair terminator, got {:?}",
-            body.optional_terminator
-        );
+            let expected = (!newline.is_empty()).then(|| {
+                Span::new(
+                    file.id,
+                    Position::new(prefix.len() as u32),
+                    Position::new((prefix.len() + newline.len()) as u32),
+                )
+            });
+            assert_eq!(separator, expected, "incorrect span for separator {newline:?}");
+        }
     }
 }

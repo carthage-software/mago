@@ -56,6 +56,7 @@ mod tests {
         let tag_pair = Terminator::TagPair(
             ClosingTag { span: make_span(0, 2) },
             OpeningTag::Short(ShortOpeningTag { span: make_span(2, 2) }),
+            None,
         );
 
         assert_eq!(fingerprint_item(&semicolon, &opts, &names), fingerprint_item(&closing_tag, &opts, &names));

@@ -1210,7 +1210,7 @@ where
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, Terminator, {
             match self {
-                Terminator::Semicolon(_) | Terminator::TagPair(_, _) => Document::String(b";"),
+                Terminator::Semicolon(_) | Terminator::TagPair(..) => Document::String(b";"),
                 Terminator::ClosingTag(t) => {
                     Document::Array(vec_in![f.arena; Document::Space(Space::soft()), t.format(f)])
                 }

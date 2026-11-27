@@ -17,8 +17,12 @@ pub enum Terminator<'arena> {
     Semicolon(Span),
     /// A closing tag.
     ClosingTag(ClosingTag),
-    /// A closing tag followed immediately by an opening tag.
-    TagPair(ClosingTag, OpeningTag<'arena>),
+    /// A closing tag followed by an opening tag, with an optional newline span between them.
+    TagPair(
+        ClosingTag,
+        OpeningTag<'arena>,
+        #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))] Option<Span>,
+    ),
     /// Missing terminator.
     #[strum(disabled)]
     Missing(Span),
@@ -43,7 +47,7 @@ impl HasSpan for Terminator<'_> {
         match self {
             Terminator::Semicolon(s) => *s,
             Terminator::ClosingTag(t) => t.span(),
-            Terminator::TagPair(c, o) => c.span().join(o.span()),
+            Terminator::TagPair(c, o, _) => c.span().join(o.span()),
             Terminator::Missing(s) => *s,
         }
     }

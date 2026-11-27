@@ -93,9 +93,9 @@ where
         );
 
         if is_newline && matches!(self.stream.peek_kind(1)?, Some(T!["<?php" | "<?"])) {
-            self.stream.consume()?;
+            let separator = self.stream.consume_span()?;
 
-            return Ok(Some(Terminator::TagPair(closing_tag, self.parse_opening_tag()?)));
+            return Ok(Some(Terminator::TagPair(closing_tag, self.parse_opening_tag()?, Some(separator))));
         }
 
         Ok(terminator)

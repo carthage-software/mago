@@ -89,7 +89,7 @@ impl LintRule for NoPhpTagTerminatorRule {
         let Node::Terminator(terminator) = node else {
             return;
         };
-        let Terminator::TagPair(close, open) = terminator else {
+        let Terminator::TagPair(close, open, _) = terminator else {
             return;
         };
 

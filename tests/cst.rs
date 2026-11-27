@@ -37,3 +37,22 @@ fn parse_errors_fail_without_hiding_output() {
         assert!(String::from_utf8_lossy(&output.stdout).contains(expected));
     }
 }
+
+#[test]
+fn tag_pair_json_includes_the_separator_only_when_present() {
+    let output = run("switch-tag-pairs.php", &["--json"]);
+    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+
+    let cst: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let statements = &cst["program"]["statements"]["nodes"];
+    let adjacent = &statements[1]["value"]["body"]["value"]["optional_terminator"];
+    let separated = &statements[2]["value"]["body"]["value"]["optional_terminator"];
+
+    assert_eq!(adjacent["type"], "TagPair");
+    assert_eq!(adjacent["value"].as_array().unwrap().len(), 2);
+    assert_eq!(separated["type"], "TagPair");
+    assert_eq!(separated["value"].as_array().unwrap().len(), 3);
+    let separator = &separated["value"][2];
+    assert_eq!(separator["start"], separated["value"][0]["span"]["end"]);
+    assert_eq!(separator["end"], separated["value"][1]["value"]["span"]["start"]);
+}
