@@ -561,6 +561,7 @@ test_case!(issue_2634);
 test_case!(issue_2643);
 test_case!(issue_2645);
 test_case!(issue_2646);
+test_case!(issue_2665);
 test_case!(issue_2668);
 test_case!(issue_2783);
 test_case!(idempotency_docblock_before_parameter);
