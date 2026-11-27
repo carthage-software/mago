@@ -682,8 +682,8 @@ final class ReflectionReference
     private function __clone(): void {}
 }
 
-#[Mago\AvailableSince(80500)]
-final class ReflectionConstant implements Reflector
+#[Mago\AvailableSince(80400)]
+class ReflectionConstant implements Reflector
 {
     #[Mago\AvailableSince(80500)]
     public function getFileName(): string|false {}
@@ -708,6 +708,9 @@ final class ReflectionConstant implements Reflector
     public function __construct(string $name) {}
 
     public function getName(): string {}
+
+    #[Mago\AvailableSince(80600)]
+    public function inNamespace(): bool {}
 
     public function getNamespaceName(): string {}
 
