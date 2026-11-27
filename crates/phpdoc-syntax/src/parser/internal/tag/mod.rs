@@ -40,7 +40,7 @@ where
         let vendor = TagVendor::from_name(token.value);
         let remainder = remainder_after_vendor(raw_name, vendor);
 
-        let value = match self.dispatch_tag_value(remainder) {
+        let value = match self.dispatch_tag_value(remainder, vendor) {
             Ok(value) => value,
             Err(error) => {
                 self.record_error(error);
@@ -82,7 +82,7 @@ where
     }
 
     /// A WordPress-style hash item (`@type string $key Description.`) names a variable after its
-    /// type, which a type alias (`@type Name = Type`) never does.
+    /// type. Only check unprefixed tags: prefixed type aliases can contain named callable parameters.
     fn is_at_hash_notation_item(&mut self) -> bool {
         for offset in 0..32 {
             if offset > 0 && self.stream.starts_line(offset) {
@@ -101,7 +101,11 @@ where
     }
 
     #[inline]
-    fn dispatch_tag_value(&mut self, remainder: &[u8]) -> Result<TagValue<'arena>, ParseError> {
+    fn dispatch_tag_value(
+        &mut self,
+        remainder: &[u8],
+        vendor: Option<TagVendor>,
+    ) -> Result<TagValue<'arena>, ParseError> {
         let mut buffer = [0u8; NORMALIZED_NAME_CAPACITY];
         let mut length = 0;
         for byte in remainder {
@@ -150,7 +154,7 @@ where
             b"assertiftrue" => Ok(TagValue::AssertIfTrue(self.parse_assert_tag_value()?)),
             b"assertiffalse" => Ok(TagValue::AssertIfFalse(self.parse_assert_tag_value()?)),
             b"where" => self.parse_where_tag_value(),
-            b"type" if self.is_at_hash_notation_item() => self.parse_generic_tag_value(),
+            b"type" if vendor.is_none() && self.is_at_hash_notation_item() => self.parse_generic_tag_value(),
             b"type" => self.parse_type_alias_tag_value(),
             b"importtype" => self.parse_type_alias_import_tag_value(),
             b"deprecated" => self.parse_deprecated_tag_value(),
