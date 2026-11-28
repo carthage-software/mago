@@ -471,7 +471,7 @@ generate_ast_walker! {
             Terminator::ClosingTag(closing_tag) => {
                 walker.walk_closing_tag(closing_tag, context);
             }
-            Terminator::TagPair(closing_tag, opening_tag) => {
+            Terminator::TagPair(closing_tag, opening_tag, _) => {
                 walker.walk_closing_tag(closing_tag, context);
                 walker.walk_opening_tag(opening_tag, context);
             }

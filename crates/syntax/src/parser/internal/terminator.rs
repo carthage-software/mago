@@ -33,7 +33,7 @@ where
 
             let next = self.stream.lookahead(0)?;
             if matches!(next.map(|t| t.kind), Some(T!["<?php" | "<?"])) {
-                return Ok(Terminator::TagPair(closing_tag, self.parse_opening_tag()?));
+                return Ok(Terminator::TagPair(closing_tag, self.parse_opening_tag()?, None));
             }
 
             return Ok(Terminator::ClosingTag(closing_tag));

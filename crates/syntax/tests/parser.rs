@@ -1356,6 +1356,27 @@ mod parser {
         "($a == (($b = (& $c)) > $d))"
     );
     smoke_test!(reference_assignment_comparison_chain, "<?php $a[] =& $a == $a =& $b > gc_collect_cycles();");
+
+    // `?>` consumes one directly following newline, so nothing sits between the switch and its first case.
+    smoke_test!(
+        issue_2806_switch_colon_close_tag_newline,
+        "<?php switch ($t): ?>\n<?php case 'a': ?>x<?php endswitch ?>"
+    );
+    smoke_test!(
+        issue_2806_switch_colon_close_tag_crlf,
+        "<?php switch ($t): ?>\r\n<?php case 'a': ?>x<?php endswitch ?>"
+    );
+    smoke_test!(issue_2806_switch_colon_close_tag_cr, "<?php switch ($t): ?>\r<?php case 'a': ?>x<?php endswitch ?>");
+    smoke_test!(issue_2806_switch_brace_close_tag_newline, "<?php switch ($t) { ?>\n<?php case 'a': ?>x<?php } ?>");
+    smoke_test!(issue_2806_switch_colon_close_tag_short_open_tag, "<?php switch ($t): ?>\n<? case 'a': endswitch;");
+    parse_error_test!(
+        issue_2806_switch_colon_close_tag_two_newlines,
+        "<?php switch ($t): ?>\n\n<?php case 'a': ?>x<?php endswitch ?>"
+    );
+    parse_error_test!(
+        issue_2806_switch_colon_close_tag_space_newline,
+        "<?php switch ($t): ?> \n<?php case 'a': ?>x<?php endswitch ?>"
+    );
 }
 
 mod semantics {
@@ -1363,6 +1384,8 @@ mod semantics {
 
     use mago_allocator::LocalArena;
     use mago_database::file::File;
+    use mago_span::Position;
+    use mago_span::Span;
     use mago_syntax::cst::*;
     use mago_syntax::parser::parse_file;
 
@@ -1709,5 +1732,48 @@ mod semantics {
                 "the ` d` line should keep one leading space"
             );
         });
+    }
+
+    #[test]
+    fn issue_2806_switch_tag_pair_preserves_newline_span() {
+        let colon = "<?php switch ($t): ?>";
+        let brace = "<?php switch ($t) { ?>";
+        let endswitch = "<?php case 'a': ?>x<?php endswitch ?>";
+
+        for (prefix, newline, suffix) in [
+            (colon, "\n", endswitch),
+            (colon, "\r\n", endswitch),
+            (colon, "\r", endswitch),
+            (colon, "\n", "<? case 'a': endswitch;"),
+            (brace, "\n", "<?php case 'a': ?>x<?php } ?>"),
+            (colon, "", endswitch),
+        ] {
+            let arena = LocalArena::new();
+            let code = format!("{prefix}{newline}{suffix}");
+            let file = File::ephemeral(Cow::Borrowed(b"issue_2806".as_slice()), Cow::Owned(code.into_bytes()));
+            let program = parse_file(&arena, &file);
+
+            assert!(program.errors.is_empty(), "failed to parse with separator {newline:?}: {:?}", program.errors);
+
+            let Some(Statement::Switch(switch)) = program.statements.get(1) else {
+                panic!("expected a switch statement, got {:?}", program.statements.get(1));
+            };
+            let terminator = match &switch.body {
+                SwitchBody::ColonDelimited(body) => body.optional_terminator,
+                SwitchBody::BraceDelimited(body) => body.optional_terminator,
+            };
+            let Some(Terminator::TagPair(_, _, separator)) = terminator else {
+                panic!("expected a tag pair terminator, got {terminator:?}");
+            };
+
+            let expected = (!newline.is_empty()).then(|| {
+                Span::new(
+                    file.id,
+                    Position::new(prefix.len() as u32),
+                    Position::new((prefix.len() + newline.len()) as u32),
+                )
+            });
+            assert_eq!(separator, expected, "incorrect span for separator {newline:?}");
+        }
     }
 }

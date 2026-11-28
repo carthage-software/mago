@@ -12,6 +12,7 @@ use crate::cst::cst::SwitchCaseSeparator;
 use crate::cst::cst::SwitchColonDelimitedBody;
 use crate::cst::cst::SwitchDefaultCase;
 use crate::cst::cst::SwitchExpressionCase;
+use crate::cst::cst::Terminator;
 use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
@@ -58,7 +59,7 @@ where
 
     fn parse_switch_brace_delimited_body(&mut self) -> Result<SwitchBraceDelimitedBody<'arena>, ParseError> {
         let left_brace = self.stream.eat_span(T!["{"])?;
-        let optional_terminator = self.parse_optional_terminator()?;
+        let optional_terminator = self.parse_switch_optional_terminator()?;
         let cases = self.parse_switch_cases()?;
         let right_brace = self.stream.eat_span(T!["}"])?;
 
@@ -68,11 +69,36 @@ where
     fn parse_switch_colon_delimited_body(&mut self) -> Result<SwitchColonDelimitedBody<'arena>, ParseError> {
         Ok(SwitchColonDelimitedBody {
             colon: self.stream.eat_span(T![":"])?,
-            optional_terminator: self.parse_optional_terminator()?,
+            optional_terminator: self.parse_switch_optional_terminator()?,
             cases: self.parse_switch_cases()?,
             end_switch: self.expect_keyword(T!["endswitch"])?,
             terminator: self.parse_terminator()?,
         })
+    }
+
+    /// Parses the optional terminator that may follow the opening `{` or `:` of a switch body.
+    ///
+    /// PHP's `?>` consumes a single newline (`\n`, `\r\n` or `\r`) directly after it, so
+    /// `switch ($x): ?>` followed by a newline and `<?php case ...` contains nothing between
+    /// the switch and its first case. Such a newline is treated as part of the tag pair.
+    fn parse_switch_optional_terminator(&mut self) -> Result<Option<Terminator<'arena>>, ParseError> {
+        let terminator = self.parse_optional_terminator()?;
+        let Some(Terminator::ClosingTag(closing_tag)) = terminator else {
+            return Ok(terminator);
+        };
+
+        let is_newline = matches!(
+            self.stream.lookahead(0)?,
+            Some(token) if token.kind == T![InlineText] && matches!(token.value, b"\n" | b"\r\n" | b"\r")
+        );
+
+        if is_newline && matches!(self.stream.peek_kind(1)?, Some(T!["<?php" | "<?"])) {
+            let separator = self.stream.consume_span()?;
+
+            return Ok(Some(Terminator::TagPair(closing_tag, self.parse_opening_tag()?, Some(separator))));
+        }
+
+        Ok(terminator)
     }
 
     fn parse_switch_cases(&mut self) -> Result<Sequence<'arena, SwitchCase<'arena>>, ParseError> {

@@ -2319,7 +2319,7 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
             Node::Terminator(node) => match node {
                 Terminator::Semicolon(_) => {}
                 Terminator::ClosingTag(closing_tag) => f(Node::ClosingTag(closing_tag)),
-                Terminator::TagPair(closing_tag, opening_tag) => {
+                Terminator::TagPair(closing_tag, opening_tag, _) => {
                     f(Node::ClosingTag(closing_tag));
                     f(Node::OpeningTag(opening_tag));
                 }
