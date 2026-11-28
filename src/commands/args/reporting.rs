@@ -27,6 +27,8 @@
 //!
 //! The `minimum_fail_level` determines when the command exits with failure.
 //! This enables CI integration where certain issue severities should fail builds.
+//! With `--fix` and `--fail-on-remaining`, the same threshold applies to issues
+//! left unfixed. It defaults to `error`.
 
 use clap::ColorChoice;
 use clap::Parser;
@@ -112,11 +114,13 @@ pub struct ReportingArgs {
     #[arg(long, short = 'd', requires = "fix", alias = "diff")]
     pub dry_run: bool,
 
-    /// Exit with a non-zero status code if there are remaining issues after fixing.
+    /// Exit with a non-zero status code if issues at or above the minimum fail level remain after fixing.
     ///
-    /// When used with --fix, the command will exit with code 1 if there are any
-    /// issues that could not be automatically fixed and require manual attention.
-    /// This is useful in CI/CD pipelines to ensure all issues are addressed.
+    /// When used with --fix, the command exits with code 1 if a remaining issue
+    /// is at or above `--minimum-fail-level`. The default threshold is `error`,
+    /// matching `mago lint` without `--fix`. Warnings, help, and notes below
+    /// that threshold do not fail the command. A higher bar is the existing
+    /// `minimum-fail-level` setting.
     /// Requires --fix to be enabled.
     #[arg(long, requires = "fix")]
     pub fail_on_remaining: bool,
@@ -151,17 +155,16 @@ pub struct ReportingArgs {
 
     /// Set the minimum issue severity that causes the command to fail.
     ///
-    /// The command will exit with a non-zero status if any issues at or above
+    /// The command exits with a non-zero status if any issues at or above
     /// this level are found. For example, setting this to 'warning' means
     /// the command fails on warnings and errors, but not on notes or help suggestions.
     ///
+    /// With `--fix` and `--fail-on-remaining`, the same threshold applies to
+    /// issues that remain after fixes. The default threshold is `error`,
+    /// matching `mago lint` without `--fix`.
+    ///
     /// Defaults to 'error', or the value set in the configuration file.
-    #[arg(
-        long,
-        short = 'm',
-        value_parser = enum_variants!(Level),
-        conflicts_with = "fix"
-    )]
+    #[arg(long, short = 'm', value_parser = enum_variants!(Level))]
     pub minimum_fail_level: Option<Level>,
 
     /// Set the minimum issue severity to be shown in the report.

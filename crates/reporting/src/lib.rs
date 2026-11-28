@@ -206,7 +206,7 @@ impl FromStr for Level {
 }
 
 type IssueEdits = Vec<TextEdit>;
-type IssueEditBatches = Vec<(Option<String>, IssueEdits)>;
+type IssueEditBatches = Vec<(Option<String>, Level, IssueEdits)>;
 
 /// Represents an issue identified in the code.
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -901,15 +901,16 @@ impl IssueCollection {
     /// Each batch contains all edits from a single issue along with the rule code.
     /// All edits from an issue must be applied together as a batch to maintain code validity.
     ///
-    /// Returns `HashMap<FileId, Vec<(Option<String>, IssueEdits)>>` where each tuple
-    /// is (rule_code, edits_for_that_issue).
+    /// Returns `HashMap<FileId, Vec<(Option<String>, Level, IssueEdits)>>` where each tuple
+    /// is (rule_code, level, edits_for_that_issue).
     #[must_use]
     pub fn to_edit_batches(self) -> HashMap<FileId, IssueEditBatches> {
-        let mut result: HashMap<FileId, Vec<(Option<String>, IssueEdits)>> = HashMap::default();
+        let mut result: HashMap<FileId, IssueEditBatches> = HashMap::default();
         for issue in self.issues.into_iter().filter(|issue| !issue.edits.is_empty()) {
             let code = issue.code;
+            let level = issue.level;
             for (file_id, edit_list) in issue.edits {
-                result.entry(file_id).or_default().push((code.clone(), edit_list));
+                result.entry(file_id).or_default().push((code.clone(), level, edit_list));
             }
         }
 

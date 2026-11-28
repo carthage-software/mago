@@ -52,7 +52,7 @@ exit 0
 
 ### Auto-fix and auto-format staged files
 
-This adds `--fix` to the lint step. `--fail-on-remaining` blocks the commit if any issues could not be auto-fixed and still need manual attention. Without it, `--fix` exits zero even when unfixed issues remain.
+This adds `--fix` to the lint step. `--fail-on-remaining` blocks the commit when a remaining issue is at or above the minimum fail level. The default threshold is `error`, matching `mago lint` without `--fix`. A higher bar is the existing `minimum-fail-level` setting. Without it, `--fix` exits zero even when unfixed issues remain.
 
 ```bash
 #!/bin/sh
